@@ -4,10 +4,17 @@
 **/*.seq.gz
 **/*.fastq.gz
 **/*.fasta.gz
+**/*.gbff.gz
 **/*.fastq
 **/*.fasta
+**/*.gbff
 **/*.d
 **/*.stamp
 **/ncbitaxo.tgz
 **/*.sif
+
 indexes
+bin
+tmp
+
+src/kmerasm/kmerasm
