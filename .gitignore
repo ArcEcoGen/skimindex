@@ -1,0 +1,13 @@
+**/*.log
+**/*.stdout
+**/*.stderr
+**/*.seq.gz
+**/*.fastq.gz
+**/*.fasta.gz
+**/*.fastq
+**/*.fasta
+**/*.d
+**/*.stamp
+**/ncbitaxo.tgz
+**/*.sif
+indexes
