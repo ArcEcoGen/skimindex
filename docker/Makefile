@@ -82,8 +82,10 @@ ifeq ($(RUNTIME),apptainer)
              --bind $(PROJECT_ROOT)/bin:/app/bin \
              --bind $(PROJECT_ROOT):/workspace \
              --writable-tmpfs
-  RUN_CMD    = apptainer run $(BIND) $(IMAGE_REF)
-  RUN_DEV_CMD = apptainer shell $(BIND_DEV) $(IMAGE_REF)
+  # Apptainer ignores Dockerfile ENV — use APPTAINERENV_PREPEND_PATH to inject PATH
+  APPTAINER_ENV = APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts
+  RUN_CMD     = $(APPTAINER_ENV) apptainer run   --pwd /app $(BIND) $(IMAGE_REF)
+  RUN_DEV_CMD = $(APPTAINER_ENV) apptainer shell --pwd /app $(BIND_DEV) $(IMAGE_REF)
 else
   BIND = -v $(GENBANK_DIR):/genbank \
          -v $(INDEXES_DIR):/indexes \
@@ -100,7 +102,7 @@ endif
 
 # One-shot download command per runtime (non-interactive, no TTY)
 ifeq ($(RUNTIME),apptainer)
-  DOWNLOAD_CMD = apptainer exec $(BIND) $(IMAGE_REF)
+  DOWNLOAD_CMD = $(APPTAINER_ENV) apptainer exec --pwd /app $(BIND) $(IMAGE_REF)
 else
   DOWNLOAD_CMD = $(RUNTIME) run --rm $(BIND) $(IMAGE_REF)
 endif
