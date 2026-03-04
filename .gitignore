@@ -1,3 +1,5 @@
+**/.DS_Store
+
 **/*.log
 **/*.stdout
 **/*.stderr
@@ -13,6 +15,13 @@
 **/ncbitaxo.tgz
 **/*.sif
 
+genbank
+!genbank/Makefile
+
+docker/*.oci.tar
+docker/.builder-ready
+docker/.Dockerfile.generated
+
 **/*_spectrum.txt
 **/*_stats.txt
 **/*.fof
@@ -22,4 +31,3 @@ bin
 tmp
 
 src/kmerasm/kmerasm
-genbank/Plants/plant_genomes_gbff/keep_list.txt

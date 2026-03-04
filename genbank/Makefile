@@ -29,6 +29,10 @@ SUFFIXES += .d
 NODEPS:=clean taxonomy
 DEPFILES:=$(wildcard Release_$(GBRELEASE)/depends/*.d)
 
+# Explicitly set the default goal before -include, because the first rule in
+# the generated .d file would otherwise become the default target.
+.DEFAULT_GOAL := all
+
 ifeq (0, $(words $(findstring $(MAKECMDGOALS), $(NODEPS))))
     #Chances are, these files don't exist.  GMake will create them and
     #clean up automatically afterwards
@@ -102,4 +106,4 @@ Release_$(GBRELEASE)/depends/gbfiles.d: Makefile
 
 Release_$(GBRELEASE)/taxonomy:
 	@mkdir -p $@
-	@obitaxonomy --download-ncbi
+	@cd $@ && obitaxonomy --download-ncbi
