@@ -105,9 +105,18 @@ else
   DOWNLOAD_CMD = $(RUNTIME) run --rm $(BIND) $(IMAGE_REF)
 endif
 
-.PHONY: build build-multiplatform push run run-dev \
+# Host directories that must exist before any container is started
+HOST_DIRS := $(GENBANK_DIR) $(INDEXES_DIR) $(SKIMS_DIR) $(PROCESSED_DIR)
+
+.PHONY: build build-multiplatform push run run-dev ensure-dirs \
         download_references download_genbank download_human download_plants \
         clean clean-builder help
+
+## ensure-dirs        : Create host mount directories if they do not exist
+ensure-dirs:
+	@mkdir -p $(HOST_DIRS)
+	@echo "Host directories ready:"
+	@for d in $(HOST_DIRS); do echo "  $$d"; done
 
 # Generate the Dockerfile with base image tags substituted
 $(DOCKERFILE_GEN): $(DOCKERFILE_TPL)
@@ -141,32 +150,32 @@ build-multiplatform: $(DOCKERFILE_GEN) .builder-ready
 	touch .builder-ready
 
 ## run                : Run the image (apptainer > docker > podman), mounting genbank/indexes/skims
-run:
+run: ensure-dirs
 	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
 	$(RUN_CMD)
 
 ## run-dev            : Run the image in dev mode (root, project mounted at /workspace)
-run-dev:
+run-dev: ensure-dirs
 	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
 	$(RUN_DEV_CMD)
 
 ## download_references: Download GenBank, Human and Plants references inside the container
-download_references:
+download_references: ensure-dirs
 	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
 	$(DOWNLOAD_CMD) download_references.sh
 
 ## download_genbank   : Download GenBank divisions inside the container
-download_genbank:
+download_genbank: ensure-dirs
 	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
 	$(DOWNLOAD_CMD) download_genbank.sh
 
 ## download_human     : Download the human reference genome inside the container
-download_human:
+download_human: ensure-dirs
 	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
 	$(DOWNLOAD_CMD) download_human.sh
 
 ## download_plants    : Download Spermatophyta complete assemblies inside the container
-download_plants:
+download_plants: ensure-dirs
 	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
 	$(DOWNLOAD_CMD) download_plants.sh
 
