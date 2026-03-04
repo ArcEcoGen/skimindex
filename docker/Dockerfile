@@ -55,6 +55,7 @@ RUN mkdir -p /usr/local/bin \
 COPY --from=builder /usr/local/bin/obi* /usr/local/bin
 COPY genbank/Makefile /genbank/Makefile
 COPY obiluascripts/ /app/obiluascripts/
+COPY scripts/ /app/scripts/
 
 # Install NCBI datasets CLI tools (architecture-aware) and C tools from src/
 ARG TARGETARCH

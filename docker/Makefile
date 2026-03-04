@@ -56,6 +56,14 @@ INDEXES_DIR       := $(PROJECT_ROOT)/indexes
 SKIMS_DIR         := $(PROJECT_ROOT)/skims
 PROCESSED_DIR     := $(PROJECT_ROOT)/processed_data
 
+# SIF image for apptainer (stored in images/ at the project root)
+IMAGES_DIR := $(PROJECT_ROOT)/images
+SIF_FILE   := $(IMAGES_DIR)/$(IMAGE_NAME)-$(IMAGE_TAG).sif
+
+# Apptainer cache and tmp — kept inside images/ to avoid filling /tmp
+APPTAINER_CACHEDIR ?= $(IMAGES_DIR)/.apptainer/cache
+APPTAINER_TMPDIR   ?= $(IMAGES_DIR)/.apptainer/tmp
+
 # Detect container runtime: apptainer > docker > podman
 RUNTIME := $(shell \
 	if command -v apptainer >/dev/null 2>&1; then echo apptainer; \
@@ -63,9 +71,11 @@ RUNTIME := $(shell \
 	elif command -v podman  >/dev/null 2>&1; then echo podman;    \
 	else echo none; fi)
 
-# Image reference per runtime
+# Image reference per runtime:
+#   apptainer → local SIF file (must exist; run `make pull-sif` first)
+#   docker/podman → registry image name
 ifeq ($(RUNTIME),apptainer)
-  IMAGE_REF := docker://$(FULL_IMAGE)
+  IMAGE_REF := $(SIF_FILE)
 else
   IMAGE_REF := $(FULL_IMAGE)
 endif
@@ -82,8 +92,10 @@ ifeq ($(RUNTIME),apptainer)
              --bind $(PROJECT_ROOT)/bin:/app/bin \
              --bind $(PROJECT_ROOT):/workspace \
              --writable-tmpfs
-  # Apptainer ignores Dockerfile ENV — use APPTAINERENV_PREPEND_PATH to inject PATH
-  APPTAINER_ENV = APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts
+  # Apptainer ignores Dockerfile ENV — use APPTAINERENV_* to inject environment
+  APPTAINER_ENV = APPTAINER_CACHEDIR=$(APPTAINER_CACHEDIR) \
+                  APPTAINER_TMPDIR=$(APPTAINER_TMPDIR) \
+                  APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts
   RUN_CMD     = $(APPTAINER_ENV) apptainer run   --pwd /app $(BIND) $(IMAGE_REF)
   RUN_DEV_CMD = $(APPTAINER_ENV) apptainer shell --pwd /app $(BIND_DEV) $(IMAGE_REF)
 else
@@ -110,7 +122,7 @@ endif
 # Host directories that must exist before any container is started
 HOST_DIRS := $(GENBANK_DIR) $(INDEXES_DIR) $(SKIMS_DIR) $(PROCESSED_DIR)
 
-.PHONY: build build-multiplatform push run run-dev ensure-dirs \
+.PHONY: build build-multiplatform push pull-sif run run-dev ensure-dirs \
         download_references download_genbank download_human download_plants \
         clean clean-builder help
 
@@ -119,6 +131,13 @@ ensure-dirs:
 	@mkdir -p $(HOST_DIRS)
 	@echo "Host directories ready:"
 	@for d in $(HOST_DIRS); do echo "  $$d"; done
+
+## pull-sif           : Pull the image from the registry and convert it to a local SIF file
+pull-sif:
+	@mkdir -p $(IMAGES_DIR) $(APPTAINER_CACHEDIR) $(APPTAINER_TMPDIR)
+	APPTAINER_CACHEDIR=$(APPTAINER_CACHEDIR) \
+	APPTAINER_TMPDIR=$(APPTAINER_TMPDIR) \
+	apptainer pull --force $(SIF_FILE) docker://$(FULL_IMAGE)
 
 # Generate the Dockerfile with base image tags substituted
 $(DOCKERFILE_GEN): $(DOCKERFILE_TPL)
