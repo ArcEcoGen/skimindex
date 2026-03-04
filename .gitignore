@@ -13,8 +13,13 @@
 **/ncbitaxo.tgz
 **/*.sif
 
+**/*_spectrum.txt
+**/*_stats.txt
+**/*.fof
+
 indexes
 bin
 tmp
 
 src/kmerasm/kmerasm
+genbank/Plants/plant_genomes_gbff/keep_list.txt
