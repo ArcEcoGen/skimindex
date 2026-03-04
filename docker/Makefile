@@ -98,7 +98,16 @@ else
   RUN_DEV_CMD = $(RUNTIME) run --rm -it $(BIND_DEV) $(IMAGE_REF) bash
 endif
 
-.PHONY: build build-multiplatform push run run-dev clean clean-builder help
+# One-shot download command per runtime (non-interactive, no TTY)
+ifeq ($(RUNTIME),apptainer)
+  DOWNLOAD_CMD = apptainer exec $(BIND) $(IMAGE_REF)
+else
+  DOWNLOAD_CMD = $(RUNTIME) run --rm $(BIND) $(IMAGE_REF)
+endif
+
+.PHONY: build build-multiplatform push run run-dev \
+        download_references download_genbank download_human download_plants \
+        clean clean-builder help
 
 # Generate the Dockerfile with base image tags substituted
 $(DOCKERFILE_GEN): $(DOCKERFILE_TPL)
@@ -140,6 +149,26 @@ run:
 run-dev:
 	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
 	$(RUN_DEV_CMD)
+
+## download_references: Download GenBank, Human and Plants references inside the container
+download_references:
+	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
+	$(DOWNLOAD_CMD) download_references.sh
+
+## download_genbank   : Download GenBank divisions inside the container
+download_genbank:
+	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
+	$(DOWNLOAD_CMD) download_genbank.sh
+
+## download_human     : Download the human reference genome inside the container
+download_human:
+	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
+	$(DOWNLOAD_CMD) download_human.sh
+
+## download_plants    : Download Spermatophyta complete assemblies inside the container
+download_plants:
+	@if [ "$(RUNTIME)" = "none" ]; then echo "Error: no container runtime found (apptainer/docker/podman)"; exit 1; fi
+	$(DOWNLOAD_CMD) download_plants.sh
 
 ## push               : Push the OCI archive to the Zot registry using skopeo (run build-multiplatform first)
 push: $(OCI_ARCHIVE)
