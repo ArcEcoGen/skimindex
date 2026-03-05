@@ -1,45 +1,67 @@
 SHELL := /bin/bash
-FTPNCBI=ftp.ncbi.nlm.nih.gov
-GBURL=https://$(FTPNCBI)/genbank
-GBRELEASE_URL=$(GBURL)/GB_Release_Number
 
-TAXOURL=https://$(FTPNCBI)/pub/taxonomy/taxdump.tar.gz
+FTPNCBI       := ftp.ncbi.nlm.nih.gov
+GBURL         := https://$(FTPNCBI)/genbank
+GBRELEASE_URL := $(GBURL)/GB_Release_Number
+TAXOURL       := https://$(FTPNCBI)/pub/taxonomy/taxdump.tar.gz
 
-GBRELEASE:=$(shell curl $(GBRELEASE_URL))
+# ---------- release number -----------------------------------------
+# One small request (~100 bytes) — unavoidable to know the release.
+GBRELEASE := $(shell curl -s $(GBRELEASE_URL))
 
-GBDIV_ALL:=$(shell curl -L ${GBURL} \
-                  | grep -E 'gb.+\.seq\.gz' \
-				  | sed -E 's@^.*<a href="gb([^0-9]+)[0-9]+\.seq.gz.*$$@\1@' \
-				  | sort \
-				  | uniq)
+# ---------- FTP directory listing (cached per release) -------------
+# The listing is downloaded once and stored locally.
+# All subsequent variable derivations read from this local file,
+# so re-running make never triggers additional network requests.
+GB_LISTING := Release_$(GBRELEASE)/.gb_listing
 
+# Side-effect assignment: create the cache file if it does not exist.
+# Evaluated at parse time (`:=`), before GBDIV_ALL / GBFILE_ALL below.
+_ := $(shell \
+    if [ ! -f "$(GB_LISTING)" ]; then \
+        mkdir -p "$(dir $(GB_LISTING))" && \
+        curl -s -L "$(GBURL)" > "$(GB_LISTING)" && \
+        echo "[cache] FTP listing saved: $(GB_LISTING)" >&2; \
+    fi)
+
+# ---------- division lists (derived from local cache) --------------
+empty :=
+space := $(empty) $(empty)
+
+# All divisions present in the current release (parsed from filenames).
+GBDIV_ALL := $(shell sed -nE 's/.*gb([a-z]+)[0-9]+\.seq\.gz.*/\1/p' \
+                 $(GB_LISTING) | sort -u)
+
+# Divisions to download (override on the command line if needed).
 # To clean genome skim against contaminations from:
-#   - Bacteria: bac
+#   - Bacteria: bct
 #   - Fungi: pln
-GBDIV=bct pln
-# GBDIV=bct inv mam phg pln pri rod vrl vrt
-DIRECTORIES=fasta fasta_fgs
+GBDIV := bct pln
+# GBDIV := bct inv mam phg pln pri rod vrl vrt
 
-GBFILE_ALL:=$(shell curl -L ${GBURL} \
-					| grep -E "gb($$(tr ' ' '|' <<< "${GBDIV}"))[0-9]+" \
-					| sed -E 's@^<a href="(gb.+.seq.gz)">.*$$@\1@')
+# ERE alternation pattern built from GBDIV (e.g. "bct|pln").
+GBDIV_PATTERN := $(subst $(space),|,$(GBDIV))
 
+# All matching filenames for the selected divisions.
+GBFILE_ALL := $(shell grep -oE 'gb($(GBDIV_PATTERN))[0-9]+\.seq\.gz' \
+                  $(GB_LISTING))
 
-SUFFIXES += .d
-NODEPS:=clean taxonomy
-DEPFILES:=$(wildcard Release_$(GBRELEASE)/depends/*.d)
+# ---------- dependency / stamp infrastructure ----------------------
+DIRECTORIES := fasta fasta_fgs
 
-# Explicitly set the default goal before -include, because the first rule in
-# the generated .d file would otherwise become the default target.
+SUFFIXES  += .d
+NODEPS    := clean taxonomy
+DEPFILES  := $(wildcard Release_$(GBRELEASE)/depends/*.d)
+
+# Explicitly set the default goal before -include so that the first
+# rule in a generated .d file does not become the default target.
 .DEFAULT_GOAL := all
 
 ifeq (0, $(words $(findstring $(MAKECMDGOALS), $(NODEPS))))
-    #Chances are, these files don't exist.  GMake will create them and
-    #clean up automatically afterwards
     -include $(DEPFILES)
 endif
 
-
+# ---------- top-level targets -------------------------------------
 all: depends directories FORCE
 	@make downloads
 
@@ -59,6 +81,7 @@ taxonomy: directories Release_$(GBRELEASE)/taxonomy
 
 directories: Release_$(GBRELEASE)/fasta Release_$(GBRELEASE)/stamp Release_$(GBRELEASE)/tmp
 
+# ---------- directory creation ------------------------------------
 Release_$(GBRELEASE):
 	@mkdir -p $@
 	@echo Create $@ directory
@@ -75,6 +98,7 @@ Release_$(GBRELEASE)/tmp: Release_$(GBRELEASE)
 	@mkdir -p $@
 	@echo Create $@ directory
 
+# ---------- dependency file generation ----------------------------
 Release_$(GBRELEASE)/depends/gbfiles.d: Makefile
 	@echo Create depends directory
 	@mkdir -p Release_$(GBRELEASE)/depends
@@ -102,8 +126,9 @@ Release_$(GBRELEASE)/depends/gbfiles.d: Makefile
 				echo ; \
 				done > $@ ; \
 				echo >> $@ ; \
-				echo "fasta_files: $$fasta_files" >> $@ ;
+				echo "fasta_files: $$fasta_files" >> $@
 
+# ---------- taxonomy ----------------------------------------------
 Release_$(GBRELEASE)/taxonomy:
 	@mkdir -p $@
 	@cd $@ && obitaxonomy --download-ncbi
