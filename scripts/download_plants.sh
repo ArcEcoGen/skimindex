@@ -12,10 +12,10 @@
 #   ncbi_dataset/data/assembly_data_report.jsonl
 #
 # Resume logic (checked in order):
-#   1. ZIP absent and ncbi_dataset/ absent → full download
-#   2. ZIP present, ncbi_dataset/ absent   → extract only
-#   3. ncbi_dataset/ present               → compress only
+#   1. ncbi_dataset/ present               → compress only
 #      (per-accession .gbff.gz already present → skip that accession)
+#   2. Otherwise                           → download_zip (resumes or
+#      re-downloads if corrupt) + extract_zip + compress per accession
 # ============================================================
 
 set -euo pipefail
@@ -33,34 +33,28 @@ REPORT="${DATASET_DIR}/data/assembly_data_report.jsonl"
 
 mkdir -p "$OUTPUT_DIR"
 
-# ---------- stage 1 & 2: download + extract if needed ----------
+# ---------- stage 1: download + extract if needed ----------
 
 if [[ ! -d "$DATASET_DIR" ]]; then
-    if [[ ! -f "$ZIP_FILE" ]]; then
-        echo "[1/3] Downloading complete $TAXON assemblies (latest versions)..."
-        echo "      Destination : $ZIP_FILE"
-        echo "      (This may take a long time and use tens of GB — be patient...)"
-        datasets download genome taxon "$TAXON" \
-            --assembly-level complete \
-            --assembly-version latest \
-            --include gbff \
-            --filename "$ZIP_FILE"
-        echo "[1/3] Download complete."
-    else
-        echo "[RESUME] ZIP found — skipping download."
-    fi
+    echo "[1/2] Downloading complete $TAXON assemblies (latest versions)..."
+    echo "      Destination : $ZIP_FILE"
+    echo "      (This may take a long time and use tens of GB — be patient...)"
+    download_zip "$ZIP_FILE" taxon "$TAXON" \
+        --assembly-level complete \
+        --assembly-version latest \
+        --include gbff
 
     extract_zip "$ZIP_FILE" "$OUTPUT_DIR"
     rm -f "$ZIP_FILE"
-    echo "[2/3] Extraction complete."
+    echo "[1/2] Download and extraction complete."
 else
     echo "[RESUME] ncbi_dataset/ found — skipping download and extraction."
-    rm -f "$ZIP_FILE"
+    rm -f "$ZIP_FILE" 2>/dev/null || true
 fi
 
-# ---------- stage 3: compress per accession ----------
+# ---------- stage 2: compress per accession ----------
 
-echo "[3/3] Compressing per-accession GBFF files into $OUTPUT_DIR ..."
+echo "[2/2] Compressing per-accession GBFF files into $OUTPUT_DIR ..."
 
 ACCESSIONS=()
 while IFS= read -r -d '' acc_dir; do

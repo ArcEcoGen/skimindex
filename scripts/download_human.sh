@@ -6,10 +6,11 @@
 #   {scientific_name}-{accession}.gbff.gz
 #
 # Resume logic (checked in order):
-#   1. Final .gbff.gz exists           → done, nothing to do
-#   2. ncbi_dataset/ present           → consolidate + cleanup
-#   3. ZIP present                     → extract + consolidate + cleanup
-#   4. Nothing                         → full download pipeline
+#   1. Final .gbff.gz exists  → done, nothing to do
+#   2. ncbi_dataset/ present  → consolidate (gbff_compress) + cleanup
+#   3. Otherwise              → download_zip (resumes/re-downloads as
+#                               needed) then zip_gbff_compress (stream
+#                               ZIP → pigz, no intermediate disk I/O)
 # ============================================================
 
 set -euo pipefail
@@ -71,33 +72,18 @@ if [[ -d "$DATASET_DIR" ]]; then
     exit 0
 fi
 
-# ---------- stage 3: zip present ----------
-if [[ -f "$ZIP_FILE" ]]; then
-    echo "[RESUME] ZIP found — extracting..."
-    extract_zip "$ZIP_FILE" "$OUTPUT_DIR"
-    rm -f "$ZIP_FILE"
-    consolidate_accession "${DATASET_DIR}/data/${ACCESSION}" "$ORGANISM" "$FINAL_FILE"
-    rm -rf "$DATASET_DIR"
-    exit 0
-fi
-
-# ---------- stage 4: full download ----------
-echo "[1/3] Fetching metadata for $ACCESSION..."
+# ---------- stage 3: download (or resume) + stream-compress ----------
+echo "[1/2] Fetching metadata for $ACCESSION..."
 datasets summary genome accession "$ACCESSION" --as-json-lines \
 | jq -r '"    Name      : " + .assembly_info.assembly_name,
           "    Organism  : " + .organism.organism_name,
           "    Status    : " + .assembly_info.assembly_status,
           "    Released  : " + .assembly_info.release_date'
 
-echo "[2/3] Downloading GBFF for $ACCESSION..."
+echo "[2/2] Downloading GBFF for $ACCESSION (large ~1.5 GB, be patient)..."
 echo "      Destination : $ZIP_FILE"
-echo "      (This file is large ~1.5 GB, please be patient...)"
-datasets download genome accession "$ACCESSION" \
-    --include gbff \
-    --filename "$ZIP_FILE"
+download_zip "$ZIP_FILE" accession "$ACCESSION" --include gbff
 
-echo "[3/3] Extracting and consolidating..."
-extract_zip "$ZIP_FILE" "$OUTPUT_DIR"
+echo "[compress] Streaming ZIP → $FINAL_FILE ..."
+zip_gbff_compress "$ZIP_FILE" "$FINAL_FILE"
 rm -f "$ZIP_FILE"
-consolidate_accession "${DATASET_DIR}/data/${ACCESSION}" "$ORGANISM" "$FINAL_FILE"
-rm -rf "$DATASET_DIR"
