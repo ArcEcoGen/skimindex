@@ -17,27 +17,27 @@ bind-mounted into the container at runtime — no data lives inside the image.
 |------|---------|-------------|
 | [Apptainer](https://apptainer.org) | Container runtime (HPC, preferred) | cluster nodes |
 | [Docker](https://docs.docker.com) or [Podman](https://podman.io) | Container runtime (workstation) | local machine |
-| `make` | Build and run orchestration | host |
+| `make` | Build orchestration | host (developers) |
 | `skopeo` | Push multi-arch image to registry | release only |
 
-The Makefile in `docker/` auto-detects the available runtime in priority order:
-**Apptainer > Docker > Podman**.
+### Get the entry-point script
 
-### Pull the pre-built image
+The `skimindex.sh` script is the single entry point for end users.
+It auto-detects the available runtime (**Apptainer > Docker > Podman**) and
+manages bind-mounts from the project configuration.
 
-**Apptainer (SIF format — recommended on HPC):**
+Download it from the repository or generate it with `make skimindex-script` in
+`docker/`.
+
+### Pull the container image
 
 ```bash
-cd docker/
-make pull-sif
+./skimindex.sh update
 ```
 
-The SIF file is saved to `images/skimindex-latest.sif`.
-
-**Docker / Podman:**
-
-The image is pulled automatically from the registry the first time a `make run`
-or `make download_*` target is executed.
+This pulls the latest image from the registry.  For Apptainer the SIF file is
+saved to `images/skimindex-latest.sif`; for Docker/Podman the image is cached
+locally.
 
 ### Build from source
 
@@ -69,14 +69,15 @@ skimindex/
 │   └── skimindex.toml          # pipeline configuration (mounted as /config)
 ├── docker/
 │   ├── Dockerfile              # multi-stage OCI image definition
-│   └── Makefile                # build, run and registry targets
+│   ├── Makefile                # image build and push targets
+│   └── skimindex.sh.in         # template for the user entry-point script
 ├── genbank/
 │   └── Makefile                # GenBank flat-file download and FASTA conversion
-├── images/                     # SIF files produced by `make pull-sif`
+├── images/                     # SIF files produced by `skimindex.sh update`
 ├── indexes/                    # kmindex index files (mounted as /indexes)
 ├── log/                        # pipeline log files (mounted as /log)
 ├── obiluascripts/              # Lua scripts for OBITools4
-│   └── splitseqs_31.lua        # fragment sequences at 31-mer overlap
+│   └── splitseqs_31.lua        # split sequences into overlapping fragments
 ├── genbank/                    # reference data (mounted as /genbank)
 │   ├── Human/                  # human reference genome (.gbff.gz per accession)
 │   ├── Plants/                 # plant reference genomes (.gbff.gz per accession)
@@ -88,11 +89,11 @@ skimindex/
 │           └── ncbi_taxonomy.tgz
 ├── processed_data/             # post-processed results (mounted as /processed_data)
 ├── scripts/                    # pipeline shell scripts (inside container at /app/scripts)
-│   ├── download_references.sh  # master download coordinator
 │   ├── download_genbank.sh     # download GenBank flat-file divisions
-│   ├── download_refgenome.sh   # download a genome section defined in config
-│   ├── download_human.sh       # shortcut → download_refgenome.sh --section human
-│   └── download_plants.sh      # shortcut → download_refgenome.sh --section plants
+│   ├── download_references.sh  # download all taxon genome sections defined in config
+│   ├── split_references.sh     # split reference sequences into overlapping fragments
+│   └── _download_refgenome.sh  # internal: download one genome section (called by download_references.sh)
+├── skimindex.sh                # user entry-point (generated)
 ├── skims/                      # skim input/output files (mounted as /skims)
 └── src/
     └── kmerasm/                # C tool — compute unitigs from a k-mer set
@@ -130,21 +131,17 @@ To redirect a mount point to an external storage volume, set an absolute path:
 genbank = "/data/nfs/genbank"
 ```
 
-No Makefile change is needed — the bind-mount flags are generated automatically.
+No script change is needed — the bind-mount flags are generated automatically
+from this section.
 
 ### `[logging]` — log level and file
 
 ```toml
 [logging]
-level = "INFO"               # DEBUG | INFO | WARNING | ERROR
-file  = "/log/skimindex.log" # container path; maps to log/skimindex.log on host
-```
-
-### `[directories]` — container-side data roots
-
-```toml
-[directories]
-genbank = "/genbank"   # root for all downloaded reference data inside the container
+level      = "INFO"               # DEBUG | INFO | WARNING | ERROR
+file       = "/log/skimindex.log" # container path; maps to log/skimindex.log on host
+mirror     = true                 # true → tee logs to screen AND file
+everything = true                 # true → also redirect all stderr to the log
 ```
 
 ### `[genbank]` — GenBank flat-file divisions
@@ -155,15 +152,29 @@ divisions = "bct pln"   # space-separated two-letter division codes
                         # Full list: bct inv mam phg pln pri rod vrl vrt
 ```
 
+### `[decontamination]` — fragment and index parameters
+
+```toml
+[decontamination]
+kmer_size = 29    # k-mer size for decontamination indices
+frg_size  = 200   # fragment length (bp) when splitting reference sequences
+batches   = 20    # number of output batch files per reference section
+```
+
+The overlap between consecutive fragments is computed automatically as
+`kmer_size - 1`, ensuring every k-mer spanning a fragment boundary appears in at
+least one fragment.
+
 ### Genome sections — one TOML section per reference target
 
-Any section that contains a `taxon` key is treated as a genome download target.
-The section name is used as an identifier (passed to `--section`).
+Two types of genome sections are supported:
+
+**Taxon sections** — sequences downloaded via NCBI datasets (must have a `taxon` key):
 
 ```toml
 [human]
 taxon            = "human"
-directory        = "Human"       # relative to [directories].genbank → /genbank/Human
+directory        = "Human"       # relative to /genbank → /genbank/Human
 reference        = true          # pass --reference filter to NCBI datasets
 assembly_source  = "refseq"      # refseq | genbank
 assembly_level   = "chromosome"  # complete | chromosome | scaffold | contig
@@ -177,49 +188,61 @@ assembly_level   = "complete"
 assembly_version = "latest"
 ```
 
+**Division sections** — sequences filtered from GenBank flat files
+(must have both `taxid` and `divisions` keys):
+
+```toml
+[fungi]
+taxid     = 4751    # NCBI taxon ID
+divisions = "pln"   # GenBank division(s) to search
+directory = "Fungi"
+
+[bacteria]
+taxid     = 1       # root (all bacteria via bct division)
+divisions = "bct"
+directory = "Bacteria"
+```
+
 Reserved section names (never treated as genome targets):
-`logging`, `local_directories`, `directories`, `genbank`.
+`logging`, `local_directories`, `genbank`.
 
 ---
 
 ## Usage
 
-All commands are run from the `docker/` directory.
-Scripts inside the container are available directly by name (no path prefix needed)
-because `/app/scripts` is on `$PATH`.
+### Initialise a new project
 
 ```bash
-cd docker/
+./skimindex.sh init
 ```
+
+Creates the directory structure and downloads the default `config/skimindex.toml`.
 
 ### Interactive shell
 
 ```bash
-make run        # production shell
-make run-dev    # development shell (source tree mounted at /workspace)
+./skimindex.sh shell                        # production shell
+./skimindex.sh shell --mount SRC:DST ...   # with extra bind-mounts
 ```
 
 ### Install genome data
 
-#### Download reference data
-
 Download everything configured in `skimindex.toml` in a single step:
 
 ```bash
-make download_references
+./skimindex.sh download_references
 ```
 
 Or run individual steps:
 
 ```bash
-make download_genbank    # GenBank flat-file divisions (bct, pln, …)
-make download_human      # human reference genome (RefSeq, chromosome level)
-make download_plants     # Spermatophyta complete assemblies
+./skimindex.sh download_genbank      # GenBank flat-file divisions (bct, pln, …)
+./skimindex.sh download_references   # all taxon sections defined in config
 ```
 
-All download scripts support `--help` for detailed usage.
+All subcommands support `--help` for detailed usage.
 
-##### GenBank flat files
+#### GenBank flat files
 
 The `download_genbank.sh` script drives `genbank/Makefile` in a retry loop,
 re-running `make` as long as new stamp files appear (network failures are
@@ -236,72 +259,30 @@ Release_<N>/
     └── ncbi_taxonomy.tgz
 ```
 
-To download additional divisions without editing the config:
+#### Reference genomes (taxon sections)
+
+`download_references` iterates over all taxon sections defined in `skimindex.toml`
+and downloads one `{organism}-{accession}.gbff.gz` file per accession.
+
+To add a new genome target, add a `taxon` section to `skimindex.toml` and run:
 
 ```bash
-# Inside the container:
-download_genbank.sh --divisions "bct pln pri"
-
-# Or via make:
-make download_genbank
-# (set divisions in config/skimindex.toml [genbank] section)
+./skimindex.sh download_references   # picks up all sections automatically
 ```
 
-##### Reference genomes (human, plants, custom)
+### Split reference sequences
 
-`download_refgenome.sh` downloads all assemblies matching the filters for a
-given taxon and produces one `{organism}-{accession}.gbff.gz` file per accession:
+Fragment reference sequences into overlapping windows for k-mer index building:
 
 ```bash
-# Inside the container:
-download_refgenome.sh --section human
-download_refgenome.sh --section plants
-download_refgenome.sh --taxon "Fungi" --output /genbank/Fungi \
-                      --assembly-level complete
+./skimindex.sh split_references                   # all sections
+./skimindex.sh split_references --section human   # single section
 ```
 
-To add a new genome target, add a section to `skimindex.toml` and run:
+Output files are written to `<processed_data>/<section_directory>/fragments/frg_<N>.fasta.gz`.
 
-```bash
-make download_references   # picks up all sections automatically
-```
-
-### Decontamination filter
-
-> **Note:** the decontamination workflow is partially automated.
-> The steps below may require manual intervention or HPC job submission.
-
-#### Preparing references
-
-> *Not yet automated — see DEV.md for current manual procedure.*
-
-The reference FASTA files must be fragmented into overlapping 200 bp windows
-before indexing, using `obiluascripts/splitseqs_31.lua` (31-mer overlap):
-
-```bash
-# Inside the container (example for human):
-obiscript -S /app/obiluascripts/splitseqs_31.lua \
-          /genbank/Human/*.gbff.gz \
-| obigrep -v -s '^n+$' \
-| obidistribute -Z -n 20 \
-               -p /genbank/Human/fragments/human_genome_frg_%s.fasta.gz
-```
-
-K-mer counts are needed to size the Bloom filter:
-
-```bash
-ntcard -k 31 -o /genbank/Human/human_kmer_spectrum.txt \
-       /genbank/Human/*.gbff.gz 2>&1 | head -2 \
-       > /genbank/Human/human_kmer_stats.txt
-```
-
-#### Decontaminate genomes
-
-> *Not yet automated.*
-
-Once fragment files and k-mer counts are available, build a kmindex index
-and run decontamination queries against the index.
-Refer to `DEV.md` and the kmindex documentation for current procedure.
+The fragmentation is performed by `obiluascripts/splitseqs_31.lua`, controlled
+by the `[decontamination]` configuration section.
 
 ---
 

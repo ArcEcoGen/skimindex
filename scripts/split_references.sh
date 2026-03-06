@@ -95,7 +95,7 @@ _genbank_release_dir() {
 _do_split() {
     local fragments_dir="$1"
     FRAGMENT_SIZE="$FRG_SIZE" OVERLAP="$OVERLAP" \
-    obiscript -S /app/obiluascripts/splitseqs_31.lua \
+    obiscript -S /app/obiluascripts/splitseqs.lua \
     | obigrep -v -s '^[Nn]+$' \
     | obidistribute -Z -n "$BATCHES" \
                     -p "${fragments_dir}/frg_%s.fasta.gz"

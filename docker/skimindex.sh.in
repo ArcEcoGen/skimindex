@@ -326,6 +326,7 @@ case "$SUBCMD" in
         ;;
     shell)
         if [[ "$RUNTIME" == "none" ]]; then
+
             logerror "No container runtime found (apptainer, docker or podman required)."
             exit 1
         fi

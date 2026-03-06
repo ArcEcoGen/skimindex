@@ -71,6 +71,7 @@ COPY config/ /config/
 
 RUN chmod +x /usr/local/bin/obi* \
              /app/scripts/[A-Za-z]*.sh \
+             /app/scripts/_[A-Za-z]*.sh \
     && find /tmp/src-built -maxdepth 2 -type f -executable -exec cp {} /app/bin/ \; \
     && rm -rf /tmp/src-built
 

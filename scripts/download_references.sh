@@ -108,7 +108,7 @@ fi
 
 if [[ -n "$DO_SECTION" ]]; then
     run_step "Genome: $DO_SECTION" \
-        "${SCRIPT_DIR}/download_refgenome.sh" --section "$DO_SECTION"
+        "${SCRIPT_DIR}/_download_refgenome.sh" --section "$DO_SECTION"
 fi
 
 # ---------- all genome sections ----------
@@ -121,7 +121,7 @@ if $DO_ALL_SECTIONS; then
     else
         for section in "${GENOME_SECTIONS[@]}"; do
             run_step "Genome: $section" \
-                "${SCRIPT_DIR}/download_refgenome.sh" --section "$section"
+                "${SCRIPT_DIR}/_download_refgenome.sh" --section "$section"
         done
     fi
 fi

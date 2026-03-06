@@ -17,14 +17,14 @@
 # Subcommands:
 #   init                     Initialise a new project directory and download the default config.
 #   update                   Pull the latest container image from the registry (or refresh the SIF for apptainer).
-#   shell [--mount SRC:DST]  Start an interactive shell inside the container.
-#                            --mount may be repeated for multiple extra bind-mounts.
+#   shell                    Start an interactive shell inside the container.
 #   download_genbank         Download GenBank flat-file divisions and convert them to
-#   download_human           Downloads the human reference genome (GBFF) from NCBI.
-#   download_plants          Downloads Spermatophyta genome assemblies from NCBI.
 #   download_references      Master script for the reference data pipeline.
-#   download_refgenome       Downloads genome assemblies from NCBI for a given taxon and
 #   split_references         Split reference genome sequences into overlapping fragments
+#
+# shell options:
+#   --mount SRC:DST      Bind-mount SRC (host) to DST (container).
+#                        May be repeated for multiple extra mounts.
 #
 # Configuration:
 #   <project-dir>/config/skimindex.toml
@@ -474,6 +474,7 @@ case "$SUBCMD" in
         ;;
     shell)
         if [[ "$RUNTIME" == "none" ]]; then
+
             logerror "No container runtime found (apptainer, docker or podman required)."
             exit 1
         fi
@@ -512,17 +513,8 @@ case "$SUBCMD" in
     download_genbank)
         _ski_run_exec download_genbank.sh "$@"
         ;;
-    download_human)
-        _ski_run_exec download_human.sh "$@"
-        ;;
-    download_plants)
-        _ski_run_exec download_plants.sh "$@"
-        ;;
     download_references)
         _ski_run_exec download_references.sh "$@"
-        ;;
-    download_refgenome)
-        _ski_run_exec download_refgenome.sh "$@"
         ;;
     split_references)
         _ski_run_exec split_references.sh "$@"

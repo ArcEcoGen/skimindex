@@ -124,7 +124,7 @@ user_scripts() {
     for f in "${SCRIPTS_DIR}"/*.sh; do
         [[ -f "$f" ]] || continue
         base="$(basename "$f")"
-        [[ "$base" == __* ]] && continue
+        [[ "$base" == _* ]] && continue   # _ prefix: internal; __ prefix: library
         printf '%s\n' "$base"
     done | sort
 }
