@@ -310,17 +310,36 @@ GITHUB_RAW_URL ?= https://raw.githubusercontent.com/metabarcoding/skimindex/main
 
 # SKIMINDEX_SH    : Generated standalone user script (project root).
 # SKIMINDEX_SH_IN : Source template inside the scripts/ directory.
-SKIMINDEX_SH    := $(PROJECT_ROOT)/skimindex.sh
-SKIMINDEX_SH_IN := $(PROJECT_ROOT)/scripts/skimindex.sh.in
+SKIMINDEX_SH      := $(PROJECT_ROOT)/skimindex.sh
+SKIMINDEX_SH_IN   := $(PROJECT_ROOT)/docker/skimindex.sh.in
 BUILD_USER_SCRIPT := $(PROJECT_ROOT)/docker/build_user_script.sh
 
 # =============================================================================
 # Targets
 # =============================================================================
 
-.PHONY: build build-multiplatform push pull-sif run run-dev ensure-dirs \
+.PHONY: all build build-multiplatform push pull-sif run run-dev ensure-dirs \
         download_references download_genbank download_human download_plants \
         skimindex-script clean clean-builder help
+
+## all                : Build multi-platform image, push to registry, generate skimindex.sh
+all: build-multiplatform push skimindex-script
+
+## skimindex-script   : Generate the standalone user entry-point skimindex.sh
+skimindex-script: $(SKIMINDEX_SH)
+
+$(SKIMINDEX_SH): $(SKIMINDEX_SH_IN) $(BUILD_USER_SCRIPT) \
+                 $(PROJECT_ROOT)/scripts/__utils_functions.sh \
+                 $(wildcard $(PROJECT_ROOT)/scripts/*.sh)
+	bash $(BUILD_USER_SCRIPT) \
+		--root    $(PROJECT_ROOT) \
+		--set     IMAGE_REGISTRY=$(REGISTRY) \
+		--set     IMAGE_NAME=$(IMAGE_NAME) \
+		--set     IMAGE_TAG=$(IMAGE_TAG) \
+		--set     GITHUB_RAW_URL=$(GITHUB_RAW_URL) \
+		$(SKIMINDEX_SH_IN) > $@
+	chmod +x $@
+	@echo "Generated: $@"
 
 ## ensure-dirs        : Create host mount directories if they do not exist
 ensure-dirs:

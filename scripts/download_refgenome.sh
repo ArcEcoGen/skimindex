@@ -54,7 +54,7 @@ OPT_ASSEMBLY_VERSION=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)
-            sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+            sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
             exit 0
             ;;
         --section)          SECTION="$2";              shift 2 ;;
@@ -91,7 +91,7 @@ if [[ -n "$SECTION" ]]; then
     if [[ -z "$OUTPUT_DIR" ]]; then
         rel_var="SKIMINDEX__${SECTION_UP}__DIRECTORY"
         genbank_var="SKIMINDEX__DIRECTORIES__GENBANK"
-        _genbank_root="${!genbank_var:-/genbank}"
+        _genbank_root="${!genbank_var}"
         _rel_dir="${!rel_var:-${SECTION,,}}"
         OUTPUT_DIR="${_genbank_root}/${_rel_dir}"
         unset _genbank_root _rel_dir

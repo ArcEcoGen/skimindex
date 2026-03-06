@@ -48,13 +48,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"     # project root = parent of docker/
 SCRIPTS_DIR=""                      # resolved below
-TEMPLATE="skimindex.sh.in"
+TEMPLATE="${SCRIPT_DIR}/skimindex.sh.in"   # default template
+_template_explicit=0                # set to 1 when given as positional arg
 declare -A SUBSTITUTIONS
 
-SUBSTITUTIONS["IMAGE_REGISTRY"]=""
-SUBSTITUTIONS["IMAGE_REGISTRY"]=""
-SUBSTITUTIONS["IMAGE_REGISTRY"]=""
-
+# Built-in defaults (overridable via --set)
 SUBSTITUTIONS["GITHUB_RAW_URL"]="https://raw.githubusercontent.com/ArcEcoGen/skimindex/refs/heads/main"
 
 # ---------------------------------------------------------------------------
@@ -63,7 +61,7 @@ SUBSTITUTIONS["GITHUB_RAW_URL"]="https://raw.githubusercontent.com/ArcEcoGen/ski
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
-            sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+            sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
             exit 0
             ;;
         --root)        ROOT="$2";        shift 2 ;;
@@ -80,16 +78,20 @@ while [[ $# -gt 0 ]]; do
             ;;
         -*) echo "Error: unknown option '$1'" >&2; exit 1 ;;
         *)
-            [[ -n "$TEMPLATE" ]] && { echo "Error: unexpected argument '$1'" >&2; exit 1; }
-            TEMPLATE="$1"; shift
+            (( _template_explicit )) && { echo "Error: unexpected argument '$1'" >&2; exit 1; }
+            TEMPLATE="$1"; _template_explicit=1; shift
             ;;
     esac
 done
 
-[[ -z "$TEMPLATE" ]] && { echo "Error: no template file specified." >&2; exit 1; }
 [[ -f "$TEMPLATE" ]] || { echo "Error: template not found: $TEMPLATE" >&2; exit 1; }
 
 SCRIPTS_DIR="${SCRIPTS_DIR:-${ROOT}/scripts}"
+
+# Derive FULL_IMAGE from components (unless explicitly overridden via --set)
+if [[ -z "${SUBSTITUTIONS[FULL_IMAGE]+x}" ]]; then
+    SUBSTITUTIONS["FULL_IMAGE"]="${SUBSTITUTIONS[IMAGE_REGISTRY]}/${SUBSTITUTIONS[IMAGE_NAME]}:${SUBSTITUTIONS[IMAGE_TAG]}"
+fi
 
 # ---------------------------------------------------------------------------
 # strip_guard <file>
@@ -157,6 +159,8 @@ generate_subcommands_list() {
     # Built-in subcommands first
     printf '#   %-24s %s\n' "init" \
         "Initialise a new project directory and download the default config."
+    printf '#   %-24s %s\n' "update" \
+        "Pull the latest container image from the registry (or refresh the SIF for apptainer)."
     printf '#   %-24s %s\n' "shell" \
         "Start an interactive shell inside the container."
 

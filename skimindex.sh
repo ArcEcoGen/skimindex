@@ -9,17 +9,21 @@
 #   --project-dir DIR    Project root directory (default: current working
 #                        directory).  All relative paths in the configuration
 #                        are resolved from this directory.
+#   --local              Use the locally cached image without checking the
+#                        registry for updates (docker/podman only; apptainer
+#                        always uses the local SIF file).
 #   -h, --help           Show this help and exit.
 #
 # Subcommands:
 #   init                     Initialise a new project directory and download the default config.
+#   update                   Pull the latest container image from the registry (or refresh the SIF for apptainer).
 #   shell                    Start an interactive shell inside the container.
 #   download_genbank         Download GenBank flat-file divisions and convert them to
 #   download_human           Downloads the human reference genome (GBFF) from NCBI.
 #   download_plants          Downloads Spermatophyta genome assemblies from NCBI.
 #   download_references      Master script for the reference data pipeline.
 #   download_refgenome       Downloads genome assemblies from NCBI for a given taxon and
-#   split_human              
+#   split_references         Split reference genome sequences into overlapping fragments
 #
 # Configuration:
 #   <project-dir>/config/skimindex.toml
@@ -29,9 +33,9 @@
 # Container runtime:
 #   Auto-detected in priority order: apptainer > docker > podman.
 #   Apptainer uses the local SIF image:
-#       <project-dir>/images/@@IMAGE_NAME@@-@@IMAGE_TAG@@.sif
+#       <project-dir>/images/skimindex-latest.sif
 #   Docker / Podman pull the image from the registry on first use:
-#       @@FULL_IMAGE@@
+#       registry.metabarcoding.org/arcecogen/skimindex:latest
 # =============================================================================
 set -euo pipefail
 
@@ -82,20 +86,16 @@ LOG_LEVEL=$LOG_INFO_LEVEL
 
 exec 3>&2
 
-# ---------- VT100 color codes (empty when fd 3 is not a terminal) ----------
+# ---------- VT100 color codes (always defined as constants) ----------
+# Colors are always embedded in log messages; openlogfile strips them via sed
+# when writing to a file, so the file stays clean while the screen keeps colors.
 
-_log_color() {
-    [ -t 3 ] && printf '%s' "$1" || true
-}
-
-_LOG_RESET=$(   _log_color $'\033[0m'    )
-_LOG_CYAN=$(    _log_color $'\033[0;36m' )   # DEBUG
-_LOG_GREEN=$(   _log_color $'\033[0;32m' )   # INFO
-_LOG_YELLOW=$(  _log_color $'\033[0;33m' )   # WARNING
-_LOG_RED=$(     _log_color $'\033[1;31m' )   # ERROR
-_LOG_DIM=$(     _log_color $'\033[2m'    )   # timestamp / host dimmed
-
-unset -f _log_color
+_LOG_RESET=$'\033[0m'
+_LOG_CYAN=$'\033[0;36m'    # DEBUG
+_LOG_GREEN=$'\033[0;32m'   # INFO
+_LOG_YELLOW=$'\033[0;33m'  # WARNING
+_LOG_RED=$'\033[1;31m'     # ERROR
+_LOG_DIM=$'\033[2m'        # timestamp / host dimmed
 
 # ---------- internal formatter ----------
 
@@ -145,22 +145,44 @@ function setloglevel() {
 # ---------- logfile management ----------
 
 function openlogfile() {
-    if [[ "${2:-}" == "STDERR" ]]; then
-        exec 3> >(tee -a "$1" >&2)
-    else
-        exec 3>> "$1"
+    local logpath="$1"
+    local mirror="${2:-false}"      # "true" → tee logs to screen + file
+    local everything="${3:-false}"  # "true" → also redirect fd 2 (all stderr) through fd 3
+    # Test write access before redirecting fd 3 (avoids set -e crash).
+    # Use touch rather than >> to avoid bash printing a redirection error
+    # to stderr even when the failure is handled.
+    if ! touch "$logpath" 2>/dev/null; then
+        logwarning "cannot open log file: $logpath — logging to stderr only."
+        return 0
     fi
-    LOGFILE="$1"
-}
-
-function logstderrtoo() {
-    [[ -n "${LOGFILE:-}" ]] && openlogfile "${LOGFILE}" STDERR
+    if [[ "$mirror" == "true" ]]; then
+        # fd 3 → tee:
+        #   - to screen via fd 2 (colors intact)
+        #   - to file via sed (VT100 codes stripped)
+        exec 3> >(tee >(sed 's/\x1b\[[0-9;]*m//g' >> "$logpath") >&2)
+    else
+        # fd 3 → file only (VT100 codes stripped)
+        exec 3> >(sed 's/\x1b\[[0-9;]*m//g' >> "$logpath")
+    fi
+    if [[ "$everything" == "true" ]]; then
+        # fd 2 → fd 3: all stderr (bash errors, command output) also captured
+        # NOTE: tee's >&2 is evaluated at fork time (before this exec),
+        # so it keeps pointing to the original screen fd — no loop.
+        exec 2>&3
+        LOGEVERYTHING=1
+    fi
+    LOGFILE="$logpath"
 }
 
 function closelogfile() {
     if [[ -n "${LOGFILE:-}" ]]; then
-        exec 3>&-
-        exec 3>&2
+        # Restore fd 2 only if it was redirected (everything=true)
+        if [[ -n "${LOGEVERYTHING:-}" ]]; then
+            exec 2>/dev/tty 2>/dev/null || exec 2>&1
+            unset LOGEVERYTHING
+        fi
+        exec 3>&-   # close log fd
+        exec 3>&2   # restore fd 3 to stderr
         LOGFILE=""
     fi
 }
@@ -168,19 +190,22 @@ function closelogfile() {
 # =============================================================================
 # Image identity  (substituted at build time by docker/build_user_script.sh)
 # =============================================================================
-_SKI_IMAGE_REGISTRY=""
-_SKI_IMAGE_NAME="@@IMAGE_NAME@@"
-_SKI_IMAGE_TAG="@@IMAGE_TAG@@"
+_SKI_IMAGE_REGISTRY="registry.metabarcoding.org/arcecogen"
+_SKI_IMAGE_NAME="skimindex"
+_SKI_IMAGE_TAG="latest"
 
 # URL of the raw skimindex.toml in the source repository (used by `init`).
-_SKI_CONFIG_URL="https://raw.githubusercontent.com/ArcEcoGen/skimindex/refs/heads/main/config/skimindex.toml"
+_SKI_CONFIG_URL="https://raw.githubusercontent.com/metabarcoding/skimindex/main/config/skimindex.toml"
 
 # =============================================================================
 # Project root — defaults to current working directory
 # =============================================================================
 PROJECT_ROOT="$PWD"
+_SKI_LOCAL=0   # set to 1 by --local; disables --pull always for docker/podman
 
-# Parse --project-dir (and -h/--help) before the subcommand
+# Parse global options before the subcommand.
+# Stop option processing at the first non-option argument (the subcommand)
+# so that options belonging to the subcommand (e.g. --help) are not consumed.
 _remaining_args=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -188,11 +213,20 @@ while [[ $# -gt 0 ]]; do
             PROJECT_ROOT="$(cd "$2" && pwd)"; shift 2 ;;
         --project-dir=*)
             PROJECT_ROOT="$(cd "${1#--project-dir=}" && pwd)"; shift ;;
+        --local)
+            _SKI_LOCAL=1; shift ;;
         -h|--help)
-            sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+            sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
             exit 0 ;;
+        --)
+            shift; _remaining_args+=("$@"); break ;;
+        -*)
+            logerror "Unknown global option: $1"
+            logerror "Run '$(basename "$0") --help' for usage."
+            exit 1 ;;
         *)
-            _remaining_args+=("$1"); shift ;;
+            # First non-option arg is the subcommand — stop global parsing
+            _remaining_args+=("$@"); break ;;
     esac
 done
 set -- "${_remaining_args[@]+"${_remaining_args[@]}"}"
@@ -268,13 +302,18 @@ _ski_run_interactive() {
     _ski_ensure_dirs
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
+    local pull_flag=()
+    (( _SKI_LOCAL )) || pull_flag=(--pull always)
     if [[ "$RUNTIME" == "apptainer" ]]; then
+        if (( ! _SKI_LOCAL )) && _ski_apptainer_needs_update; then
+            logwarning "A newer image is available. Run '$(basename "$0") update' to refresh."
+        fi
         _ski_build_bind_array "--bind"
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer run --pwd /app "${BIND[@]}" "$SIF_FILE"
     else
         _ski_build_bind_array "-v"
-        "$RUNTIME" run --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE"
+        "$RUNTIME" run "${pull_flag[@]}" --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE"
     fi
 }
 
@@ -282,13 +321,87 @@ _ski_run_exec() {
     _ski_ensure_dirs
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
+    local pull_flag=()
+    (( _SKI_LOCAL )) || pull_flag=(--pull always)
     if [[ "$RUNTIME" == "apptainer" ]]; then
+        if (( ! _SKI_LOCAL )) && _ski_apptainer_needs_update; then
+            logwarning "A newer image is available. Run '$(basename "$0") update' to refresh."
+        fi
         _ski_build_bind_array "--bind"
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" "$@"
     else
         _ski_build_bind_array "-v"
-        "$RUNTIME" run --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
+        "$RUNTIME" run "${pull_flag[@]}" --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
+    fi
+}
+
+# =============================================================================
+# update subcommand — pull the latest image
+# =============================================================================
+
+# _ski_registry_digest <registry> <name> <tag>
+#   Query the OCI registry for the current digest of <name>:<tag>.
+#   Tries both OCI and Docker v2 manifest media types.
+#   Outputs the digest (sha256:…) on success, empty string on failure.
+_ski_registry_digest() {
+    local registry="$1" name="$2" tag="$3"
+    local url="https://${registry}/v2/${name}/manifests/${tag}"
+    local digest=""
+    if command -v curl >/dev/null 2>&1; then
+        digest=$(curl -fsSL --connect-timeout 5 \
+            -H "Accept: application/vnd.oci.image.index.v1+json" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+            -D - "$url" 2>/dev/null \
+            | grep -i '^docker-content-digest:' \
+            | head -1 \
+            | tr -d '\r' \
+            | sed 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*//')
+    fi
+    printf '%s' "$digest"
+}
+
+# _ski_apptainer_needs_update
+#   Returns 0 (true) when the registry digest differs from the locally cached
+#   digest, or when the SIF file is absent.  Returns 1 when up-to-date or
+#   when the registry cannot be reached (offline mode).
+_ski_apptainer_needs_update() {
+    local digest_file="${SIF_FILE%.sif}.digest"
+    [[ -f "$SIF_FILE" ]] || return 0   # no SIF → must pull
+
+    local remote_digest
+    remote_digest=$(_ski_registry_digest \
+        "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
+    [[ -z "$remote_digest" ]] && return 1   # offline / unreachable → skip
+
+    local local_digest=""
+    [[ -f "$digest_file" ]] && local_digest="$(cat "$digest_file")"
+
+    [[ "$remote_digest" != "$local_digest" ]]
+}
+
+_ski_update() {
+    local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
+    if [[ "$RUNTIME" == "apptainer" ]]; then
+        local sif_dir digest_file
+        sif_dir="$(dirname "$SIF_FILE")"
+        digest_file="${SIF_FILE%.sif}.digest"
+        mkdir -p "$sif_dir"
+        loginfo "Pulling latest SIF from docker://${_SKI_FULL_IMAGE}"
+        loginfo "Destination: $SIF_FILE"
+        apptainer pull --force "$SIF_FILE" "docker://${_SKI_FULL_IMAGE}"
+        # Record the remote digest so future checks can skip unnecessary pulls
+        local remote_digest
+        remote_digest=$(_ski_registry_digest \
+            "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
+        [[ -n "$remote_digest" ]] && printf '%s' "$remote_digest" > "$digest_file"
+        loginfo "SIF updated: $SIF_FILE"
+    else
+        loginfo "Pulling latest image: ${_SKI_FULL_IMAGE}"
+        "$RUNTIME" pull "$_SKI_FULL_IMAGE"
+        loginfo "Image updated."
     fi
 }
 
@@ -330,7 +443,7 @@ _ski_init() {
 # Subcommand dispatch
 # =============================================================================
 if [[ $# -eq 0 ]]; then
-    sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+    sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
     exit 0
 fi
 
@@ -338,11 +451,19 @@ SUBCMD="$1"; shift
 
 case "$SUBCMD" in
     -h|--help)
-        sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+        sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
         exit 0
         ;;
     init)
         _ski_init "$@"
+        exit 0
+        ;;
+    update)
+        if [[ "$RUNTIME" == "none" ]]; then
+            logerror "No container runtime found (apptainer, docker or podman required)."
+            exit 1
+        fi
+        _ski_update
         exit 0
         ;;
     shell)
@@ -387,8 +508,8 @@ case "$SUBCMD" in
     download_refgenome)
         _ski_run_exec download_refgenome.sh "$@"
         ;;
-    split_human)
-        _ski_run_exec split_human.sh "$@"
+    split_references)
+        _ski_run_exec split_references.sh "$@"
         ;;
     *)
         logerror "Unknown subcommand '$SUBCMD'."

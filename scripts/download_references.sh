@@ -40,7 +40,7 @@ GENBANK_DIR=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)
-            sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+            sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
             exit 0
             ;;
         --list)         LIST_MODE=true;        shift   ;;
@@ -66,19 +66,17 @@ if ! $DO_GENBANK && ! $DO_ALL_SECTIONS && [[ -z "$DO_SECTION" ]] \
     DO_ALL_SECTIONS=true
 fi
 
-GENBANK_DIR="${GENBANK_DIR:-${SKIMINDEX__DIRECTORIES__GENBANK:-/genbank}}"
+GENBANK_DIR="${GENBANK_DIR:-${SKIMINDEX__DIRECTORIES__GENBANK}}"
 
 # ---------- info-only modes (print and exit) ----------
 
 if $LIST_MODE; then
-    sections="${SKIMINDEX__GENOME_SECTIONS:-}"
-    echo "${sections// /,}"
+    echo "${SKIMINDEX__TAXON_SECTIONS// /,}"
     exit 0
 fi
 
 if $GENBANK_DIV_MODE; then
-    divisions="${SKIMINDEX__GENBANK__DIVISIONS:-bct pln}"
-    echo "${divisions// /,}"
+    echo "${SKIMINDEX__GENBANK__DIVISIONS// /,}"
     exit 0
 fi
 
@@ -116,7 +114,7 @@ fi
 # ---------- all genome sections ----------
 
 if $DO_ALL_SECTIONS; then
-    read -r -a GENOME_SECTIONS <<< "${SKIMINDEX__GENOME_SECTIONS:-}"
+    read -r -a GENOME_SECTIONS <<< "${SKIMINDEX__TAXON_SECTIONS}"
 
     if [[ ${#GENOME_SECTIONS[@]} -eq 0 ]]; then
         logwarning "No genome sections found in config — nothing to download."

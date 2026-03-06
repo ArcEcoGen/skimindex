@@ -9,6 +9,9 @@
 #   --project-dir DIR    Project root directory (default: current working
 #                        directory).  All relative paths in the configuration
 #                        are resolved from this directory.
+#   --local              Use the locally cached image without checking the
+#                        registry for updates (docker/podman only; apptainer
+#                        always uses the local SIF file).
 #   -h, --help           Show this help and exit.
 #
 # Subcommands:
@@ -47,8 +50,11 @@ _SKI_CONFIG_URL="@@GITHUB_RAW_URL@@/config/skimindex.toml"
 # Project root — defaults to current working directory
 # =============================================================================
 PROJECT_ROOT="$PWD"
+_SKI_LOCAL=0   # set to 1 by --local; disables --pull always for docker/podman
 
-# Parse --project-dir (and -h/--help) before the subcommand
+# Parse global options before the subcommand.
+# Stop option processing at the first non-option argument (the subcommand)
+# so that options belonging to the subcommand (e.g. --help) are not consumed.
 _remaining_args=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -56,11 +62,20 @@ while [[ $# -gt 0 ]]; do
             PROJECT_ROOT="$(cd "$2" && pwd)"; shift 2 ;;
         --project-dir=*)
             PROJECT_ROOT="$(cd "${1#--project-dir=}" && pwd)"; shift ;;
+        --local)
+            _SKI_LOCAL=1; shift ;;
         -h|--help)
-            sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+            sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
             exit 0 ;;
+        --)
+            shift; _remaining_args+=("$@"); break ;;
+        -*)
+            logerror "Unknown global option: $1"
+            logerror "Run '$(basename "$0") --help' for usage."
+            exit 1 ;;
         *)
-            _remaining_args+=("$1"); shift ;;
+            # First non-option arg is the subcommand — stop global parsing
+            _remaining_args+=("$@"); break ;;
     esac
 done
 set -- "${_remaining_args[@]+"${_remaining_args[@]}"}"
@@ -136,13 +151,18 @@ _ski_run_interactive() {
     _ski_ensure_dirs
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
+    local pull_flag=()
+    (( _SKI_LOCAL )) || pull_flag=(--pull always)
     if [[ "$RUNTIME" == "apptainer" ]]; then
+        if (( ! _SKI_LOCAL )) && _ski_apptainer_needs_update; then
+            logwarning "A newer image is available. Run '$(basename "$0") update' to refresh."
+        fi
         _ski_build_bind_array "--bind"
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer run --pwd /app "${BIND[@]}" "$SIF_FILE"
     else
         _ski_build_bind_array "-v"
-        "$RUNTIME" run --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE"
+        "$RUNTIME" run "${pull_flag[@]}" --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE"
     fi
 }
 
@@ -150,13 +170,87 @@ _ski_run_exec() {
     _ski_ensure_dirs
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
+    local pull_flag=()
+    (( _SKI_LOCAL )) || pull_flag=(--pull always)
     if [[ "$RUNTIME" == "apptainer" ]]; then
+        if (( ! _SKI_LOCAL )) && _ski_apptainer_needs_update; then
+            logwarning "A newer image is available. Run '$(basename "$0") update' to refresh."
+        fi
         _ski_build_bind_array "--bind"
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" "$@"
     else
         _ski_build_bind_array "-v"
-        "$RUNTIME" run --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
+        "$RUNTIME" run "${pull_flag[@]}" --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
+    fi
+}
+
+# =============================================================================
+# update subcommand — pull the latest image
+# =============================================================================
+
+# _ski_registry_digest <registry> <name> <tag>
+#   Query the OCI registry for the current digest of <name>:<tag>.
+#   Tries both OCI and Docker v2 manifest media types.
+#   Outputs the digest (sha256:…) on success, empty string on failure.
+_ski_registry_digest() {
+    local registry="$1" name="$2" tag="$3"
+    local url="https://${registry}/v2/${name}/manifests/${tag}"
+    local digest=""
+    if command -v curl >/dev/null 2>&1; then
+        digest=$(curl -fsSL --connect-timeout 5 \
+            -H "Accept: application/vnd.oci.image.index.v1+json" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+            -D - "$url" 2>/dev/null \
+            | grep -i '^docker-content-digest:' \
+            | head -1 \
+            | tr -d '\r' \
+            | sed 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*//')
+    fi
+    printf '%s' "$digest"
+}
+
+# _ski_apptainer_needs_update
+#   Returns 0 (true) when the registry digest differs from the locally cached
+#   digest, or when the SIF file is absent.  Returns 1 when up-to-date or
+#   when the registry cannot be reached (offline mode).
+_ski_apptainer_needs_update() {
+    local digest_file="${SIF_FILE%.sif}.digest"
+    [[ -f "$SIF_FILE" ]] || return 0   # no SIF → must pull
+
+    local remote_digest
+    remote_digest=$(_ski_registry_digest \
+        "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
+    [[ -z "$remote_digest" ]] && return 1   # offline / unreachable → skip
+
+    local local_digest=""
+    [[ -f "$digest_file" ]] && local_digest="$(cat "$digest_file")"
+
+    [[ "$remote_digest" != "$local_digest" ]]
+}
+
+_ski_update() {
+    local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
+    if [[ "$RUNTIME" == "apptainer" ]]; then
+        local sif_dir digest_file
+        sif_dir="$(dirname "$SIF_FILE")"
+        digest_file="${SIF_FILE%.sif}.digest"
+        mkdir -p "$sif_dir"
+        loginfo "Pulling latest SIF from docker://${_SKI_FULL_IMAGE}"
+        loginfo "Destination: $SIF_FILE"
+        apptainer pull --force "$SIF_FILE" "docker://${_SKI_FULL_IMAGE}"
+        # Record the remote digest so future checks can skip unnecessary pulls
+        local remote_digest
+        remote_digest=$(_ski_registry_digest \
+            "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
+        [[ -n "$remote_digest" ]] && printf '%s' "$remote_digest" > "$digest_file"
+        loginfo "SIF updated: $SIF_FILE"
+    else
+        loginfo "Pulling latest image: ${_SKI_FULL_IMAGE}"
+        "$RUNTIME" pull "$_SKI_FULL_IMAGE"
+        loginfo "Image updated."
     fi
 }
 
@@ -198,7 +292,7 @@ _ski_init() {
 # Subcommand dispatch
 # =============================================================================
 if [[ $# -eq 0 ]]; then
-    sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+    sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
     exit 0
 fi
 
@@ -206,11 +300,19 @@ SUBCMD="$1"; shift
 
 case "$SUBCMD" in
     -h|--help)
-        sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+        sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
         exit 0
         ;;
     init)
         _ski_init "$@"
+        exit 0
+        ;;
+    update)
+        if [[ "$RUNTIME" == "none" ]]; then
+            logerror "No container runtime found (apptainer, docker or podman required)."
+            exit 1
+        fi
+        _ski_update
         exit 0
         ;;
     shell)

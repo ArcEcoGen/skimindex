@@ -64,7 +64,7 @@ GENBANK_DIR=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)
-            sed -n '2,/^# =\+$/{ s/^# \{0,1\}//; /^=\+$/d; p }' "$0"
+            sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
             exit 0
             ;;
         --divisions) DIVISIONS="$2"; shift 2 ;;
@@ -79,7 +79,7 @@ done
 # shellcheck source=__skimindex_config.sh
 source "${SCRIPT_DIR}/__skimindex_config.sh"
 
-GENBANK_DIR="${GENBANK_DIR:-${SKIMINDEX__DIRECTORIES__GENBANK:-/genbank}}"
+GENBANK_DIR="${GENBANK_DIR:-${SKIMINDEX__DIRECTORIES__GENBANK}}"
 
 # Build make arguments: pass GBDIV only when --divisions was given explicitly.
 # The Makefile already reads SKIMINDEX__GENBANK__DIVISIONS from the environment.

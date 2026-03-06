@@ -6,17 +6,20 @@
 #
 # Genome download sections:
 #   Any section with a 'taxon' key is treated as a genome download target.
-#   Reserved sections (logging, local_directories, directories, genbank) are
-#   never treated as genome targets regardless of their content.
-#   Each genome section may define a 'directory' key (relative to
-#   directories.genbank); if absent the section name is used as the subdir.
+#   Reserved sections (logging, local_directories, genbank) are never treated
+#   as genome targets regardless of their content.
+#   Each genome section may define a 'directory' key (relative to the genbank
+#   mount point /genbank); if absent the section name is used as the subdir.
+#
+# Container-side paths are derived automatically from [local_directories]:
+#   each key <k> is bind-mounted to /<k> inside the container.
 # =============================================================================
 
 
 # Host-side paths for each container mount point.
 # Each key <k> defines the host path that is bind-mounted to /<k> inside
 # the container.  Relative paths are resolved from the project root by
-# docker/Makefile.  These values are not used inside the container.
+# skimindex.sh.  Inside the container the path is always /<k>.
 [local_directories]
 genbank        = "genbank"
 indexes        = "indexes"
@@ -25,17 +28,12 @@ processed_data = "processed_data"
 config         = "config"
 log            = "log"
 
-# Container-side paths
-# All the paths bellow are relative to the container
-
 # Logging configuration.
 [logging]
-level = "INFO"              # DEBUG | INFO | WARNING | ERROR
-file  = "/log/skimindex.log"
-
-# Container-side root directories.
-[directories]
-genbank = "/genbank"        # root directory for all downloaded reference data
+level  = "INFO"             # DEBUG | INFO | WARNING | ERROR
+file   = "/log/skimindex.log"
+mirror     = true          # true → tee logs to screen AND file; false → file only
+everything = true          # true → also redirect all stderr (commands, bash errors) to log
 
 # GenBank flat-file divisions to download.
 # Space-separated list of two-letter division codes.
@@ -46,22 +44,40 @@ divisions = "bct pln"       # bacteria + land plants/fungi (contamination filter
 # Human reference genome — single canonical assembly from RefSeq.
 [human]
 taxon            = "human"
-directory        = "Human"        # relative to directories.genbank → /genbank/Human
+directory        = "Human"        # relative to the genbank mount → /genbank/Human
 reference        = true           # pass --reference filter to datasets
 assembly_source  = "refseq"       # refseq | genbank
 assembly_level   = "chromosome"   # complete | chromosome | scaffold | contig
 assembly_version = "latest"       # latest | all
+example          = true           # used as decontamination example
+
+[fungi]
+taxid            = 4751           # taxon:4751 [Fungi]@kingdom
+divisions        = "pln"          # GenBank division to considere for selecting sequences
+directory        = "Fungi"
+example          = true          # used as decontamination example
+
+[bacteria]
+taxid            = 1             # taxon:1 [root]@no rank
+divisions        = "bct"         # GenBank division to considere for selecting sequences
+directory        = "Bacteria"
+example          = true          # used as decontamination example
 
 # Spermatophyta — bulk download of all assemblies matching the filters.
 [plants]
 taxon            = "Spermatophyta"
-directory        = "Plants"       # relative to directories.genbank → /genbank/Plants
+directory        = "Plants"       # relative to the genbank mount → /genbank/Plants
 reference        = false
 assembly_level   = "complete"     # complete | chromosome | scaffold | contig
 assembly_version = "latest"       # latest | all
+example          = false           # used as decontamination contre-example
 
 [decontamination]
-kmer_size        = 29
+kmer_size        = 29             # kmer size used to build decontamination indices
+frg_size         = 200            # reference sequences are splitted in small fragments
+                                  # overlaping by kmer_size-1
+batches          = 20             # After splitting references sequences are divided in
+                                  # this given number of batches
 
 [genome_indexing]
 kmer_size        = 31

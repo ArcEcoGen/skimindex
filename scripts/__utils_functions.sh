@@ -47,20 +47,16 @@ LOG_LEVEL=$LOG_INFO_LEVEL
 
 exec 3>&2
 
-# ---------- VT100 color codes (empty when fd 3 is not a terminal) ----------
+# ---------- VT100 color codes (always defined as constants) ----------
+# Colors are always embedded in log messages; openlogfile strips them via sed
+# when writing to a file, so the file stays clean while the screen keeps colors.
 
-_log_color() {
-    [ -t 3 ] && printf '%s' "$1" || true
-}
-
-_LOG_RESET=$(   _log_color $'\033[0m'    )
-_LOG_CYAN=$(    _log_color $'\033[0;36m' )   # DEBUG
-_LOG_GREEN=$(   _log_color $'\033[0;32m' )   # INFO
-_LOG_YELLOW=$(  _log_color $'\033[0;33m' )   # WARNING
-_LOG_RED=$(     _log_color $'\033[1;31m' )   # ERROR
-_LOG_DIM=$(     _log_color $'\033[2m'    )   # timestamp / host dimmed
-
-unset -f _log_color
+_LOG_RESET=$'\033[0m'
+_LOG_CYAN=$'\033[0;36m'    # DEBUG
+_LOG_GREEN=$'\033[0;32m'   # INFO
+_LOG_YELLOW=$'\033[0;33m'  # WARNING
+_LOG_RED=$'\033[1;31m'     # ERROR
+_LOG_DIM=$'\033[2m'        # timestamp / host dimmed
 
 # ---------- internal formatter ----------
 
@@ -110,22 +106,44 @@ function setloglevel() {
 # ---------- logfile management ----------
 
 function openlogfile() {
-    if [[ "${2:-}" == "STDERR" ]]; then
-        exec 3> >(tee -a "$1" >&2)
-    else
-        exec 3>> "$1"
+    local logpath="$1"
+    local mirror="${2:-false}"      # "true" → tee logs to screen + file
+    local everything="${3:-false}"  # "true" → also redirect fd 2 (all stderr) through fd 3
+    # Test write access before redirecting fd 3 (avoids set -e crash).
+    # Use touch rather than >> to avoid bash printing a redirection error
+    # to stderr even when the failure is handled.
+    if ! touch "$logpath" 2>/dev/null; then
+        logwarning "cannot open log file: $logpath — logging to stderr only."
+        return 0
     fi
-    LOGFILE="$1"
-}
-
-function logstderrtoo() {
-    [[ -n "${LOGFILE:-}" ]] && openlogfile "${LOGFILE}" STDERR
+    if [[ "$mirror" == "true" ]]; then
+        # fd 3 → tee:
+        #   - to screen via fd 2 (colors intact)
+        #   - to file via sed (VT100 codes stripped)
+        exec 3> >(tee >(sed 's/\x1b\[[0-9;]*m//g' >> "$logpath") >&2)
+    else
+        # fd 3 → file only (VT100 codes stripped)
+        exec 3> >(sed 's/\x1b\[[0-9;]*m//g' >> "$logpath")
+    fi
+    if [[ "$everything" == "true" ]]; then
+        # fd 2 → fd 3: all stderr (bash errors, command output) also captured
+        # NOTE: tee's >&2 is evaluated at fork time (before this exec),
+        # so it keeps pointing to the original screen fd — no loop.
+        exec 2>&3
+        LOGEVERYTHING=1
+    fi
+    LOGFILE="$logpath"
 }
 
 function closelogfile() {
     if [[ -n "${LOGFILE:-}" ]]; then
-        exec 3>&-
-        exec 3>&2
+        # Restore fd 2 only if it was redirected (everything=true)
+        if [[ -n "${LOGEVERYTHING:-}" ]]; then
+            exec 2>/dev/tty 2>/dev/null || exec 2>&1
+            unset LOGEVERYTHING
+        fi
+        exec 3>&-   # close log fd
+        exec 3>&2   # restore fd 3 to stderr
         LOGFILE=""
     fi
 }

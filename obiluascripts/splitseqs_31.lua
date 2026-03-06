@@ -1,6 +1,13 @@
+function begin()
+    local fragment_size = tonumber(os.getenv("FRAGMENT_SIZE")) or 200
+    local overlap       = tonumber(os.getenv("OVERLAP"))       or 28
+    obicontext.item("fragment_size", fragment_size)
+    obicontext.item("overlap",       overlap)
+end
+
 function worker(sequence)
-    local fragment_size = 200
-    local overlap = 31 -- chevauchement entre fragments
+    local fragment_size = obicontext.item("fragment_size")
+    local overlap         = obicontext.item("overlap")
     local sequence_length = sequence:len()
 
     local slice = BioSequenceSlice.new()
