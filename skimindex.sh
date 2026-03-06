@@ -17,7 +17,8 @@
 # Subcommands:
 #   init                     Initialise a new project directory and download the default config.
 #   update                   Pull the latest container image from the registry (or refresh the SIF for apptainer).
-#   shell                    Start an interactive shell inside the container.
+#   shell [--mount SRC:DST]  Start an interactive shell inside the container.
+#                            --mount may be repeated for multiple extra bind-mounts.
 #   download_genbank         Download GenBank flat-file divisions and convert them to
 #   download_human           Downloads the human reference genome (GBFF) from NCBI.
 #   download_plants          Downloads Spermatophyta genome assemblies from NCBI.
@@ -298,6 +299,9 @@ _ski_ensure_dirs() {
 # =============================================================================
 # Run helpers
 # =============================================================================
+
+# _ski_run_interactive [extra_mount ...]
+#   extra_mount: "src:dst" pairs added on top of the config-driven mounts.
 _ski_run_interactive() {
     _ski_ensure_dirs
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
@@ -309,10 +313,12 @@ _ski_run_interactive() {
             logwarning "A newer image is available. Run '$(basename "$0") update' to refresh."
         fi
         _ski_build_bind_array "--bind"
+        for _m in "$@"; do BIND+=(--bind "$_m"); done
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer run --pwd /app "${BIND[@]}" "$SIF_FILE"
     else
         _ski_build_bind_array "-v"
+        for _m in "$@"; do BIND+=(-v "$_m"); done
         "$RUNTIME" run "${pull_flag[@]}" --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE"
     fi
 }
@@ -473,10 +479,20 @@ case "$SUBCMD" in
         fi
         if [[ "$RUNTIME" == "apptainer" && ! -f "$SIF_FILE" ]]; then
             logerror "SIF image not found: $SIF_FILE"
-            logerror "Run: cd <project>/docker && make pull-sif"
+            logerror "Run: $(basename "$0") update"
             exit 1
         fi
-        _ski_run_interactive
+        _shell_mounts=()
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --mount)     _shell_mounts+=("$2"); shift 2 ;;
+                --mount=*)   _shell_mounts+=("${1#--mount=}"); shift ;;
+                --)          shift; break ;;
+                -*)          logerror "Unknown shell option: $1"; exit 1 ;;
+                *)           break ;;
+            esac
+        done
+        _ski_run_interactive "${_shell_mounts[@]}"
         exit 0
         ;;
 esac
