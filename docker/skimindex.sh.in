@@ -152,18 +152,25 @@ _ski_ensure_dirs() {
 # Run helpers
 # =============================================================================
 
+# _ski_ensure_current
+#   For apptainer: auto-update the SIF when the digest is unknown (no .digest
+#   file) or when the registry has a newer image.  Skipped with --local.
+_ski_ensure_current() {
+    [[ "$RUNTIME" == "apptainer" ]] || return 0
+    (( _SKI_LOCAL )) && return 0
+    _ski_apptainer_needs_update && _ski_update
+}
+
 # _ski_run_interactive [extra_mount ...]
 #   extra_mount: "src:dst" pairs added on top of the config-driven mounts.
 _ski_run_interactive() {
     _ski_ensure_dirs
+    _ski_ensure_current
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
     local pull_flag=()
     (( _SKI_LOCAL )) || pull_flag=(--pull always)
     if [[ "$RUNTIME" == "apptainer" ]]; then
-        if (( ! _SKI_LOCAL )) && _ski_apptainer_needs_update; then
-            logwarning "A newer image is available. Run '$(basename "$0") update' to refresh."
-        fi
         _ski_build_bind_array "--bind"
         for _m in "$@"; do BIND+=(--bind "$_m"); done
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
@@ -177,14 +184,12 @@ _ski_run_interactive() {
 
 _ski_run_exec() {
     _ski_ensure_dirs
+    _ski_ensure_current
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
     local pull_flag=()
     (( _SKI_LOCAL )) || pull_flag=(--pull always)
     if [[ "$RUNTIME" == "apptainer" ]]; then
-        if (( ! _SKI_LOCAL )) && _ski_apptainer_needs_update; then
-            logwarning "A newer image is available. Run '$(basename "$0") update' to refresh."
-        fi
         _ski_build_bind_array "--bind"
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" "$@"
@@ -204,19 +209,37 @@ _ski_run_exec() {
 #   Outputs the digest (sha256:…) on success, empty string on failure.
 _ski_registry_digest() {
     local registry="$1" name="$2" tag="$3"
-    local url="https://${registry}/v2/${name}/manifests/${tag}"
+    # registry may contain an org path (e.g. registry.example.com/org).
+    # The OCI distribution v2 API requires /v2/ immediately after the host,
+    # so split registry into host and optional org prefix.
+    local host="${registry%%/*}"
+    local prefix="${registry#"$host"}"           # empty or /org[/...]
+    local repo="${prefix:+${prefix#/}/}${name}"  # org/name  or just  name
+    local url="https://${host}/v2/${repo}/manifests/${tag}"
     local digest=""
     if command -v curl >/dev/null 2>&1; then
-        digest=$(curl -fsSL --connect-timeout 5 \
+        # Fetch the manifest index and extract the digest for the current
+        # platform (linux/<arch>).  This avoids false positives when only
+        # a different architecture's image is updated.
+        local arch
+        case "$(uname -m)" in
+            x86_64)  arch="amd64" ;;
+            aarch64) arch="arm64" ;;
+            *)       arch="$(uname -m)" ;;
+        esac
+        local body
+        body=$(curl -fsSL --connect-timeout 5 \
             -H "Accept: application/vnd.oci.image.index.v1+json" \
-            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
-            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
-            -D - "$url" 2>/dev/null \
-            | grep -i '^docker-content-digest:' \
-            | head -1 \
-            | tr -d '\r' \
-            | sed 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*//')
+            "$url" 2>/dev/null)
+        # Parse the platform-specific digest from the JSON index.
+        # digest appears before architecture in each manifest entry, so we
+        # record the last seen digest and print it when the arch matches.
+        # Falls back to empty string if the response is not a manifest list.
+        digest=$(printf '%s' "$body" \
+            | awk -v arch="$arch" \
+                '/"digest":/ { match($0, /sha256:[^"]+/); last = substr($0, RSTART, RLENGTH) }
+                 /"architecture":/ && index($0, "\"" arch "\"") > 0 && length(last) > 0 { print last; last = "" }')
     fi
     printf '%s' "$digest"
 }
