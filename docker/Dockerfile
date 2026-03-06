@@ -3,7 +3,7 @@
 # Base image versions are substituted by the Makefile (GO_VERSION / ANACONDA_VERSION)
 FROM golang:@@GO_VERSION@@ AS builder
 
-ARG OBITOOLS_BRANCH=master
+ARG OBITOOLS_VERSION=latest
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update
@@ -16,7 +16,11 @@ RUN apt-get -y install \
     zlib1g-dev
 
 COPY docker/install_obitools.sh /tmp/install_obitools.sh
-RUN bash /tmp/install_obitools.sh --install-dir /usr/local \
+RUN if [ "$OBITOOLS_VERSION" = "latest" ]; then \
+        bash /tmp/install_obitools.sh --install-dir /usr/local; \
+    else \
+        bash /tmp/install_obitools.sh --install-dir /usr/local --version "$OBITOOLS_VERSION"; \
+    fi \
     && rm /tmp/install_obitools.sh
 
 # Build C tools from src/
@@ -50,12 +54,15 @@ RUN mkdir -p /usr/local/bin \
              /processed_data/decontamination \
              /processed_data/skims \
              /skims \
-             /app/scripts /app/bin /app/obiluascripts
+             /app/scripts /app/bin /app/obiluascripts \
+             /config \
+             /log
 
 COPY --from=builder /usr/local/bin/obi* /usr/local/bin
 COPY genbank/Makefile /genbank/Makefile
 COPY obiluascripts/ /app/obiluascripts/
 COPY scripts/ /app/scripts/
+COPY config/ /config/
 
 # Install NCBI datasets CLI tools (architecture-aware) and C tools from src/
 ARG TARGETARCH

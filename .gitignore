@@ -30,4 +30,6 @@ indexes
 bin
 tmp
 
+test_dir
+
 src/kmerasm/kmerasm

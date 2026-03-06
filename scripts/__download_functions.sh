@@ -1,5 +1,5 @@
 # ============================================================
-# download_functions.sh
+# __download_functions.sh
 # Shared helper functions for NCBI genome download scripts.
 # Source this file — do NOT execute it directly.
 #
@@ -8,8 +8,16 @@
 
 # Guard against direct execution
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "ERROR: download_functions.sh is a library — source it, do not run it." >&2
+    echo "ERROR: __download_functions.sh is a library — source it, do not run it." >&2
     exit 1
+fi
+
+# Load shared utilities if not already loaded
+if [[ "$(type -t loginfo)" != "function" ]]; then
+    _dlfn_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # shellcheck source=__utils_functions.sh
+    source "${_dlfn_dir}/__utils_functions.sh"
+    unset _dlfn_dir
 fi
 
 # ---------- safe_name ------------------------------------------
@@ -91,21 +99,21 @@ download_zip() {
     shift   # remaining args forwarded to datasets
 
     if [[ -f "$zip_file" ]]; then
-        echo "[check] Verifying existing ZIP integrity..."
+        loginfo "Verifying existing ZIP integrity..."
         if check_zip "$zip_file"; then
-            echo "[RESUME] ZIP valid — skipping download."
+            loginfo "ZIP valid — skipping download."
             return 0
         else
-            echo "[WARN] ZIP is corrupt or truncated — discarding and re-downloading."
+            logwarning "ZIP is corrupt or truncated — discarding and re-downloading."
             rm -f "$zip_file"
         fi
     fi
 
     datasets download genome "$@" --filename "$zip_file"
 
-    echo "[check] Verifying downloaded ZIP integrity..."
+    loginfo "Verifying downloaded ZIP integrity..."
     if ! check_zip "$zip_file"; then
-        echo "[ERROR] Downloaded ZIP failed integrity check — removing." >&2
+        logerror "Downloaded ZIP failed integrity check — removing."
         rm -f "$zip_file"
         return 1
     fi
@@ -117,7 +125,7 @@ download_zip() {
 extract_zip() {
     local zip_file="$1"
     local dest_dir="$2"
-    echo "[extract] $zip_file → $dest_dir"
+    loginfo "Extracting $(basename "$zip_file") → $dest_dir"
     unzip -q "$zip_file" -d "$dest_dir"
 }
 
@@ -130,7 +138,7 @@ extract_zip() {
 zip_gbff_compress() {
     local zip_file="$1"
     local out_file="$2"
-    echo "[stream] $zip_file → $out_file"
+    loginfo "Streaming $(basename "$zip_file") → $(basename "$out_file")"
     python3 - "$zip_file" <<'PYEOF' | pigz -9 -c > "$out_file"
 import sys, zipfile, shutil
 
@@ -156,13 +164,13 @@ consolidate_accession() {
 
     if [[ -f "$out_file" ]]; then
         size=$(du -sh "$out_file" | cut -f1)
-        echo "  [SKIP] $(basename "$out_file")  [$size]"
+        loginfo "SKIP: $(basename "$out_file") [$size]"
         return 0
     fi
 
-    echo "  [compress] $organism → $(basename "$out_file")"
+    loginfo "Compressing $organism → $(basename "$out_file")"
     gbff_compress "$acc_dir" "$out_file"
 
     size=$(du -sh "$out_file" | cut -f1)
-    echo "  [OK] $(basename "$out_file")  [$size]"
+    loginfo "OK: $(basename "$out_file") [$size]"
 }

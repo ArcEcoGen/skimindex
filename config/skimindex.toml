@@ -1,0 +1,67 @@
+# =============================================================================
+# skimindex pipeline configuration
+# =============================================================================
+# Mounted read-only at /config inside the container.
+# Scripts read values via __skimindex_config.sh.
+#
+# Genome download sections:
+#   Any section with a 'taxon' key is treated as a genome download target.
+#   Reserved sections (logging, local_directories, directories, genbank) are
+#   never treated as genome targets regardless of their content.
+#   Each genome section may define a 'directory' key (relative to
+#   directories.genbank); if absent the section name is used as the subdir.
+# =============================================================================
+
+
+# Host-side paths for each container mount point.
+# Each key <k> defines the host path that is bind-mounted to /<k> inside
+# the container.  Relative paths are resolved from the project root by
+# docker/Makefile.  These values are not used inside the container.
+[local_directories]
+genbank        = "genbank"
+indexes        = "indexes"
+skims          = "skims"
+processed_data = "processed_data"
+config         = "config"
+log            = "log"
+
+# Container-side paths
+# All the paths bellow are relative to the container
+
+# Logging configuration.
+[logging]
+level = "INFO"              # DEBUG | INFO | WARNING | ERROR
+file  = "/log/skimindex.log"
+
+# Container-side root directories.
+[directories]
+genbank = "/genbank"        # root directory for all downloaded reference data
+
+# GenBank flat-file divisions to download.
+# Space-separated list of two-letter division codes.
+# Full list: bct inv mam phg pln pri rod vrl vrt
+[genbank]
+divisions = "bct pln"       # bacteria + land plants/fungi (contamination filter)
+
+# Human reference genome — single canonical assembly from RefSeq.
+[human]
+taxon            = "human"
+directory        = "Human"        # relative to directories.genbank → /genbank/Human
+reference        = true           # pass --reference filter to datasets
+assembly_source  = "refseq"       # refseq | genbank
+assembly_level   = "chromosome"   # complete | chromosome | scaffold | contig
+assembly_version = "latest"       # latest | all
+
+# Spermatophyta — bulk download of all assemblies matching the filters.
+[plants]
+taxon            = "Spermatophyta"
+directory        = "Plants"       # relative to directories.genbank → /genbank/Plants
+reference        = false
+assembly_level   = "complete"     # complete | chromosome | scaffold | contig
+assembly_version = "latest"       # latest | all
+
+[decontamination]
+kmer_size        = 29
+
+[genome_indexing]
+kmer_size        = 31

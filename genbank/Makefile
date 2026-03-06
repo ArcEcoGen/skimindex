@@ -32,12 +32,13 @@ space := $(empty) $(empty)
 GBDIV_ALL := $(shell sed -nE 's/.*gb([a-z]+)[0-9]+\.seq\.gz.*/\1/p' \
                  $(GB_LISTING) | sort -u)
 
-# Divisions to download (override on the command line if needed).
-# To clean genome skim against contaminations from:
-#   - Bacteria: bct
-#   - Fungi: pln
-GBDIV := bct pln
-# GBDIV := bct inv mam phg pln pri rod vrl vrt
+# Divisions to download.
+# Priority order (first defined wins):
+#   1. Command-line override:  make GBDIV="bct pln pri"
+#   2. Environment variable:   SKIMINDEX__GENBANK__DIVISIONS (set by skimindex_config.sh)
+#   3. Built-in default:       bct pln  (bacteria + land plants/fungi)
+# Full list: bct inv mam phg pln pri rod vrl vrt
+GBDIV := $(or $(GBDIV),$(SKIMINDEX__GENBANK__DIVISIONS),bct pln)
 
 # ERE alternation pattern built from GBDIV (e.g. "bct|pln").
 GBDIV_PATTERN := $(subst $(space),|,$(GBDIV))
@@ -131,4 +132,4 @@ Release_$(GBRELEASE)/depends/gbfiles.d: Makefile
 # ---------- taxonomy ----------------------------------------------
 Release_$(GBRELEASE)/taxonomy:
 	@mkdir -p $@
-	@cd $@ && obitaxonomy --download-ncbi
+	@cd $@ && obitaxonomy --download-ncbi --out ncbi_taxonomy.tgz

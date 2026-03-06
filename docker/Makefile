@@ -50,8 +50,9 @@ MINICONDA_VERSION := latest
 # Tracked here for auditability and future version pinning.
 # Passed to docker build as --build-arg so they appear in the image metadata.
 
-# OBITOOLS_BRANCH : Git branch (or tag) of OBITools to build from source.
-OBITOOLS_BRANCH   := master
+# OBITOOLS_VERSION : OBITools4 version to install. Use "latest" for the most
+#                    recent release, or a specific tag such as "4.4.8".
+OBITOOLS_VERSION   := latest
 
 # KMINDEX_VERSION : Conda package specifier for kmindex (channel::package).
 KMINDEX_VERSION   := bioconda::kmindex
@@ -118,7 +119,7 @@ DOCKERFILE_GEN := .Dockerfile.generated
 #                  buildx build`. Carries tool versions and OCI annotations.
 #                  Base image versions are NOT included here (see above).
 BUILD_ARGS := \
-	--build-arg OBITOOLS_BRANCH=$(OBITOOLS_BRANCH) \
+	--build-arg OBITOOLS_VERSION=$(OBITOOLS_VERSION) \
 	--build-arg KMINDEX_VERSION=$(KMINDEX_VERSION) \
 	--build-arg NTCARD_VERSION=$(NTCARD_VERSION) \
 	--build-arg OCI_VERSION=$(OCI_VERSION) \
@@ -129,34 +130,43 @@ BUILD_ARGS := \
 # Host filesystem layout
 # =============================================================================
 
-# PROJECT_ROOT  : Absolute path to the project root, computed from
-#                 BUILD_CONTEXT so it is stable regardless of the directory
-#                 from which make is invoked.
+# PROJECT_ROOT : Absolute path to the project root, computed from
+#                BUILD_CONTEXT so it is stable regardless of the directory
+#                from which make is invoked.
 PROJECT_ROOT := $(abspath $(BUILD_CONTEXT))
 
-# The following four directories are bind-mounted into every container run.
-# They can be overridden on the command line, e.g.:
-#   make run GENBANK_DIR=/data/genbank
+# CONFIG_FILE  : Pipeline configuration file (always at the canonical location).
+CONFIG_FILE  := $(PROJECT_ROOT)/config/skimindex.toml
+
+# ---------------------------------------------------------------------------
+# Mount-point resolution — driven by [local_directories] in CONFIG_FILE
 #
-# GENBANK_DIR   : Holds raw GenBank sequence files downloaded by the
-#                 download_* targets.  Mounted as /genbank inside the container.
-GENBANK_DIR       := $(PROJECT_ROOT)/genbank
+# Principle: each key k in [local_directories] defines a host path that is
+# bind-mounted to /k inside the container.  Relative values are resolved
+# from PROJECT_ROOT; absolute values are used as-is.
+# To relocate a mount point, edit skimindex.toml — no Makefile change needed.
+# ---------------------------------------------------------------------------
 
-# INDEXES_DIR   : Holds kmindex index files built from the sequences.
-#                 Mounted as /indexes inside the container.
-INDEXES_DIR       := $(PROJECT_ROOT)/indexes
+# HOST_DIRS : space-separated list of all resolved host mount directories.
+#             Created by `make ensure-dirs` before any container run.
+HOST_DIRS := $(shell awk -v root='$(PROJECT_ROOT)' \
+    '/^\[local_directories\]/{s=1;next} /^\[/{s=0} \
+     s && /^[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*=/ { \
+       v=$$0; gsub(/^[^"]*"/, "", v); gsub(/".*$$/, "", v); \
+       printf "%s ", (substr(v,1,1)=="/") ? v : root "/" v \
+     }' $(CONFIG_FILE) 2>/dev/null)
 
-# SKIMS_DIR     : Holds skim output files produced by the pipeline.
-#                 Mounted as /skims inside the container.
-SKIMS_DIR         := $(PROJECT_ROOT)/skims
-
-# PROCESSED_DIR : Holds post-processed / final result files.
-#                 Mounted as /processed_data inside the container.
-PROCESSED_DIR     := $(PROJECT_ROOT)/processed_data
-
-# HOST_DIRS     : Aggregated list of all host directories that must exist
-#                 before starting any container.  Created by `make ensure-dirs`.
-HOST_DIRS := $(GENBANK_DIR) $(INDEXES_DIR) $(SKIMS_DIR) $(PROCESSED_DIR)
+# _bind_flags(prefix) : build the full set of bind-mount flags.
+#   Each key k produces: <prefix> <hostpath>:/<k>
+#   Call with "--bind" (apptainer) or "-v" (docker/podman).
+_bind_flags = $(shell awk -v root='$(PROJECT_ROOT)' -v pfx='$(1)' \
+    '/^\[local_directories\]/{s=1;next} /^\[/{s=0} \
+     s && /^[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*=/ { \
+       k=$$1; v=$$0; \
+       gsub(/^[^"]*"/, "", v); gsub(/".*$$/, "", v); \
+       path = (substr(v,1,1)=="/") ? v : root "/" v; \
+       printf "%s %s:/%s ", pfx, path, k \
+     }' $(CONFIG_FILE) 2>/dev/null)
 
 # =============================================================================
 # Apptainer image and cache
@@ -227,10 +237,7 @@ endif
 #             root at /workspace.  Used by RUN_DEV_CMD for live editing.
 
 ifeq ($(RUNTIME),apptainer)
-  BIND = --bind $(GENBANK_DIR):/genbank \
-         --bind $(INDEXES_DIR):/indexes \
-         --bind $(SKIMS_DIR):/skims \
-         --bind $(PROCESSED_DIR):/processed_data
+  BIND     = $(call _bind_flags,--bind)
   BIND_DEV = $(BIND) \
              --bind $(PROJECT_ROOT)/obiluascript:/app/obiluascripts \
              --bind $(PROJECT_ROOT)/scripts:/app/scripts \
@@ -253,10 +260,7 @@ ifeq ($(RUNTIME),apptainer)
   #               Drops into a shell with the full source tree mounted.
   RUN_DEV_CMD = $(APPTAINER_ENV) apptainer shell --pwd /app $(BIND_DEV) $(IMAGE_REF)
 else
-  BIND = -v $(GENBANK_DIR):/genbank \
-         -v $(INDEXES_DIR):/indexes \
-         -v $(SKIMS_DIR):/skims \
-         -v $(PROCESSED_DIR):/processed_data
+  BIND     = $(call _bind_flags,-v)
   BIND_DEV = $(BIND) \
              -v $(PROJECT_ROOT)/obiluascripts:/app/obiluascripts \
              -v $(PROJECT_ROOT)/scripts:/app/scripts \
@@ -292,12 +296,31 @@ else
 endif
 
 # =============================================================================
+# GitHub repository
+# =============================================================================
+
+# GITHUB_RAW_URL : Base URL for raw file access in the source repository.
+#                  Used by `skimindex init` to download the default config.
+#                  Override when working from a fork or a private mirror.
+GITHUB_RAW_URL ?= https://raw.githubusercontent.com/metabarcoding/skimindex/main
+
+# =============================================================================
+# User entry-point script
+# =============================================================================
+
+# SKIMINDEX_SH    : Generated standalone user script (project root).
+# SKIMINDEX_SH_IN : Source template inside the scripts/ directory.
+SKIMINDEX_SH    := $(PROJECT_ROOT)/skimindex.sh
+SKIMINDEX_SH_IN := $(PROJECT_ROOT)/scripts/skimindex.sh.in
+BUILD_USER_SCRIPT := $(PROJECT_ROOT)/docker/build_user_script.sh
+
+# =============================================================================
 # Targets
 # =============================================================================
 
 .PHONY: build build-multiplatform push pull-sif run run-dev ensure-dirs \
         download_references download_genbank download_human download_plants \
-        clean clean-builder help
+        skimindex-script clean clean-builder help
 
 ## ensure-dirs        : Create host mount directories if they do not exist
 ensure-dirs:
