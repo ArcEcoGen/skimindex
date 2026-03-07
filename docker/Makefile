@@ -60,8 +60,8 @@ OCI_REVISION := $(shell git -C .. rev-parse --short HEAD 2>/dev/null || echo unk
 # =============================================================================
 
 BUILD_CONTEXT  := ..
-DOCKERFILE_TPL := Dockerfile
-DOCKERFILE_GEN := .Dockerfile.generated
+DOCKERFILE_IN  := Dockerfile.in
+DOCKERFILE     := Dockerfile
 
 BUILD_ARGS := \
 	--build-arg OBITOOLS_VERSION=$(OBITOOLS_VERSION) \
@@ -97,7 +97,7 @@ BUILD_USER_SCRIPT := $(PROJECT_ROOT)/docker/build_user_script.sh
 # Targets
 # =============================================================================
 
-.PHONY: all build build-multiplatform push run run-dev \
+.PHONY: all build build-multiplatform build-dev push run run-dev \
         skimindex-script clean clean-builder help
 
 ## all                : Build multi-platform image, push to registry, generate skimindex.sh
@@ -120,29 +120,36 @@ $(SKIMINDEX_SH): $(SKIMINDEX_SH_IN) $(BUILD_USER_SCRIPT) \
 	@echo "Generated: $@"
 
 # Generate the Dockerfile with base image tags substituted
-$(DOCKERFILE_GEN): $(DOCKERFILE_TPL)
+$(DOCKERFILE): $(DOCKERFILE_IN)
 	sed \
 		-e 's/@@GO_VERSION@@/$(GO_VERSION)/g' \
 		-e 's/@@ANACONDA_VERSION@@/$(MINICONDA_VERSION)/g' \
 		$< > $@
 
 ## build              : Build for the native platform and load into the local Docker daemon
-build: $(DOCKERFILE_GEN)
+build: $(DOCKERFILE)
 	docker build $(BUILD_ARGS) \
 		--tag $(FULL_IMAGE) \
-		--file $(DOCKERFILE_GEN) \
+		--file $(DOCKERFILE) \
 		$(BUILD_CONTEXT)
 
 ## build-multiplatform: Build for $(PLATFORMS) and export as a local OCI archive ($(OCI_ARCHIVE))
-build-multiplatform: $(DOCKERFILE_GEN) .builder-ready
+build-multiplatform: $(DOCKERFILE) .builder-ready
 	docker buildx build $(BUILD_ARGS) \
 		--builder $(BUILDER) \
 		--platform $(PLATFORMS) \
 		--tag $(FULL_IMAGE) \
-		--file $(DOCKERFILE_GEN) \
+		--file $(DOCKERFILE) \
 		--provenance=false \
 		--output type=oci,dest=$(OCI_ARCHIVE) \
 		$(BUILD_CONTEXT)
+
+## build-dev          : Build the dev image for local devcontainer use
+build-dev: $(DOCKERFILE)
+	docker build \
+		--build-arg BASE_IMAGE=$(FULL_IMAGE) \
+		--tag $(IMAGE_NAME)-dev:$(IMAGE_TAG) \
+		.devcontainer/
 
 # Create the buildx builder with docker-container driver (once)
 .builder-ready:
@@ -173,7 +180,7 @@ push: $(OCI_ARCHIVE)
 ## clean              : Remove the local Docker image, the OCI archive and generated files
 clean: clean-builder
 	docker rmi --force $(FULL_IMAGE) 2>/dev/null || true
-	rm -f $(OCI_ARCHIVE) $(DOCKERFILE_GEN)
+	rm -f $(OCI_ARCHIVE) $(DOCKERFILE)
 
 ## clean-builder      : Remove the buildx builder ($(BUILDER))
 clean-builder:

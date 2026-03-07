@@ -1,4 +1,7 @@
 **/.DS_Store
+**/__pycache__
+**/*.egg-info
+**/.doit.db*
 
 **/*.log
 **/*.stdout
@@ -20,7 +23,7 @@ genbank
 
 docker/*.oci.tar
 docker/.builder-ready
-docker/.Dockerfile.generated
+docker/Dockerfile
 
 **/*_spectrum.txt
 **/*_stats.txt

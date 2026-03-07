@@ -26,7 +26,10 @@ RUN if [ "$OBITOOLS_VERSION" = "latest" ]; then \
 # Build C tools from src/
 COPY src/ /tmp/src/
 RUN for dir in /tmp/src/*/; do \
-        [ -f "$dir/Makefile" ] && make -C "$dir"; \
+        dir="${dir%/}"; \
+        if [ -f "$dir/Makefile" ]; then \
+            make -C "$dir"; \
+        fi; \
     done
 
 FROM continuumio/miniconda3:@@ANACONDA_VERSION@@ AS skimindex
@@ -37,7 +40,7 @@ ARG NTCARD_VERSION=bioconda::ntcard
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl make unzip less jq pigz sudo \
+    && apt-get install -y --no-install-recommends curl make unzip less jq pigz sudo python3-plumbum python3-doit \
     && rm -rf /var/lib/apt/lists/*
 
 # Install NCBI datasets CLI tools (architecture-aware) and C tools from src/
@@ -68,12 +71,15 @@ COPY genbank/Makefile /genbank/Makefile
 COPY obiluascripts/ /app/obiluascripts/
 COPY scripts/ /app/scripts/
 COPY config/ /config/
+COPY src/skimindex_py/ /tmp/skimindex_py/
 
 RUN chmod +x /usr/local/bin/obi* \
              /app/scripts/[A-Za-z]*.sh \
              /app/scripts/_[A-Za-z]*.sh \
     && find /tmp/src-built -maxdepth 2 -type f -executable -exec cp {} /app/bin/ \; \
-    && rm -rf /tmp/src-built
+    && rm -rf /tmp/src-built \
+    && pip install --no-build-isolation /tmp/skimindex_py \
+    && rm -rf /tmp/skimindex_py
 
 # Create an unprivileged user with a home directory and sudo access
 RUN groupadd -r skimindex \
