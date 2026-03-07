@@ -44,9 +44,10 @@ def curl_download(url: str, *extra_args):
         "-s",
         "-L",
         "--http2",
-        "--user-agent", "Mozilla/5.0",
-        "--max-time", "300",
-        "--retry", "3",
+        "--user-agent",
+        "Mozilla/5.0",
+        "--retry",
+        "3",
         url,
-        *extra_args
+        *extra_args,
     )

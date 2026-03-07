@@ -9,6 +9,7 @@ Orchestrates NCBI reference genome downloads and processing:
 Uses stamp files for robustness: if interrupted, relaunching skips already-processed steps.
 """
 
+import functools
 import json
 import re
 import shutil
@@ -18,7 +19,164 @@ from typing import Any, Dict, List, Optional
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
 from skimindex.unix.compress import pigz, unzip
-from skimindex.unix.ncbi import datasets
+from skimindex.unix.ncbi import datasets, datasets_summary_genome
+
+
+def list_assemblies(
+    taxon: str,
+    assembly_level: Optional[str] = None,
+    reference: bool = False,
+    assembly_source: Optional[str] = None,
+    assembly_version: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """List genome assemblies for a taxon using NCBI datasets summary.
+
+    Runs: datasets summary genome taxon <taxon> [flags]
+    Returns the list of assembly reports.
+    """
+    cmd_args = ["taxon", taxon]
+
+    if reference:
+        cmd_args.append("--reference")
+    if assembly_source:
+        cmd_args.extend(["--assembly-source", assembly_source])
+    if assembly_level:
+        cmd_args.extend(["--assembly-level", assembly_level])
+    if assembly_version:
+        cmd_args.extend(["--assembly-version", assembly_version])
+
+    loginfo(f"Listing assemblies for taxon '{taxon}'...")
+    _, stdout, _ = datasets_summary_genome(*cmd_args).run()
+    return json.loads(stdout).get("reports", [])
+
+
+@functools.lru_cache(maxsize=None)
+def _cached_list_assemblies(
+    taxon: str,
+    assembly_level: Optional[str],
+    reference: bool,
+    assembly_source: Optional[str],
+    assembly_version: Optional[str],
+) -> tuple:
+    """Cached wrapper around list_assemblies() to avoid repeated NCBI API calls.
+
+    Returns tuple instead of list for hashability (lru_cache requirement).
+    """
+    assemblies = list_assemblies(taxon, assembly_level, reference, assembly_source, assembly_version)
+    return tuple(assemblies)  # Convert to tuple for hashability
+
+
+def list_taxids(
+    taxon: str,
+    assembly_level: Optional[str] = None,
+    reference: bool = False,
+    assembly_source: Optional[str] = None,
+    assembly_version: Optional[str] = None,
+) -> List[int]:
+    """List NCBI taxonomic IDs for assemblies matching the criteria.
+
+    Returns list of tax_id values in order, including duplicates.
+    """
+    assemblies = list_assemblies(taxon, assembly_level, reference, assembly_source, assembly_version)
+    taxids = []
+
+    for assembly in assemblies:
+        biosample = assembly.get("assembly_info", {}).get("biosample", {})
+        description = biosample.get("description", {})
+        organism = description.get("organism", {})
+        tax_id = organism.get("tax_id")
+        if tax_id is not None:
+            taxids.append(tax_id)
+
+    return taxids
+
+
+def _get_accession_type(accession: str) -> int:
+    """Return priority for accession type: 0 for GCF (RefSeq), 1 for GCA (GenBank)."""
+    return 0 if accession.startswith("GCF_") else 1
+
+
+def _get_genome_size(assembly: Dict[str, Any]) -> int:
+    """Extract total sequence length from assembly stats."""
+    stats = assembly.get("assembly_stats", {})
+    total_length = stats.get("total_sequence_length", "0")
+    try:
+        return int(total_length)
+    except (ValueError, TypeError):
+        return 0
+
+
+def filter_assemblies_by_species(assemblies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filter assemblies to keep only one per species.
+
+    Selection criteria (in order):
+    1. Prefer RefSeq (GCF_) over GenBank (GCA_)
+    2. Prefer larger genomes
+    """
+    species_groups = {}
+
+    for assembly in assemblies:
+        biosample = assembly.get("assembly_info", {}).get("biosample", {})
+        description = biosample.get("description", {})
+        organism = description.get("organism", {})
+        organism_name = organism.get("organism_name", "")
+
+        if organism_name:
+            if organism_name not in species_groups:
+                species_groups[organism_name] = []
+            species_groups[organism_name].append(assembly)
+
+    # Select best assembly per species
+    selected = []
+    for species, assemblies_list in species_groups.items():
+        # Sort by: accession type (GCF first), then by genome size (descending)
+        best = sorted(
+            assemblies_list,
+            key=lambda a: (
+                _get_accession_type(a.get("accession", "")),
+                -_get_genome_size(a),
+            ),
+        )[0]
+        selected.append(best)
+
+    return selected
+
+
+def filter_assemblies_by_genus(assemblies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filter assemblies to keep only one per genus.
+
+    Selection criteria (in order):
+    1. Prefer RefSeq (GCF_) over GenBank (GCA_)
+    2. Prefer larger genomes
+    """
+    genus_groups = {}
+
+    for assembly in assemblies:
+        biosample = assembly.get("assembly_info", {}).get("biosample", {})
+        description = biosample.get("description", {})
+        organism = description.get("organism", {})
+        organism_name = organism.get("organism_name", "")
+
+        if organism_name:
+            genus = organism_name.split()[0]
+            if genus not in genus_groups:
+                genus_groups[genus] = []
+            genus_groups[genus].append(assembly)
+
+    # Select best assembly per genus
+    selected = []
+    for genus, assemblies_list in genus_groups.items():
+        # Sort by: accession type (GCF first), then by genome size (descending)
+        best = sorted(
+            assemblies_list,
+            key=lambda a: (
+                _get_accession_type(a.get("accession", "")),
+                -_get_genome_size(a),
+            ),
+        )[0]
+        selected.append(best)
+
+    return selected
 
 
 def list_sections() -> str:
@@ -47,6 +205,7 @@ def _load_section_config(section: str) -> Dict[str, Any]:
 
         # Get optional filters
         reference = str(section_data.get("reference", "false")).lower() == "true"
+        one_per = section_data.get("one_per", "").lower()  # "species", "genus", or empty
 
         return {
             "taxon": taxon,
@@ -55,6 +214,7 @@ def _load_section_config(section: str) -> Dict[str, Any]:
             "assembly_source": section_data.get("assembly_source"),
             "assembly_level": section_data.get("assembly_level"),
             "assembly_version": section_data.get("assembly_version"),
+            "one_per": one_per,
         }
     except Exception as e:
         logerror(f"Error loading section [{section}]: {e}")
@@ -80,72 +240,93 @@ def _format_dataset_flags(
     return " ".join(flags) if flags else "<none>"
 
 
-def _download_assemblies(
-    taxon: str,
-    zip_file: Path,
-    reference: bool,
-    assembly_source: Optional[str],
-    assembly_level: Optional[str],
-    assembly_version: Optional[str],
+def _get_organism_name_from_report(assembly: Dict[str, Any]) -> str:
+    """Extract organism name from a datasets summary report dict."""
+    biosample = assembly.get("assembly_info", {}).get("biosample", {})
+    description = biosample.get("description", {})
+    organism = description.get("organism", {})
+    name = organism.get("organism_name", "")
+    return name or assembly.get("accession", "unknown")
+
+
+def _download_accession(accession: str, zip_file: Path, stamp: Path) -> bool:
+    """Download a single accession ZIP. Skip if stamp exists."""
+    if stamp.exists():
+        loginfo(f"    [{accession}] Already downloaded (stamp exists)")
+        return True
+
+    try:
+        loginfo(f"    [{accession}] Downloading...")
+        zip_file.parent.mkdir(parents=True, exist_ok=True)
+        datasets(
+            "download", "genome", "accession", accession,
+            "--include", "gbff",
+            "--filename", str(zip_file),
+        )()
+        stamp.touch()
+        return True
+    except Exception as e:
+        logerror(f"    [{accession}] Download failed: {e}")
+        zip_file.unlink(missing_ok=True)
+        return False
+
+
+def _extract_accession(
+    accession: str, zip_file: Path, work_dir: Path, stamp: Path
 ) -> bool:
-    """Download genome assemblies from NCBI using datasets command."""
-    try:
-        loginfo(f"Downloading assemblies for '{taxon}'...")
-        loginfo(f"Destination: {zip_file}")
-        loginfo("This may take a long time — be patient...")
-
-        # Build datasets command arguments
-        cmd_args = ["download", "genome", "taxon", taxon]
-
-        if reference:
-            cmd_args.append("--reference")
-        if assembly_source:
-            cmd_args.extend(["--assembly-source", assembly_source])
-        if assembly_level:
-            cmd_args.extend(["--assembly-level", assembly_level])
-        if assembly_version:
-            cmd_args.extend(["--assembly-version", assembly_version])
-
-        cmd_args.extend(["--include", "gbff"])
-        cmd_args.extend(["--filename", str(zip_file)])
-
-        # Execute datasets command
-        datasets(*cmd_args)()
+    """Extract a single accession ZIP. Skip if stamp exists."""
+    if stamp.exists():
+        loginfo(f"    [{accession}] Already extracted")
         return True
 
+    if not zip_file.exists():
+        logerror(f"    [{accession}] ZIP not found: {zip_file}")
+        return False
+
+    try:
+        work_dir.mkdir(parents=True, exist_ok=True)
+        unzip("-d", str(work_dir), str(zip_file))()
+        stamp.touch()
+        # Suppress ZIP after extraction
+        zip_file.unlink(missing_ok=True)
+        return True
     except Exception as e:
-        logerror(f"Failed to download assemblies: {e}")
+        logerror(f"    [{accession}] Extract failed: {e}")
         return False
 
 
-def _extract_assemblies(zip_file: Path, output_path: Path) -> bool:
-    """Extract ZIP archive."""
-    try:
-        loginfo(f"Extracting {zip_file}...")
-        output_path.mkdir(parents=True, exist_ok=True)
-        unzip("-d", str(output_path), str(zip_file))()
+def _compress_accession(
+    accession: str,
+    organism_name: str,
+    work_dir: Path,
+    output_path: Path,
+    stamp: Path,
+) -> bool:
+    """Compress GBFF files for one accession. Skip if stamp exists."""
+    if stamp.exists():
+        loginfo(f"    [{accession}] Already compressed")
         return True
-    except Exception as e:
-        logerror(f"Failed to extract ZIP: {e}")
+
+    safe_name_str = _safe_name(organism_name)
+    out_file = output_path / f"{safe_name_str}-{accession}.gbff.gz"
+
+    if out_file.exists():
+        loginfo(f"    [{accession}] Output already exists: {out_file.name}")
+        stamp.touch()
+        return True
+
+    # Find GBFF files in work_dir/ncbi_dataset/data/{accession}/
+    dataset_dir = work_dir / "ncbi_dataset" / "data" / accession
+    if not dataset_dir.exists():
+        logerror(f"    [{accession}] Dataset dir not found: {dataset_dir}")
         return False
 
-
-def _get_organism_name(report_file: Path, accession: str) -> Optional[str]:
-    """Extract organism name from assembly_data_report.jsonl."""
-    try:
-        if not report_file.exists():
-            return None
-
-        with open(report_file, "r") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                data = json.loads(line)
-                if data.get("accession") == accession:
-                    return data.get("organism", {}).get("organism_name")
-    except Exception:
-        pass
-    return None
+    ok = _consolidate_accession(dataset_dir, organism_name, out_file)
+    if ok:
+        stamp.touch()
+        # Cleanup work directory
+        shutil.rmtree(work_dir, ignore_errors=True)
+    return ok
 
 
 def _safe_name(organism: str) -> str:
@@ -192,54 +373,11 @@ def _consolidate_accession(accession_dir: Path, organism: str, out_file: Path) -
         return False
 
 
-def _compress_accessions(
-    dataset_dir: Path, output_path: Path, report_file: Path
-) -> int:
-    """Compress GBFF files per accession. Returns number of errors."""
-    loginfo(f"Compressing per-accession GBFF files into {output_path}...")
-
-    # Find accession directories
-    accessions: List[str] = []
-    data_dir = dataset_dir / "data"
-
-    if data_dir.exists():
-        for item in sorted(data_dir.iterdir()):
-            if item.is_dir():
-                accessions.append(item.name)
-
-    total = len(accessions)
-    count = 0
-    errors = 0
-
-    for accession in accessions:
-        count += 1
-        loginfo(f"[{count}/{total}] {accession}")
-
-        # Get organism name from report
-        organism = _get_organism_name(report_file, accession)
-        if not organism:
-            organism = accession
-
-        # Create safe filename
-        safe_name_str = _safe_name(organism)
-        out_file = output_path / f"{safe_name_str}-{accession}.gbff.gz"
-
-        # Skip if already exists
-        if out_file.exists():
-            loginfo(f"  Skipping {out_file.name} (already exists)")
-            continue
-
-        # Compress accession
-        if not _consolidate_accession(data_dir / accession, organism, out_file):
-            logerror(f"Failed to compress {accession}")
-            errors += 1
-
-    loginfo(f"  Total: {total}")
-    return errors
-
-
-def process_refgenome_section(section: str) -> bool:
-    """Download and process a single reference genome section.
+def process_refgenome_section(
+    section: str,
+    one_per: Optional[str] = None,
+) -> bool:
+    """Download and process a single reference genome section, accession by accession.
 
     Returns True on success, False if any step failed.
     """
@@ -257,65 +395,79 @@ def process_refgenome_section(section: str) -> bool:
     assembly_source = config_vals.get("assembly_source")
     assembly_level = config_vals.get("assembly_level")
     assembly_version = config_vals.get("assembly_version")
+    # CLI arguments override TOML config
+    one_per = one_per if one_per is not None else config_vals.get("one_per", "")
 
-    # Setup paths
-    zip_file = output_dir / "download.zip"
-    dataset_dir = output_dir / "ncbi_dataset"
-    report_file = dataset_dir / "data" / "assembly_data_report.jsonl"
+    # Create directories
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stamps_dir = output_dir / ".stamps"
+    work_base = output_dir / ".work"
+    stamps_dir.mkdir(exist_ok=True)
 
-    # Stamp files for robustness
-    download_stamp = output_dir / ".download.stamp"
-    extract_stamp = output_dir / ".extract.stamp"
-    compress_stamp = output_dir / ".compress.stamp"
+    # Log configuration
+    loginfo(f"[{section}] Taxon: {taxon}")
+    loginfo(f"[{section}] Output: {output_dir}")
+    dataset_flags = _format_dataset_flags(reference, assembly_source, assembly_level, assembly_version)
+    if dataset_flags != "<none>":
+        loginfo(f"[{section}] Datasets flags: {dataset_flags}")
 
-    # Step 1: Download ZIP (skip if already done)
-    if not download_stamp.exists():
-        loginfo(f"[{section}] Downloading assemblies for taxon: {taxon}")
-        dataset_flags = _format_dataset_flags(reference, assembly_source, assembly_level, assembly_version)
-        if dataset_flags != "<none>":
-            loginfo(f"[{section}] Datasets flags: {dataset_flags}")
+    # Fetch assemblies (cached in memory to avoid repeated NCBI calls)
+    assemblies = list(_cached_list_assemblies(taxon, assembly_level, reference, assembly_source, assembly_version))
 
-        output_dir.mkdir(parents=True, exist_ok=True)
-        if not _download_assemblies(taxon, zip_file, reference, assembly_source, assembly_level, assembly_version):
-            logerror(f"[{section}] Failed to download")
-            return False
+    if not assemblies:
+        logwarning(f"[{section}] No assemblies found for taxon '{taxon}'")
+        return True
 
-        download_stamp.touch()
-        loginfo(f"[{section}] Download complete")
+    # Apply optional filtering
+    if one_per == "species":
+        assemblies = filter_assemblies_by_species(assemblies)
+        loginfo(f"[{section}] Filtered to {len(assemblies)} assemblies (one per species)")
+    elif one_per == "genus":
+        assemblies = filter_assemblies_by_genus(assemblies)
+        loginfo(f"[{section}] Filtered to {len(assemblies)} assemblies (one per genus)")
     else:
-        loginfo(f"[{section}] ZIP already downloaded (stamp exists)")
+        loginfo(f"[{section}] Processing {len(assemblies)} assemblies")
 
-    # Step 2: Extract ZIP (skip if already done)
-    if not extract_stamp.exists():
-        loginfo(f"[{section}] Extracting {zip_file}...")
-        if not _extract_assemblies(zip_file, output_dir):
-            logerror(f"[{section}] Failed to extract")
-            return False
+    # Build accession → organism_name map
+    accession_map = {}
+    for asm in assemblies:
+        accession = asm.get("accession")
+        if accession:
+            accession_map[accession] = _get_organism_name_from_report(asm)
 
-        # Delete ZIP after extraction
-        zip_file.unlink(missing_ok=True)
-        extract_stamp.touch()
-        loginfo(f"[{section}] Extraction complete")
-    else:
-        loginfo(f"[{section}] Already extracted (stamp exists)")
+    # Process each accession
+    errors = 0
+    total = len(accession_map)
+    for i, (accession, organism_name) in enumerate(accession_map.items(), 1):
+        loginfo(f"[{section}] [{i}/{total}] {accession} — {organism_name}")
 
-    # Step 3: Compress accessions (skip if already done)
-    if not compress_stamp.exists():
-        loginfo(f"[{section}] Compressing per-accession files...")
-        errors = _compress_accessions(dataset_dir, output_dir, report_file)
+        work_dir = work_base / accession
+        zip_file = work_dir / "download.zip"
 
-        if errors == 0:
-            # Cleanup extracted data
-            loginfo(f"[{section}] Removing {dataset_dir}...")
-            shutil.rmtree(dataset_dir, ignore_errors=True)
-            compress_stamp.touch()
-            loginfo(f"[{section}] ✓ Completed successfully")
-        else:
-            logerror(f"[{section}] {errors} accession(s) failed — re-run to retry")
-            return False
-    else:
-        loginfo(f"[{section}] Already compressed (stamp exists)")
+        dl_stamp = stamps_dir / f"{accession}.download.stamp"
+        ext_stamp = stamps_dir / f"{accession}.extract.stamp"
+        cmp_stamp = stamps_dir / f"{accession}.compress.stamp"
 
+        # Download → Extract → Compress pipeline
+        if not _download_accession(accession, zip_file, dl_stamp):
+            errors += 1
+            continue
+
+        if not _extract_accession(accession, zip_file, work_dir, ext_stamp):
+            errors += 1
+            continue
+
+        if not _compress_accession(accession, organism_name, work_dir, output_dir, cmp_stamp):
+            errors += 1
+
+    # Cleanup empty work directory
+    shutil.rmtree(work_base, ignore_errors=True)
+
+    if errors:
+        logerror(f"[{section}] {errors}/{total} accession(s) failed — re-run to retry")
+        return False
+
+    loginfo(f"[{section}] ✓ All {total} accessions processed successfully")
     return True
 
 

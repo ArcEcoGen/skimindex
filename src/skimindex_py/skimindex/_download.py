@@ -7,6 +7,7 @@ Provides command-line interface for download operations.
 Usage:
     python download.py genbank [--divisions "bct pln ..."]
     python download.py refgenome [--list] [--section NAME]
+    python download.py refgenome [--taxon TAXON] [--one-per-species|--one-per-genus]
     python download.py refgenome
 
 Examples:
@@ -22,6 +23,12 @@ Examples:
     # Download a specific reference genome section
     python download.py refgenome --section human
 
+    # List assemblies for a taxon, filtering to one per species
+    python download.py refgenome --taxon Spermatophyta --one-per-species
+
+    # List assemblies for a taxon, filtering to one per genus
+    python download.py refgenome --taxon Spermatophyta --one-per-genus
+
     # Download all reference genomes (all configured sections)
     python download.py refgenome
 
@@ -35,7 +42,14 @@ import sys
 from typing import Optional
 
 from skimindex.download.genbank import list_divisions, process_genbank
-from skimindex.download.refgenome import list_sections, process_refgenome
+from skimindex.download.refgenome import (
+    list_sections,
+    process_refgenome,
+    process_refgenome_section,
+    list_assemblies,
+    filter_assemblies_by_species,
+    filter_assemblies_by_genus,
+)
 
 
 def genbank_command(args) -> int:
@@ -63,9 +77,38 @@ def refgenome_command(args) -> int:
         print(sections if sections else "")
         return 0
 
-    # Single section download
+    # Filter mode: show filtered assemblies for a taxon
+    if hasattr(args, 'taxon') and args.taxon:
+        assemblies = list_assemblies(
+            args.taxon,
+            assembly_level=getattr(args, 'assembly_level', None),
+            reference=getattr(args, 'reference', False),
+            assembly_source=getattr(args, 'assembly_source', None),
+            assembly_version=getattr(args, 'assembly_version', None),
+        )
+
+        one_per = getattr(args, 'one_per', None)
+        if one_per == "species":
+            assemblies = filter_assemblies_by_species(assemblies)
+        elif one_per == "genus":
+            assemblies = filter_assemblies_by_genus(assemblies)
+
+        # Display filtered results
+        print(f"Found {len(assemblies)} assemblies")
+        for asm in assemblies:
+            accession = asm.get('accession', 'N/A')
+            organism = asm.get('assembly_info', {}).get('biosample', {}).get('description', {}).get('organism', {}).get('organism_name', 'N/A')
+            size = asm.get('assembly_stats', {}).get('total_sequence_length', '0')
+            print(f"  {accession} - {organism} ({size} bp)")
+        return 0
+
+    # Single section download with optional CLI overrides
     if args.section:
-        return process_refgenome([args.section])
+        one_per = getattr(args, 'one_per', None)
+
+        if not process_refgenome_section(args.section, one_per):
+            return 1
+        return 0
 
     # Download all sections (use config)
     return process_refgenome()
@@ -92,6 +135,12 @@ Examples:
 
   # Download a specific reference genome (e.g., human)
   %(prog)s refgenome --section human
+
+  # List assemblies for a taxon, filtered to one per species
+  %(prog)s refgenome --taxon Spermatophyta --one-per species
+
+  # List assemblies for a taxon, filtered to one per genus
+  %(prog)s refgenome --taxon Spermatophyta --one-per genus
 
   # Download all (GenBank + all reference genome sections)
   %(prog)s refgenome
@@ -131,6 +180,37 @@ Examples:
         "--section",
         help="Download a specific reference genome section (e.g., human)",
         metavar="NAME"
+    )
+    refgenome_parser.add_argument(
+        "--taxon",
+        help="Filter assemblies for a given taxon (e.g., Spermatophyta)",
+        metavar="TAXON"
+    )
+    refgenome_parser.add_argument(
+        "--one-per",
+        choices=["species", "genus"],
+        help="Keep only one assembly per species or genus (prefer RefSeq, then largest genome)",
+        metavar="species|genus"
+    )
+    refgenome_parser.add_argument(
+        "--assembly-level",
+        help="Filter by assembly level (e.g., 'complete')",
+        metavar="LEVEL"
+    )
+    refgenome_parser.add_argument(
+        "--assembly-source",
+        help="Filter by assembly source",
+        metavar="SOURCE"
+    )
+    refgenome_parser.add_argument(
+        "--assembly-version",
+        help="Filter by assembly version",
+        metavar="VERSION"
+    )
+    refgenome_parser.add_argument(
+        "--reference",
+        action="store_true",
+        help="Filter to reference assemblies only"
     )
     refgenome_parser.set_defaults(func=refgenome_command)
 

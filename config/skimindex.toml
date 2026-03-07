@@ -70,7 +70,8 @@ directory        = "Plants"       # relative to the genbank mount → /genbank/P
 reference        = false
 assembly_level   = "complete"     # complete | chromosome | scaffold | contig
 assembly_version = "latest"       # latest | all
-example          = false           # used as decontamination contre-example
+one_per          = "genus"        # Keep only one genome per "genus" or "species"
+example          = false          # used as decontamination contre-example
 
 [decontamination]
 kmer_size        = 29             # kmer size used to build decontamination indices
