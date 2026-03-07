@@ -1,23 +1,11 @@
 {
   "name": "skimindex",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "args": {
-      "BASE_IMAGE": "registry.metabarcoding.org/arcecogen/skimindex:latest"
-    }
-  },
-  "mounts": [
-    "source=${localWorkspaceFolder}/genbank,target=/genbank,type=bind",
-    "source=${localWorkspaceFolder}/indexes,target=/indexes,type=bind",
-    "source=${localWorkspaceFolder}/skims,target=/skims,type=bind",
-    "source=${localWorkspaceFolder}/processed_data,target=/processed_data,type=bind",
-    "source=${localWorkspaceFolder}/config,target=/config,type=bind",
-    "source=${localWorkspaceFolder}/log,target=/log,type=bind",
-    "source=${localWorkspaceFolder}/obiluascripts,target=/app/obiluascripts,type=bind",
-    "source=${localWorkspaceFolder}/scripts,target=/app/scripts,type=bind",
-    "source=${localWorkspaceFolder}/bin,target=/app/bin,type=bind",
-    "source=${localWorkspaceFolder},target=/workspace,type=bind"
-  ],
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "skimindex-dev",
   "workspaceFolder": "/workspace",
-  "remoteUser": "skimindex"
+  "remoteUser": "skimindex",
+  "settings": {
+    "terminal.integrated.shell.linux": "/bin/bash"
+  },
+  "features": {}
 }

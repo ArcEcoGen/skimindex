@@ -1,43 +1,27 @@
 """
-GenBank download module using doit.
+GenBank download processor — pure Python, file-based robustness.
 
 Orchestrates GenBank data downloads and processing:
-- Downloads GenBank release number
-- Caches FTP directory listing
-- Identifies available divisions (bct, pln, pri, etc.)
+- Downloads and caches GenBank release number
+- Downloads FTP directory listing (fresh each run to catch updates)
 - Downloads individual GenBank files
 - Converts GBFF to FASTA format
 - Downloads NCBI taxonomy
 
-Tasks are defined as generators compatible with doit task system.
-
-Usage:
-    from skimindex.download.genbank import DOIT_CONFIG, task_*
-    # Use with doit command: doit -f <this_module>
-
-Environment variables (optional):
-    SKIMINDEX__GENBANK__DIVISIONS: Space-separated division list (default: "bct pln")
+Uses stamp files for robustness: if interrupted, relaunching skips already-processed files.
 """
 
-import os
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, List, Dict, Any
-
-from plumbum import local
+from typing import List
 
 from skimindex.config import config
 from skimindex.log import loginfo, logwarning, logerror
-from skimindex.unix.download import curl
-from skimindex.unix.obitools import obitaxonomy, obiconvert
+from skimindex.unix.download import curl_download
+from skimindex.unix.obitools import obiconvert
+from plumbum import local
 
-
-# doit configuration
-DOIT_CONFIG = {
-    "default_tasks": ["downloads"],
-    "verbosity": 2,
-}
 
 # Constants
 FTPNCBI = "ftp.ncbi.nlm.nih.gov"
@@ -45,169 +29,184 @@ GBURL = f"https://{FTPNCBI}/genbank"
 GBRELEASE_URL = f"{GBURL}/GB_Release_Number"
 TAXOURL = f"https://{FTPNCBI}/pub/taxonomy/taxdump.tar.gz"
 
-# Get GenBank divisions from config or environment, with fallback default
-GBDIV = config().get("genbank", "divisions", "bct pln").split()
+
+def list_divisions() -> str:
+    """List available GenBank divisions as CSV from config."""
+    cfg = config()
+    divisions = cfg.get("genbank", "divisions", "bct pln").split()
+    return ",".join(divisions) if divisions else ""
+
+
+def _get_genbank_base() -> Path:
+    """Get the base GenBank directory from config."""
+    cfg = config()
+    return Path(cfg.get("directories", "genbank", "/genbank"))
 
 
 @lru_cache(maxsize=1)
-def _get_release_number() -> str:
-    """Fetch current GenBank release number (cached)."""
+def get_release_number() -> str:
+    """Fetch GenBank release number (cached in memory during program execution)."""
     try:
-        result = curl("-s", GBRELEASE_URL)()
-        return result.strip()
+        result = curl_download(GBRELEASE_URL)()
+        release = result.strip()
+        loginfo(f"GenBank release number: {release}")
+        return release
     except Exception as e:
         logerror(f"Failed to fetch GenBank release number: {e}")
         return "unknown"
 
 
-def _get_ftp_listing(release: str) -> List[str]:
-    """Get list of GenBank files from FTP."""
-    listing_file = f"Release_{release}/.gb_listing"
+def get_ftp_listing(divisions: List[str]) -> tuple:
+    """Download and parse FTP listing to get GenBank filenames.
 
-    if Path(listing_file).exists():
-        loginfo(f"Using cached FTP listing: {listing_file}")
-        with open(listing_file) as f:
-            return f.read().splitlines()
-
-    try:
-        loginfo(f"Downloading FTP listing from {GBURL}")
-        output = curl("-s", "-L", GBURL)()
-
-        Path(listing_file).parent.mkdir(parents=True, exist_ok=True)
-        with open(listing_file, "w") as f:
-            f.write(output)
-        loginfo(f"Cached FTP listing: {listing_file}")
-        return output.splitlines()
-    except Exception as e:
-        logerror(f"Failed to download FTP listing: {e}")
-        return []
-
-
-def _filter_gb_files(listing: List[str], divisions: List[str]) -> List[str]:
-    """Filter GenBank files by selected divisions."""
-    div_pattern = "|".join(divisions)
-    pattern = re.compile(f"gb({div_pattern})[0-9]+\\.seq\\.gz")
-    return [line for line in listing if pattern.search(line)]
-
-
-# Task definitions
-def task_directories():
-    """Create necessary directories for GenBank download."""
-    release = _get_release_number()
-
-    directories = [
-        f"Release_{release}",
-        f"Release_{release}/fasta",
-        f"Release_{release}/fasta_fgs",
-        f"Release_{release}/stamp",
-        f"Release_{release}/tmp",
-        f"Release_{release}/depends",
-    ]
-
-    for directory in directories:
-        yield {
-            "name": directory,
-            "actions": [lambda d=directory: Path(d).mkdir(parents=True, exist_ok=True)],
-            "targets": [directory],
-            "verbosity": 2,
-        }
-
-
-def task_taxonomy():
-    """Download NCBI taxonomy."""
-    release = _get_release_number()
-    output_dir = f"Release_{release}/taxonomy"
-    output_file = f"{output_dir}/ncbi_taxonomy.tgz"
-
-    def download_taxonomy():
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        with local.cwd(output_dir):
-            obitaxonomy("--download-ncbi", "--out", "ncbi_taxonomy.tgz")()
-
-    return {
-        "actions": [download_taxonomy],
-        "targets": [output_file],
-        "verbosity": 2,
-    }
-
-
-def task_download_gb_files():
-    """Download individual GenBank files."""
-    release = _get_release_number()
-    listing = _get_ftp_listing(release)
-    gb_files = _filter_gb_files(listing, GBDIV)
-
-    for gb_file in gb_files:
-        stamp_file = f"Release_{release}/stamp/{gb_file}.stamp"
-        tmp_file = f"Release_{release}/tmp/{gb_file}"
-
-        def download_file(tmp=tmp_file, stamp=stamp_file, url=f"{GBURL}/{gb_file}"):
-            Path(tmp).parent.mkdir(parents=True, exist_ok=True)
-            Path(stamp).parent.mkdir(parents=True, exist_ok=True)
-            curl("-L", "-o", tmp, url)()
-            Path(stamp).touch()
-
-        yield {
-            "name": gb_file,
-            "actions": [download_file],
-            "targets": [stamp_file],
-            "verbosity": 1,
-        }
-
-
-def task_convert_to_fasta():
-    """Convert downloaded GenBank files to FASTA format."""
-    release = _get_release_number()
-    listing = _get_ftp_listing(release)
-    gb_files = _filter_gb_files(listing, GBDIV)
-
-    for gb_file in gb_files:
-        div = re.match(r"^gb(...).*$", gb_file).group(1)
-        stamp_file = f"Release_{release}/stamp/{gb_file}.stamp"
-        tmp_file = f"Release_{release}/tmp/{gb_file}"
-        fasta_file = f"Release_{release}/fasta/{div}/{gb_file.replace('.seq.gz', '.fasta.gz')}"
-        fasta_tmp = f"Release_{release}/tmp/{gb_file.replace('.seq.gz', '.fasta.gz')}"
-
-        def convert_file(tmp=tmp_file, fasta=fasta_file, fasta_t=fasta_tmp, div_path=div):
-            fasta_dir = f"Release_{release}/fasta/{div_path}"
-            Path(fasta_dir).mkdir(parents=True, exist_ok=True)
-            try:
-                output = obiconvert("-Z", "--fasta-output", "--skip-empty", tmp)()
-                with open(fasta_t, "w") as f:
-                    f.write(output)
-                Path(fasta_t).rename(fasta)
-            finally:
-                Path(tmp).unlink(missing_ok=True)
-
-        yield {
-            "name": f"fasta-{gb_file}",
-            "actions": [convert_file],
-            "file_dep": [stamp_file],
-            "targets": [fasta_file],
-            "verbosity": 1,
-        }
-
-
-def task_downloads():
-    """Main download task - orchestrate all downloads."""
-    return {
-        "actions": [
-            lambda: loginfo(f"GenBank downloads completed for divisions: {GBDIV}")
-        ],
-        "task_dep": ["taxonomy"],
-        "verbosity": 2,
-    }
-
-
-# ===== GenBank utility functions =====
-
-
-def list_divisions() -> str:
-    """
-    List configured GenBank divisions as CSV.
+    Args:
+        divisions: List of GenBank divisions to filter (e.g., ['bct', 'pln'])
 
     Returns:
-        Comma-separated string of division codes (e.g., "bct,pln")
+        Tuple of filenames matching selected divisions.
+        Always fetches fresh listing on each program run to catch GenBank updates.
     """
-    divisions_str = os.environ.get("SKIMINDEX__GENBANK__DIVISIONS", "bct pln")
-    return divisions_str.replace(" ", ",")
+    try:
+        loginfo(f"Downloading FTP listing from {GBURL}")
+        output = curl_download(GBURL)()
+
+        # Parse: extract filenames matching the pattern for selected divisions
+        div_pattern = "|".join(divisions)
+        pattern = re.compile(f"gb({div_pattern})[0-9]+\\.seq\\.gz")
+
+        filenames = []
+        for line in output.splitlines():
+            match = pattern.search(line)
+            if match:
+                filenames.append(match.group(0))
+
+        loginfo(f"Found {len(filenames)} GenBank files for divisions: {', '.join(divisions)}")
+        return tuple(filenames)
+    except Exception as e:
+        logerror(f"Failed to download FTP listing: {e}")
+        return ()
+
+
+def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
+    """Download and convert GenBank files, one by one, robustly.
+
+    Args:
+        release: GenBank release number
+        divisions: List of divisions to process
+
+    Returns:
+        True on success, False if any files failed.
+    """
+    genbank_base = _get_genbank_base()
+
+    # Get listing (parse and filter by division)
+    gb_files = get_ftp_listing(divisions)
+    if not gb_files:
+        logwarning(f"No GenBank files found for divisions: {', '.join(divisions)}")
+        return True
+
+    loginfo(f"Processing {len(gb_files)} GenBank files for divisions: {', '.join(divisions)}")
+
+    # Create directories
+    (genbank_base / f"Release_{release}/stamp").mkdir(parents=True, exist_ok=True)
+    (genbank_base / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
+
+    # Process each file
+    errors = 0
+    for i, gb_file in enumerate(gb_files, 1):
+        loginfo(f"[{i}/{len(gb_files)}] Processing {gb_file}")
+
+        stamp_file = genbank_base / f"Release_{release}/stamp/{gb_file}.stamp"
+
+        # Skip if already processed
+        if stamp_file.exists():
+            loginfo(f"  Already processed (stamp exists)")
+            continue
+
+        # Download and convert in one pipe: curl | obiconvert > fasta
+        try:
+            div = re.match(r"^gb(...).*$", gb_file).group(1)
+            fasta_dir = genbank_base / f"Release_{release}/fasta/{div}"
+            fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
+
+            fasta_dir.mkdir(parents=True, exist_ok=True)
+
+            loginfo(f"  Downloading and converting to FASTA...")
+
+            # Pipe: curl downloads -> obiconvert converts -> write to file
+            curl_cmd = curl_download(f"{GBURL}/{gb_file}")
+            convert_cmd = obiconvert("-Z", "--fasta-output", "--skip-empty")
+
+            with open(str(fasta_file), "w") as f:
+                (curl_cmd | convert_cmd) & f
+
+            loginfo(f"  Saved to {fasta_file}")
+        except Exception as e:
+            logerror(f"  Failed to download/convert {gb_file}: {e}")
+            # Clean up partial file
+            Path(fasta_file).unlink(missing_ok=True)
+            errors += 1
+            continue
+
+        # Mark as processed
+        stamp_file.touch()
+
+    if errors > 0:
+        logerror(f"Completed with {errors} error(s). Re-run to retry.")
+        return False
+
+    loginfo(f"✓ All {len(gb_files)} files processed successfully")
+    return True
+
+
+def download_taxonomy(release: str) -> bool:
+    """Download NCBI taxonomy."""
+    genbank_base = _get_genbank_base()
+    output_dir = genbank_base / f"Release_{release}/taxonomy"
+    output_file = output_dir / "ncbi_taxonomy.tgz"
+
+    if output_file.exists():
+        loginfo(f"Taxonomy already downloaded: {output_file}")
+        return True
+
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        loginfo("Downloading NCBI taxonomy...")
+        with local.cwd(str(output_dir)):
+            local["obitaxonomy"]("--download-ncbi", "--out", "ncbi_taxonomy.tgz")()
+        loginfo(f"Taxonomy saved: {output_file}")
+        return True
+    except Exception as e:
+        logerror(f"Failed to download taxonomy: {e}")
+        return False
+
+
+def process_genbank(divisions: List[str] = None) -> int:
+    """Main entry point: download release, taxonomy, and process GenBank files.
+
+    Args:
+        divisions: List of GenBank divisions to download (e.g., ['bct', 'pln']).
+                  If None, uses config default.
+
+    Returns:
+        0 on success, 1 on failure.
+    """
+    # Use provided divisions or fall back to config
+    if divisions is None:
+        cfg = config()
+        divisions = cfg.get("genbank", "divisions", "bct pln").split()
+
+    release = get_release_number()
+    if release == "unknown":
+        return 1
+
+    # Download taxonomy
+    if not download_taxonomy(release):
+        return 1
+
+    # Download and process GenBank files
+    if not download_and_process_genbank(release, divisions):
+        return 1
+
+    loginfo("===== GenBank download complete =====")
+    return 0

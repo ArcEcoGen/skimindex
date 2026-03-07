@@ -2,11 +2,11 @@
 """
 Download orchestration script for GenBank and reference genome data.
 
-Provides command-line interface for download operations via doit.
+Provides command-line interface for download operations.
 
 Usage:
     python download.py genbank [--divisions "bct pln ..."]
-    python download.py refgenome [--list] [--genbank-div]
+    python download.py refgenome [--list] [--section NAME]
     python download.py refgenome
 
 Examples:
@@ -16,14 +16,14 @@ Examples:
     # Download GenBank with specific divisions
     python download.py genbank --divisions "bct pln pri"
 
-    # Download all (GenBank + all reference genome sections)
-    python download.py refgenome
-
     # List available reference genome sections
     python download.py refgenome --list
 
-    # List configured GenBank divisions
-    python download.py refgenome --genbank-div
+    # Download a specific reference genome section
+    python download.py refgenome --section human
+
+    # Download all reference genomes (all configured sections)
+    python download.py refgenome
 
 Also available as:
     python -m skimindex               (via __main__.py)
@@ -31,62 +31,11 @@ Also available as:
 """
 
 import argparse
-import importlib
-import os
 import sys
 from typing import Optional
 
-from doit.cmd_base import TaskLoader2
-from doit.doit_cmd import DoitMain
-
-from skimindex.download.genbank import list_divisions
-from skimindex.download.refgenome import list_sections
-
-
-class PythonModuleTaskLoader(TaskLoader2):
-    """Load tasks from a Python module that contains task functions."""
-
-    def __init__(self, module_name: str):
-        self.module_name = module_name
-        self.module = None
-
-    def setup(self, opt_values):
-        """Setup method required by TaskLoader2."""
-        pass
-
-    def load_doit_config(self):
-        """Load DOIT_CONFIG from the module."""
-        if self.module is None:
-            self.module = importlib.import_module(self.module_name)
-        return getattr(self.module, 'DOIT_CONFIG', {})
-
-    def load_tasks(self, cmd, pos_args):
-        """Load task generators from the module."""
-        if self.module is None:
-            self.module = importlib.import_module(self.module_name)
-
-        tasks = []
-        for name in dir(self.module):
-            if name.startswith('task_'):
-                obj = getattr(self.module, name)
-                if callable(obj):
-                    tasks.append(obj)
-        return tasks, pos_args
-
-
-def _run_doit_tasks(module_name: str, task_list: list) -> int:
-    """Execute doit tasks from a module via doit API.
-
-    Args:
-        module_name: Module containing tasks (e.g., 'skimindex.download')
-        task_list: List of task names to run (e.g., ['genbank'])
-
-    Returns:
-        0 on success, non-zero on failure
-    """
-    loader = PythonModuleTaskLoader(module_name)
-    doit_main = DoitMain(loader)
-    return doit_main.run(task_list)
+from skimindex.download.genbank import list_divisions, process_genbank
+from skimindex.download.refgenome import list_sections, process_refgenome
 
 
 def genbank_command(args) -> int:
@@ -97,11 +46,13 @@ def genbank_command(args) -> int:
         print(divisions if divisions else "")
         return 0
 
-    # Run download task
+    # Determine divisions: CLI option > config default
     if args.divisions:
-        os.environ["SKIMINDEX__GENBANK__DIVISIONS"] = args.divisions
+        divisions = args.divisions.split()
+    else:
+        divisions = None  # Let process_genbank use config default
 
-    return _run_doit_tasks("skimindex.download", ["genbank"])
+    return process_genbank(divisions)
 
 
 def refgenome_command(args) -> int:
@@ -112,18 +63,18 @@ def refgenome_command(args) -> int:
         print(sections if sections else "")
         return 0
 
-    # Single section download (run the entire pipeline for that section)
+    # Single section download
     if args.section:
-        return _run_doit_tasks("skimindex.download.refgenome", [f"compress:{args.section}"])
+        return process_refgenome([args.section])
 
-    # Run doit refgenomes task (all sections + genbank)
-    return _run_doit_tasks("skimindex.download", ["refgenomes"])
+    # Download all sections (use config)
+    return process_refgenome()
 
 
 def main(argv: Optional[list] = None) -> int:
     """Main entry point for the download CLI."""
     parser = argparse.ArgumentParser(
-        description="Download GenBank and reference genome data using doit orchestration",
+        description="Download GenBank and reference genome data",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

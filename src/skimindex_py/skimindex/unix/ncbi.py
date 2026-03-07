@@ -44,7 +44,7 @@ def datasets(*args, **kwargs):
 
     Full documentation: datasets --help
     """
-    return local["datasets"][args]
+    return local["datasets"][*args]
 
 
 def dataformat(*args, **kwargs):
@@ -63,7 +63,7 @@ def dataformat(*args, **kwargs):
 
     Full documentation: dataformat --help
     """
-    return local["dataformat"][args]
+    return local["dataformat"][*args]
 
 
 # datasets download shortcuts — convenient API

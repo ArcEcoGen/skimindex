@@ -44,7 +44,7 @@ def pigz(*args, **kwargs):
 
     Full documentation: pigz --help
     """
-    return local["pigz"][args]
+    return local["pigz"][*args]
 
 
 def pigz_compress(*args, **kwargs):
@@ -76,7 +76,7 @@ def unzip(*args, **kwargs):
 
     Full documentation: unzip --help
     """
-    return local["unzip"][args]
+    return local["unzip"][*args]
 
 
 def unzip_list(*args, **kwargs):

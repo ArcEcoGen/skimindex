@@ -40,7 +40,7 @@ ARG NTCARD_VERSION=bioconda::ntcard
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl make unzip less jq pigz sudo python3-plumbum python3-doit \
+    && apt-get install -y --no-install-recommends curl make unzip less jq pigz sudo python3-plumbum \
     && rm -rf /var/lib/apt/lists/*
 
 # Install NCBI datasets CLI tools (architecture-aware) and C tools from src/

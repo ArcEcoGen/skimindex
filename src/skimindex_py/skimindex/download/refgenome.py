@@ -1,88 +1,60 @@
 """
-Reference genome download module — pure doit pipeline for NCBI genome downloads.
+Reference genome download processor — pure Python, file-based robustness.
 
-Implements functionality of download_references.sh + _download_refgenome.sh:
-- Downloads genome assemblies from NCBI for a given taxon (task_download)
-- Extracts GBFF files from the ZIP archive (task_extract)
-- Compresses one GBFF per accession: {scientific_name}-{accession}.gbff.gz (task_compress)
-- Orchestrates downloads for all configured sections via doit
+Orchestrates NCBI reference genome downloads and processing:
+- Downloads genome assemblies from NCBI by taxon
+- Extracts GBFF files from ZIP archives
+- Compresses per-accession: {scientific_name}-{accession}.gbff.gz
 
-Fully doit-based orchestration:
-- doit -f skimindex.download.refgenome (all sections)
-- doit -f skimindex.download.refgenome download:human (single section download)
-- doit -f skimindex.download.refgenome extract:human (single section extract)
-- doit -f skimindex.download.refgenome compress:human (single section compress)
-
-The pipeline for each section:
-  task_download(section)
-    → task_extract(section)
-      → task_compress(section)
-
-All three tasks are generated for each configured section.
+Uses stamp files for robustness: if interrupted, relaunching skips already-processed steps.
 """
 
 import json
-import os
 import re
 import shutil
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 from skimindex.config import config
-from skimindex.log import loginfo, logwarning, logerror
-from skimindex.unix.ncbi import datasets
+from skimindex.log import logerror, loginfo, logwarning
 from skimindex.unix.compress import pigz, unzip
-
-
-# Get reference genome sections from singleton config
-_SECTIONS = config().ref_genomes
+from skimindex.unix.ncbi import datasets
 
 
 def list_sections() -> str:
-    """
-    List available reference genome sections as CSV.
-
-    Returns:
-        Comma-separated string of section names
-    """
-    sections = _get_sections()
+    """List available reference genome sections as CSV from config."""
+    cfg = config()
+    sections = cfg.ref_genomes
     return ",".join(sections) if sections else ""
 
 
-def _load_from_section(section: str) -> Dict[str, Any]:
-    """Load parameters from config section environment variables."""
+def _load_section_config(section: str) -> Dict[str, Any]:
+    """Load parameters for a reference genome section from config."""
     try:
-        section_upper = section.upper()
+        cfg = config()
+        section_data = cfg.data.get(section, {})
 
         # Get taxon (required)
-        taxon_var = f"SKIMINDEX__{section_upper}__TAXON"
-        taxon = os.environ.get(taxon_var)
+        taxon = section_data.get("taxon")
         if not taxon:
-            logerror(f"Section [{section}]: {taxon_var} is not defined.")
+            logerror(f"Section [{section}]: 'taxon' is not defined in config.")
             return {}
 
         # Get output directory
-        rel_dir_var = f"SKIMINDEX__{section_upper}__DIRECTORY"
-        genbank_var = "SKIMINDEX__DIRECTORIES__GENBANK"
-        genbank_root = os.environ.get(genbank_var, "/genbank")
-        rel_dir = os.environ.get(rel_dir_var, section.lower())
-        output_dir = str(Path(genbank_root) / rel_dir)
+        genbank_root = cfg.get("directories", "genbank", "/genbank")
+        rel_dir = section_data.get("directory", section.lower())
+        output_dir = Path(genbank_root) / rel_dir
 
         # Get optional filters
-        reference_var = f"SKIMINDEX__{section_upper}__REFERENCE"
-        assembly_source_var = f"SKIMINDEX__{section_upper}__ASSEMBLY_SOURCE"
-        assembly_level_var = f"SKIMINDEX__{section_upper}__ASSEMBLY_LEVEL"
-        assembly_version_var = f"SKIMINDEX__{section_upper}__ASSEMBLY_VERSION"
-
-        reference = os.environ.get(reference_var, "").lower() == "true"
+        reference = str(section_data.get("reference", "false")).lower() == "true"
 
         return {
             "taxon": taxon,
             "output_dir": output_dir,
             "reference": reference,
-            "assembly_source": os.environ.get(assembly_source_var),
-            "assembly_level": os.environ.get(assembly_level_var),
-            "assembly_version": os.environ.get(assembly_version_var),
+            "assembly_source": section_data.get("assembly_source"),
+            "assembly_level": section_data.get("assembly_level"),
+            "assembly_version": section_data.get("assembly_version"),
         }
     except Exception as e:
         logerror(f"Error loading section [{section}]: {e}")
@@ -116,14 +88,14 @@ def _download_assemblies(
     assembly_level: Optional[str],
     assembly_version: Optional[str],
 ) -> bool:
-    """Download genome assemblies from NCBI using datasets (plumbum)."""
+    """Download genome assemblies from NCBI using datasets command."""
     try:
         loginfo(f"Downloading assemblies for '{taxon}'...")
         loginfo(f"Destination: {zip_file}")
         loginfo("This may take a long time — be patient...")
 
         # Build datasets command arguments
-        cmd_args = ["download", "genome", "--taxon", taxon]
+        cmd_args = ["download", "genome", "taxon", taxon]
 
         if reference:
             cmd_args.append("--reference")
@@ -137,7 +109,7 @@ def _download_assemblies(
         cmd_args.extend(["--include", "gbff"])
         cmd_args.extend(["--filename", str(zip_file)])
 
-        # Execute datasets command via plumbum
+        # Execute datasets command
         datasets(*cmd_args)()
         return True
 
@@ -147,10 +119,10 @@ def _download_assemblies(
 
 
 def _extract_assemblies(zip_file: Path, output_path: Path) -> bool:
-    """Extract ZIP archive using unzip (plumbum)."""
+    """Extract ZIP archive."""
     try:
         loginfo(f"Extracting {zip_file}...")
-        # Execute unzip via plumbum
+        output_path.mkdir(parents=True, exist_ok=True)
         unzip("-d", str(output_path), str(zip_file))()
         return True
     except Exception as e:
@@ -158,10 +130,72 @@ def _extract_assemblies(zip_file: Path, output_path: Path) -> bool:
         return False
 
 
+def _get_organism_name(report_file: Path, accession: str) -> Optional[str]:
+    """Extract organism name from assembly_data_report.jsonl."""
+    try:
+        if not report_file.exists():
+            return None
+
+        with open(report_file, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                data = json.loads(line)
+                if data.get("accession") == accession:
+                    return data.get("organism", {}).get("organism_name")
+    except Exception:
+        pass
+    return None
+
+
+def _safe_name(organism: str) -> str:
+    """Convert organism name to safe filename."""
+    safe = re.sub(r"[^a-zA-Z0-9._-]", "_", organism)
+    safe = re.sub(r"_+", "_", safe)
+    safe = safe.strip("_")
+    return safe
+
+
+def _consolidate_accession(accession_dir: Path, organism: str, out_file: Path) -> bool:
+    """Consolidate and compress GBFF files for an accession."""
+    try:
+        # Find all .gbff files
+        gbff_files = list(accession_dir.glob("**/*.gbff"))
+
+        if not gbff_files:
+            logerror(f"No .gbff files found in {accession_dir}")
+            return False
+
+        # If only one file, compress it directly
+        if len(gbff_files) == 1:
+            gbff_file = gbff_files[0]
+            pigz("-k", str(gbff_file))()
+            Path(str(gbff_file) + ".gz").rename(out_file)
+            return True
+
+        # Multiple files: concatenate then compress
+        temp_gbff = accession_dir / "consolidated.gbff"
+        try:
+            with open(temp_gbff, "wb") as out_f:
+                for gbff_file in sorted(gbff_files):
+                    with open(gbff_file, "rb") as in_f:
+                        out_f.write(in_f.read())
+
+            pigz("-k", str(temp_gbff))()
+            Path(str(temp_gbff) + ".gz").rename(out_file)
+            return True
+        finally:
+            temp_gbff.unlink(missing_ok=True)
+
+    except Exception as e:
+        logerror(f"Error consolidating {accession_dir}: {e}")
+        return False
+
+
 def _compress_accessions(
     dataset_dir: Path, output_path: Path, report_file: Path
 ) -> int:
-    """Compress GBFF files per accession using pigz (plumbum)."""
+    """Compress GBFF files per accession. Returns number of errors."""
     loginfo(f"Compressing per-accession GBFF files into {output_path}...")
 
     # Find accession directories
@@ -200,248 +234,121 @@ def _compress_accessions(
             logerror(f"Failed to compress {accession}")
             errors += 1
 
-    loginfo(f"  Total    : {total}")
+    loginfo(f"  Total: {total}")
     return errors
 
 
-def _get_organism_name(report_file: Path, accession: str) -> Optional[str]:
-    """Extract organism name from assembly_data_report.jsonl."""
-    try:
-        if not report_file.exists():
-            return None
+def process_refgenome_section(section: str) -> bool:
+    """Download and process a single reference genome section.
 
-        with open(report_file, "r") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                data = json.loads(line)
-                if data.get("accession") == accession:
-                    return data.get("organism", {}).get("organism_name")
-    except Exception:
-        pass
-    return None
+    Returns True on success, False if any step failed.
+    """
+    loginfo(f"===== Processing reference genome section: {section} =====")
 
-
-def _safe_name(organism: str) -> str:
-    """Convert organism name to safe filename."""
-    # Replace spaces and special chars with underscores
-    safe = re.sub(r"[^a-zA-Z0-9._-]", "_", organism)
-    # Remove consecutive underscores
-    safe = re.sub(r"_+", "_", safe)
-    # Remove leading/trailing underscores
-    safe = safe.strip("_")
-    return safe
-
-
-def _consolidate_accession(accession_dir: Path, organism: str, out_file: Path) -> bool:
-    """Consolidate and compress GBFF files for an accession using pigz (plumbum)."""
-    try:
-        # Find all .gbff files in accession directory
-        gbff_files = list(accession_dir.glob("**/*.gbff"))
-
-        if not gbff_files:
-            logerror(f"No .gbff files found in {accession_dir}")
-            return False
-
-        # If only one file, compress it directly
-        if len(gbff_files) == 1:
-            gbff_file = gbff_files[0]
-            # Compress with pigz -k (keep original), output goes to .gz
-            pigz("-k", str(gbff_file))()
-            Path(str(gbff_file) + ".gz").rename(out_file)
-            return True
-
-        # Multiple files: concatenate then compress
-        temp_gbff = accession_dir / "consolidated.gbff"
-        try:
-            with open(temp_gbff, "wb") as out_f:
-                for gbff_file in sorted(gbff_files):
-                    with open(gbff_file, "rb") as in_f:
-                        out_f.write(in_f.read())
-
-            # Compress consolidated file with pigz -k
-            pigz("-k", str(temp_gbff))()
-            Path(str(temp_gbff) + ".gz").rename(out_file)
-            return True
-        finally:
-            temp_gbff.unlink(missing_ok=True)
-
-    except Exception as e:
-        logerror(f"Error consolidating {accession_dir}: {e}")
+    # Load section config
+    config_vals = _load_section_config(section)
+    if not config_vals:
+        logerror(f"Section [{section}] configuration not found")
         return False
 
+    taxon = config_vals["taxon"]
+    output_dir = config_vals["output_dir"]
+    reference = config_vals["reference"]
+    assembly_source = config_vals.get("assembly_source")
+    assembly_level = config_vals.get("assembly_level")
+    assembly_version = config_vals.get("assembly_version")
 
-# ===== doit pure pipeline orchestration =====
+    # Setup paths
+    zip_file = output_dir / "download.zip"
+    dataset_dir = output_dir / "ncbi_dataset"
+    report_file = dataset_dir / "data" / "assembly_data_report.jsonl"
+
+    # Stamp files for robustness
+    download_stamp = output_dir / ".download.stamp"
+    extract_stamp = output_dir / ".extract.stamp"
+    compress_stamp = output_dir / ".compress.stamp"
+
+    # Step 1: Download ZIP (skip if already done)
+    if not download_stamp.exists():
+        loginfo(f"[{section}] Downloading assemblies for taxon: {taxon}")
+        dataset_flags = _format_dataset_flags(reference, assembly_source, assembly_level, assembly_version)
+        if dataset_flags != "<none>":
+            loginfo(f"[{section}] Datasets flags: {dataset_flags}")
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if not _download_assemblies(taxon, zip_file, reference, assembly_source, assembly_level, assembly_version):
+            logerror(f"[{section}] Failed to download")
+            return False
+
+        download_stamp.touch()
+        loginfo(f"[{section}] Download complete")
+    else:
+        loginfo(f"[{section}] ZIP already downloaded (stamp exists)")
+
+    # Step 2: Extract ZIP (skip if already done)
+    if not extract_stamp.exists():
+        loginfo(f"[{section}] Extracting {zip_file}...")
+        if not _extract_assemblies(zip_file, output_dir):
+            logerror(f"[{section}] Failed to extract")
+            return False
+
+        # Delete ZIP after extraction
+        zip_file.unlink(missing_ok=True)
+        extract_stamp.touch()
+        loginfo(f"[{section}] Extraction complete")
+    else:
+        loginfo(f"[{section}] Already extracted (stamp exists)")
+
+    # Step 3: Compress accessions (skip if already done)
+    if not compress_stamp.exists():
+        loginfo(f"[{section}] Compressing per-accession files...")
+        errors = _compress_accessions(dataset_dir, output_dir, report_file)
+
+        if errors == 0:
+            # Cleanup extracted data
+            loginfo(f"[{section}] Removing {dataset_dir}...")
+            shutil.rmtree(dataset_dir, ignore_errors=True)
+            compress_stamp.touch()
+            loginfo(f"[{section}] ✓ Completed successfully")
+        else:
+            logerror(f"[{section}] {errors} accession(s) failed — re-run to retry")
+            return False
+    else:
+        loginfo(f"[{section}] Already compressed (stamp exists)")
+
+    return True
 
 
-# doit configuration
-DOIT_CONFIG = {
-    "default_tasks": ["all"],
-    "verbosity": 2,
-}
+def process_refgenome(sections: List[str] = None) -> int:
+    """Main entry point: process reference genome sections.
 
+    Args:
+        sections: List of section names to process.
+                 If None, uses all configured sections from config.
 
-def _get_sections() -> List[str]:
-    """Return reference genome sections (loaded at module init)."""
-    return _SECTIONS
-
-
-def task_download():
-    """Download genome assemblies for each section (task generator)."""
-    sections = _get_sections()
+    Returns:
+        0 on success, 1 if any section failed.
+    """
+    # Use provided sections or get from config
+    if sections is None:
+        cfg = config()
+        sections = cfg.ref_genomes
 
     if not sections:
-        yield {
-            "name": "none",
-            "actions": [
-                lambda: logwarning("No reference genome sections found in config.")
-            ],
-            "verbosity": 2,
-        }
-        return
+        logwarning("No reference genome sections configured")
+        return 0
 
+    loginfo(f"Processing {len(sections)} reference genome section(s)")
+
+    # Process each section
+    errors = 0
     for section in sections:
-        # Get section configuration
-        config_vals = _load_from_section(section)
-        if not config_vals:
-            yield {
-                "name": section,
-                "actions": [
-                    lambda s=section: logerror(
-                        f"Section [{s}] configuration not found"
-                    )
-                ],
-                "verbosity": 2,
-            }
-            continue
+        if not process_refgenome_section(section):
+            errors += 1
 
-        # Extract parameters
-        final_taxon = config_vals.get("taxon")
-        final_output_dir = config_vals.get("output_dir")
-        final_reference = config_vals.get("reference", False)
-        final_assembly_source = config_vals.get("assembly_source")
-        final_assembly_level = config_vals.get("assembly_level")
-        final_assembly_version = config_vals.get("assembly_version")
+    if errors > 0:
+        logerror(f"===== {errors} section(s) failed =====")
+        return 1
 
-        output_path = Path(final_output_dir)
-        zip_file = output_path / "download.zip"
-        dataset_dir = output_path / "ncbi_dataset"
-
-        def download_assemblies_action(
-            s=section,
-            t=final_taxon,
-            z=zip_file,
-            ref=final_reference,
-            src=final_assembly_source,
-            lvl=final_assembly_level,
-            ver=final_assembly_version,
-        ):
-            loginfo(f"[{s}] Downloading assemblies for taxon: {t}")
-            dataset_flags = _format_dataset_flags(ref, src, lvl, ver)
-            if dataset_flags != "<none>":
-                loginfo(f"[{s}] Datasets flags: {dataset_flags}")
-            return _download_assemblies(t, z, ref, src, lvl, ver)
-
-        yield {
-            "name": section,
-            "actions": [download_assemblies_action],
-            "targets": [str(zip_file)],
-            "verbosity": 2,
-        }
-
-
-def task_extract():
-    """Extract downloaded ZIP archives (task generator)."""
-    sections = _get_sections()
-
-    if not sections:
-        return
-
-    for section in sections:
-        config_vals = _load_from_section(section)
-        if not config_vals:
-            continue
-
-        final_output_dir = config_vals.get("output_dir")
-        output_path = Path(final_output_dir)
-        zip_file = output_path / "download.zip"
-        dataset_dir = output_path / "ncbi_dataset"
-
-        def extract_action(s=section, z=zip_file, o=output_path):
-            loginfo(f"[{s}] Extracting {z}...")
-            success = _extract_assemblies(z, o)
-            if success:
-                z.unlink(missing_ok=True)
-                loginfo(f"[{s}] Extraction complete")
-            return success
-
-        yield {
-            "name": section,
-            "actions": [extract_action],
-            "file_dep": [str(zip_file)],
-            "targets": [str(dataset_dir)],
-            "task_dep": [f"download:{section}"],
-            "verbosity": 2,
-        }
-
-
-def task_compress():
-    """Compress GBFF files per accession (task generator)."""
-    sections = _get_sections()
-
-    if not sections:
-        return
-
-    for section in sections:
-        config_vals = _load_from_section(section)
-        if not config_vals:
-            continue
-
-        final_output_dir = config_vals.get("output_dir")
-        output_path = Path(final_output_dir)
-        dataset_dir = output_path / "ncbi_dataset"
-        report_file = dataset_dir / "data" / "assembly_data_report.jsonl"
-
-        def compress_action(s=section, d=dataset_dir, o=output_path, r=report_file):
-            loginfo(f"[{s}] Compressing per-accession GBFF files...")
-            errors = _compress_accessions(d, o, r)
-
-            if errors == 0:
-                loginfo(f"[{s}] Removing {d}...")
-                shutil.rmtree(d, ignore_errors=True)
-                loginfo(f"[{s}] ✓ Completed successfully")
-                return True
-            else:
-                logerror(f"[{s}] {errors} accession(s) failed — re-run to retry")
-                return False
-
-        yield {
-            "name": section,
-            "actions": [compress_action],
-            "task_dep": [f"extract:{section}"],
-            "verbosity": 2,
-        }
-
-
-def task_all():
-    """Aggregate task for all sections (orchestration)."""
-    sections = _get_sections()
-
-    if not sections:
-        return {
-            "actions": [
-                lambda: logwarning("No reference genome sections configured.")
-            ],
-            "verbosity": 2,
-        }
-
-    # Depend on compress tasks for all sections (the final stage)
-    task_deps = [f"compress:{section}" for section in sections]
-
-    return {
-        "actions": [
-            lambda: loginfo(f"===== Completed {len(sections)} section(s) =====")
-        ],
-        "task_dep": task_deps,
-        "verbosity": 2,
-    }
+    loginfo("===== All reference genomes processed successfully =====")
+    return 0

@@ -1,5 +1,4 @@
-ARG BASE_IMAGE=registry.metabarcoding.org/arcecogen/skimindex:latest
-FROM ${BASE_IMAGE}
+FROM registry.metabarcoding.org/arcecogen/skimindex:latest
 
 USER root
 
@@ -8,6 +7,7 @@ RUN apt-get update \
         git \
         openssh-client \
         procps \
+    && (curl -fsSL https://claude.ai/install.sh | bash) \
     && rm -rf /var/lib/apt/lists/*
 
 USER skimindex

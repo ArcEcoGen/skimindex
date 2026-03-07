@@ -11,12 +11,42 @@ def curl(*args):
     """
     Execute curl command with given arguments.
 
-    Returns the output as a string.
+    Returns a Command object that can be executed with ().
 
     Args:
         *args: Arguments to pass to curl
 
     Returns:
-        str: Standard output from curl
+        Command: plumbum Command object to be executed with ()
     """
-    return local["curl"](*args)
+    return local["curl"][*args]
+
+
+def curl_download(url: str, *extra_args):
+    """
+    Download from URL with sensible defaults for robustness.
+
+    Includes:
+      - HTTP/2 support (faster like modern browsers)
+      - User-Agent header (avoid throttling)
+      - Max time: 300 seconds (5 minutes)
+      - Automatic retries: up to 3 times on failure
+      - Silent mode (-s) and follow redirects (-L)
+
+    Args:
+        url: URL to download
+        *extra_args: Additional curl arguments (e.g., "-o", "filename")
+
+    Returns:
+        Command: plumbum Command object to be executed with ()
+    """
+    return curl(
+        "-s",
+        "-L",
+        "--http2",
+        "--user-agent", "Mozilla/5.0",
+        "--max-time", "300",
+        "--retry", "3",
+        url,
+        *extra_args
+    )

@@ -1,0 +1,20 @@
+services:
+  skimindex-dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    user: skimindex
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+      - ../genbank:/genbank
+      - ../indexes:/indexes
+      - ../skims:/skims
+      - ../processed_data:/processed_data
+      - ../config:/config
+      - ../log:/log
+      - ../obiluascripts:/app/obiluascripts
+      - ../scripts:/app/scripts
+      - ../bin:/app/bin
+    environment: []
+    command: ["bash", "-c", "tail -f /dev/null"]
