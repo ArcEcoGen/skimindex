@@ -272,9 +272,12 @@ def _download_accession(accession: str, zip_file: Path, stamp: Path) -> bool:
 
 
 def _extract_accession(
-    accession: str, zip_file: Path, work_dir: Path, stamp: Path
+    accession: str, zip_file: Path, work_dir: Path, stamp: Path, dl_stamp: Path
 ) -> bool:
-    """Extract a single accession ZIP. Skip if stamp exists."""
+    """Extract a single accession ZIP. Skip if stamp exists.
+
+    On failure, removes ZIP and dl_stamp to force re-download on retry.
+    """
     if stamp.exists():
         loginfo(f"    [{accession}] Already extracted")
         return True
@@ -285,13 +288,16 @@ def _extract_accession(
 
     try:
         work_dir.mkdir(parents=True, exist_ok=True)
-        unzip("-d", str(work_dir), str(zip_file))()
+        unzip("-o", "-d", str(work_dir), str(zip_file))()
         stamp.touch()
         # Suppress ZIP after extraction
         zip_file.unlink(missing_ok=True)
         return True
     except Exception as e:
         logerror(f"    [{accession}] Extract failed: {e}")
+        # Clean up corrupted ZIP and dl_stamp to force re-download on retry
+        zip_file.unlink(missing_ok=True)
+        dl_stamp.unlink(missing_ok=True)
         return False
 
 
@@ -453,7 +459,7 @@ def process_refgenome_section(
             errors += 1
             continue
 
-        if not _extract_accession(accession, zip_file, work_dir, ext_stamp):
+        if not _extract_accession(accession, zip_file, work_dir, ext_stamp, dl_stamp):
             errors += 1
             continue
 

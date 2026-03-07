@@ -501,11 +501,6 @@ case "$SUBCMD" in
             logerror "No container runtime found (apptainer, docker or podman required)."
             exit 1
         fi
-        if [[ "$RUNTIME" == "apptainer" && ! -f "$SIF_FILE" ]]; then
-            logerror "SIF image not found: $SIF_FILE"
-            logerror "Run: $(basename "$0") update"
-            exit 1
-        fi
         _shell_mounts=()
         while [[ $# -gt 0 ]]; do
             case "$1" in
@@ -524,11 +519,6 @@ esac
 # All remaining subcommands require a container runtime
 if [[ "$RUNTIME" == "none" ]]; then
     logerror "No container runtime found (apptainer, docker or podman required)."
-    exit 1
-fi
-if [[ "$RUNTIME" == "apptainer" && ! -f "$SIF_FILE" ]]; then
-    logerror "SIF image not found: $SIF_FILE"
-    logerror "Run: cd <project>/docker && make pull-sif"
     exit 1
 fi
 
