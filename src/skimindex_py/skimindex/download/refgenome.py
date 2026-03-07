@@ -264,6 +264,7 @@ def _download_accession(accession: str, zip_file: Path, stamp: Path) -> bool:
             "--filename", str(zip_file),
         )()
         stamp.touch()
+        loginfo(f"    [{accession}] Download complete")
         return True
     except Exception as e:
         logerror(f"    [{accession}] Download failed: {e}")
@@ -287,11 +288,13 @@ def _extract_accession(
         return False
 
     try:
+        loginfo(f"    [{accession}] Extracting...")
         work_dir.mkdir(parents=True, exist_ok=True)
         unzip("-o", "-d", str(work_dir), str(zip_file))()
         stamp.touch()
         # Suppress ZIP after extraction
         zip_file.unlink(missing_ok=True)
+        loginfo(f"    [{accession}] Extraction complete")
         return True
     except Exception as e:
         logerror(f"    [{accession}] Extract failed: {e}")
@@ -327,11 +330,13 @@ def _compress_accession(
         logerror(f"    [{accession}] Dataset dir not found: {dataset_dir}")
         return False
 
+    loginfo(f"    [{accession}] Compressing...")
     ok = _consolidate_accession(dataset_dir, organism_name, out_file)
     if ok:
         stamp.touch()
         # Cleanup work directory
         shutil.rmtree(work_dir, ignore_errors=True)
+        loginfo(f"    [{accession}] Compression complete")
     return ok
 
 
@@ -356,7 +361,7 @@ def _consolidate_accession(accession_dir: Path, organism: str, out_file: Path) -
         # If only one file, compress it directly
         if len(gbff_files) == 1:
             gbff_file = gbff_files[0]
-            pigz("-k", str(gbff_file))()
+            pigz("-f", "-k", str(gbff_file))()
             Path(str(gbff_file) + ".gz").rename(out_file)
             return True
 
@@ -368,7 +373,7 @@ def _consolidate_accession(accession_dir: Path, organism: str, out_file: Path) -
                     with open(gbff_file, "rb") as in_f:
                         out_f.write(in_f.read())
 
-            pigz("-k", str(temp_gbff))()
+            pigz("-f", "-k", str(temp_gbff))()
             Path(str(temp_gbff) + ".gz").rename(out_file)
             return True
         finally:

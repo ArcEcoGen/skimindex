@@ -159,6 +159,7 @@ _ski_ensure_current() {
     [[ "$RUNTIME" == "apptainer" ]] || return 0
     (( _SKI_LOCAL )) && return 0
     _ski_apptainer_needs_update && _ski_update
+    return 0
 }
 
 # _ski_run_interactive [extra_mount ...]
