@@ -130,6 +130,59 @@ user_scripts() {
 }
 
 # ---------------------------------------------------------------------------
+# pyproject_scripts
+#   Extract script names and module paths from [project.scripts] in pyproject.toml
+#   Output format: "script_name module.path"
+# ---------------------------------------------------------------------------
+pyproject_scripts() {
+    local pyproject="${ROOT}/src/skimindex_py/pyproject.toml"
+    [[ -f "$pyproject" ]] || return 0
+
+    awk '
+        /^\[project\.scripts\]/ { in_scripts=1; next }
+        /^\[/ { in_scripts=0; next }
+        in_scripts && /^[a-zA-Z_][a-zA-Z0-9_-]*[[:space:]]*=/ {
+            # Extract script name (everything before =)
+            match($0, /^[a-zA-Z_][a-zA-Z0-9_-]*/)
+            name = substr($0, RSTART, RLENGTH)
+            # Extract module path (everything between quotes after =, before :)
+            if (match($0, /"([^":]+)/)) {
+                module = substr($0, RSTART+1, RLENGTH-1)
+            } else if (match($0, /'\''([^'\'':]+)/)) {
+                module = substr($0, RSTART+1, RLENGTH-1)
+            }
+            if (module) printf "%s %s\n", name, module
+        }
+    ' "$pyproject" | sort
+}
+
+# ---------------------------------------------------------------------------
+# python_script_description <module_path>
+#   Extract first line of docstring from a Python module
+#   module_path format: "skimindex._download" → src/skimindex_py/skimindex/_download.py
+# ---------------------------------------------------------------------------
+python_script_description() {
+    local module="$1"
+    local file="${ROOT}/src/skimindex_py/${module//.//}.py"
+    [[ -f "$file" ]] || return 0
+
+    awk '
+        /^"""/ || /^'\'''\'''\''/ {
+            if (in_docstring) { exit }
+            in_docstring=1
+            next
+        }
+        in_docstring && (/^"""/ || /^'\'''\'''\''/) {
+            exit
+        }
+        in_docstring {
+            sub(/^[[:space:]]*/, "")
+            if ($0) { print; exit }
+        }
+    ' "$file" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
 # script_description <script.sh>
 #   Extract a one-line description from the script header.
 #   Convention: the first non-empty comment line that is not a separator
@@ -164,13 +217,20 @@ generate_subcommands_list() {
     printf '#   %-24s %s\n' "shell" \
         "Start an interactive shell inside the container."
 
-    # Auto-generated from scripts
+    # Auto-generated from bash scripts in scripts/
     local script subcommand desc
     while IFS= read -r script; do
         subcommand="${script%.sh}"
         desc="$(script_description "$script")"
         printf '#   %-24s %s\n' "$subcommand" "$desc"
     done < <(user_scripts)
+
+    # Auto-generated from Python scripts in pyproject.toml
+    local script module desc
+    while IFS=' ' read -r script module; do
+        desc="$(python_script_description "$module")"
+        printf '#   %-24s %s\n' "$script" "${desc:-Python module}"
+    done < <(pyproject_scripts)
 }
 
 # ---------------------------------------------------------------------------
@@ -179,12 +239,22 @@ generate_subcommands_list() {
 # ---------------------------------------------------------------------------
 generate_subcommands_case() {
     local script subcommand
+
+    # Bash scripts from scripts/ directory
     while IFS= read -r script; do
         subcommand="${script%.sh}"
         printf '    %s)\n' "$subcommand"
         printf '        _ski_run_exec %s "$@"\n' "$script"
         printf '        ;;\n'
     done < <(user_scripts)
+
+    # Python scripts from pyproject.toml
+    local script module
+    while IFS=' ' read -r script module; do
+        printf '    %s)\n' "$script"
+        printf '        _ski_run_exec %s "$@"\n' "$script"
+        printf '        ;;\n'
+    done < <(pyproject_scripts)
 }
 
 # ---------------------------------------------------------------------------
