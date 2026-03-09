@@ -16,7 +16,7 @@ import re
 import shutil
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
@@ -91,7 +91,10 @@ def get_ftp_listing(divisions: List[str]) -> tuple:
 
 
 def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
-    """Download and convert GenBank files, one by one, robustly.
+    """Download and convert GenBank files, grouped by division.
+
+    Processes each division separately, downloading and converting files
+    one by one. Uses temporary files for atomicity.
 
     Args:
         release: GenBank release number
@@ -117,58 +120,73 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
     (genbank_base / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
     (genbank_base / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
 
-    # Process each file
+    # Group files by division
+    division_groups: Dict[str, List[str]] = {}
+    for gb_file in gb_files:
+        div = re.match(r"^gb(...).*$", gb_file).group(1)
+        if div not in division_groups:
+            division_groups[div] = []
+        division_groups[div].append(gb_file)
+
+    # Process each division
     errors = 0
     failed_files = []
-    for i, gb_file in enumerate(gb_files, 1):
-        loginfo(f"[{i}/{len(gb_files)}] Processing {gb_file}")
+    total_files = len(gb_files)
+    file_counter = 0
 
-        stamp_file = genbank_base / f"Release_{release}/stamp/{gb_file}.stamp"
+    for div in sorted(division_groups.keys()):
+        div_files = division_groups[div]
+        loginfo(f"Division [{div}] : {len(div_files)} file(s)")
 
-        # Skip if already processed
-        if stamp_file.exists():
-            loginfo(f"  Already processed (stamp exists)")
-            continue
+        for gb_file in div_files:
+            file_counter += 1
+            loginfo(f"  [{file_counter}/{total_files}] {gb_file}")
 
-        # Download and convert in one pipe: curl | obiconvert > tmp file, then move to final location
-        try:
-            div = re.match(r"^gb(...).*$", gb_file).group(1)
-            fasta_dir = genbank_base / f"Release_{release}/fasta/{div}"
-            fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
+            stamp_file = genbank_base / f"Release_{release}/stamp/{gb_file}.stamp"
 
-            # Temporary file in tmp/ — atomic move on success
-            tmp_file = (
-                genbank_base
-                / f"Release_{release}/tmp"
-                / gb_file.replace(".seq.gz", ".fasta.gz")
-            )
+            # Skip if already processed
+            if stamp_file.exists():
+                loginfo(f"    Already processed (stamp exists)")
+                continue
 
-            fasta_dir.mkdir(parents=True, exist_ok=True)
+            # Download and convert in one pipe: curl | obiconvert > tmp file, then move to final location
+            try:
+                fasta_dir = genbank_base / f"Release_{release}/fasta/{div}"
+                fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
 
-            loginfo(f"  Downloading and converting to FASTA...")
+                # Temporary file in tmp/ — atomic move on success
+                tmp_file = (
+                    genbank_base
+                    / f"Release_{release}/tmp"
+                    / gb_file.replace(".seq.gz", ".fasta.gz")
+                )
 
-            # Pipe: curl downloads -> obiconvert converts -> redirect to tmp file
-            curl_cmd = curl_download(f"{GBURL}/{gb_file}")
-            convert_cmd = obiconvert(
-                "--batch-size", "1", "-Z", "--fasta-output", "--skip-empty"
-            )
+                fasta_dir.mkdir(parents=True, exist_ok=True)
 
-            ((curl_cmd | convert_cmd) > str(tmp_file))()
+                loginfo(f"    Downloading and converting to FASTA...")
 
-            # Atomic move from tmp to final location
-            tmp_file.rename(fasta_file)
+                # Pipe: curl downloads -> obiconvert converts -> redirect to tmp file
+                curl_cmd = curl_download(f"{GBURL}/{gb_file}")
+                convert_cmd = obiconvert(
+                    "--batch-size", "1", "-Z", "--fasta-output", "--skip-empty"
+                )
 
-            loginfo(f"  Saved to {fasta_file}")
-        except Exception as e:
-            logerror(f"  Failed to download/convert {gb_file}: {e}")
-            # Clean up partial tmp file
-            tmp_file.unlink(missing_ok=True)
-            failed_files.append((gb_file, str(e)))
-            errors += 1
-            continue
+                ((curl_cmd | convert_cmd) > str(tmp_file))()
 
-        # Mark as processed
-        stamp_file.touch()
+                # Atomic move from tmp to final location
+                tmp_file.rename(fasta_file)
+
+                loginfo(f"    Saved to {fasta_file}")
+            except Exception as e:
+                logerror(f"    Failed to download/convert {gb_file}: {e}")
+                # Clean up partial tmp file
+                tmp_file.unlink(missing_ok=True)
+                failed_files.append((gb_file, str(e)))
+                errors += 1
+                continue
+
+            # Mark as processed
+            stamp_file.touch()
 
     # Clean up tmp directory
     tmp_dir = genbank_base / f"Release_{release}/tmp"
@@ -181,7 +199,7 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
         logerror(f"Completed with {errors} error(s). Re-run to retry.")
         return False
 
-    loginfo(f"✓ All {len(gb_files)} files processed successfully")
+    loginfo(f"✓ All {total_files} files processed successfully")
     return True
 
 

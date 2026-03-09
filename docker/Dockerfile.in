@@ -98,7 +98,7 @@ ARG OCI_REVISION
 LABEL org.opencontainers.image.title="skimindex" \
       org.opencontainers.image.description="Genome skim kmer indexing." \
       org.opencontainers.image.url="https://registry.metabarcoding.org" \
-      org.opencontainers.image.source="https://github.com/metabarcoding/obitools4" \
+      org.opencontainers.image.source="https://github.com/ArcEcoGen/skimindex" \
       org.opencontainers.image.vendor="Metabarcoding.org" \
       org.opencontainers.image.licenses="CECILL-2.1" \
       org.opencontainers.image.version="${OCI_VERSION}" \

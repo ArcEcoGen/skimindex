@@ -15,8 +15,9 @@ Uses configuration parameters:
   - directories.genbank        : GenBank root directory
   - directories.processed_data : output directory for fragments
 
-Output:
-  <processed_data>/<section_dir>/fragments/frg_{batch}.fasta.gz
+Output structure:
+  - Taxon sections (per genome): <processed_data>/<section_dir>/{genome_name}/fragments/frg_{batch}.fasta.gz
+  - Division sections: <processed_data>/<section_dir>/fragments/frg_{batch}.fasta.gz
 """
 
 import os
@@ -24,12 +25,43 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from skimindex.config import config
-from skimindex.log import loginfo, logwarning, logerror
-from skimindex.unix.obitools import obiconvert, obigrep, obiscript, obidistribute
-
+from skimindex.log import logerror, loginfo, logwarning
+from skimindex.unix.obitools import obiconvert, obidistribute, obigrep, obiscript
 
 # Path to the Lua script for sequence splitting
 SPLITSEQS_LUA = "/app/obiluascripts/splitseqs.lua"
+
+
+def _extract_genome_info_from_filename(filename: str) -> Optional[tuple]:
+    """Extract genome name and accession from filename.
+
+    Expected pattern: {name}-{ACCESSION}.{ext}
+    Example: Homo_sapiens-GCF_000001405.40.gbff.gz
+             → ("Homo_sapiens", "GCF_000001405.40")
+
+    Returns:
+        Tuple of (name, accession), or None if pattern not matched.
+    """
+    import re
+
+    # Match pattern: {name}-{ACCESSION}.{ext} where ACCESSION starts with GCF_ or GCA_
+    match = re.search(r"^(.+?)-((GCF|GCA)_[^.]+\.[0-9]+)", filename)
+    if match:
+        return (match.group(1), match.group(2))
+    return None
+
+
+def _extract_accession_from_filename(filename: str) -> Optional[str]:
+    """Extract accession (GCF_/GCA_) from genome filename.
+
+    Expected pattern: {name}-{ACCESSION}.{ext}
+    Example: Homo_sapiens-GCF_000001405.40.gbff.gz → GCF_000001405.40
+
+    Returns:
+        Accession string, or None if pattern not matched.
+    """
+    result = _extract_genome_info_from_filename(filename)
+    return result[1] if result else None
 
 
 def list_sections() -> str:
@@ -94,7 +126,7 @@ def _load_section_dirs(section: str) -> Optional[Dict[str, Any]]:
     rel_dir = section_data.get("directory", section.lower())
 
     input_dir = Path(genbank_root) / rel_dir
-    fragments_dir = Path(processed_root) / rel_dir / "fragments"
+    fragments_dir = Path(processed_root) / rel_dir
 
     return {
         "rel_dir": rel_dir,
@@ -113,7 +145,7 @@ def _find_latest_release(genbank_root: Path) -> Optional[Path]:
     try:
         releases = sorted(
             genbank_root.glob("Release_*"),
-            key=lambda p: int(p.name.split("_")[1]) if "_" in p.name else 0,
+            key=lambda p: float(p.name.split("_")[1]) if "_" in p.name else 0,
         )
         return releases[-1] if releases else None
     except Exception as e:
@@ -141,11 +173,11 @@ def _run_split_pipeline(
         # Build the pipeline commands
         split_cmd = obiscript(SPLITSEQS_LUA)
         filter_cmd = obigrep("-v", "-s", "^[Nn]+$")
-        dist_cmd_args = [
-            "-Z",  # gzip output
+        dist_cmd = obidistribute(
+            "-Z",
             "-n", str(batches),
             "-p", str(fragments_dir / "frg_%s.fasta.gz"),
-        ]
+        )
 
         # Save and set env vars for the Lua script
         old_env = {
@@ -157,7 +189,6 @@ def _run_split_pipeline(
             os.environ["OVERLAP"] = str(overlap)
 
             # Execute pipeline
-            dist_cmd = obidistribute(*dist_cmd_args)
             (source_cmd | split_cmd | filter_cmd | dist_cmd)()
 
         finally:
@@ -177,18 +208,24 @@ def _run_split_pipeline(
 def split_taxon_section(section: str, params: Dict[str, int]) -> bool:
     """Split a taxon section (pre-downloaded FASTA/GBFF files).
 
+    Processes each genome separately with its own fragments subdirectory.
+    Directory name uses the source filename without extensions.
+    Output: <processed_data>/<section_dir>/{genome_name}/fragments/frg_{batch}.fasta.gz
+
+    Example: Homo_sapiens-GCF_000001405.40.gbff.gz → Homo_sapiens-GCF_000001405.40/fragments/
+
     Reads .fasta.gz and .gbff.gz files from the section directory.
+    Uses stamp files to skip re-splitting if source has not changed.
     """
     dirs = _load_section_dirs(section)
     if not dirs:
         return False
 
     input_dir = dirs["input_dir"]
-    fragments_dir = dirs["fragments_dir"]
+    section_output_dir = dirs["fragments_dir"]
 
-    loginfo(f"Section       : {section} (taxon-based)")
+    loginfo(f"Section       : {section} (taxon-based, per-genome)")
     loginfo(f"Input dir     : {input_dir}")
-    loginfo(f"Output dir    : {fragments_dir}")
 
     if not input_dir.exists():
         logwarning(f"Input directory not found: {input_dir}")
@@ -203,46 +240,79 @@ def split_taxon_section(section: str, params: Dict[str, int]) -> bool:
         logwarning(f"No .fasta.gz or .gbff.gz files found in {input_dir}")
         return True
 
-    loginfo(f"Splitting {len(input_files)} file(s) into {params['batches']} batches...")
+    loginfo(f"Processing {len(input_files)} genome(s)...")
 
-    # Create source command: obiconvert on all input files
-    source_cmd = obiconvert(*[str(f) for f in input_files])
+    # Create stamp directory
+    stamp_dir = section_output_dir / "stamp"
 
-    return _run_split_pipeline(
-        source_cmd,
-        fragments_dir,
-        params["frg_size"],
-        params["overlap"],
-        params["batches"],
-    )
+    errors = 0
+    for f in input_files:
+        # Use filename without extensions as directory name
+        # e.g., "Homo_sapiens-GCF_000001405.40.gbff.gz" → "Homo_sapiens-GCF_000001405.40"
+        parts = f.name.split(".")
+        # Remove .gz, then .gbff or .fasta (last 2 extensions)
+        genome_key = ".".join(parts[:-2]) if len(parts) > 2 else f.stem
+
+        # Check stamp file
+        stamp_file = stamp_dir / f"{genome_key}.stamp"
+
+        # Skip if stamp exists and is newer than source
+        if stamp_file.exists() and stamp_file.stat().st_mtime >= f.stat().st_mtime:
+            loginfo(f"  [{genome_key}] Already processed (stamp is up-to-date)")
+            continue
+
+        loginfo(f"  [{genome_key}] Splitting...")
+
+        # Create subdirectory for this genome: {section_dir}/{genome_key}/fragments/
+        genome_output_dir = section_output_dir / genome_key / "fragments"
+
+        # Create source command: obiconvert on this file
+        source_cmd = obiconvert(str(f))
+
+        if not _run_split_pipeline(
+            source_cmd,
+            genome_output_dir,
+            params["frg_size"],
+            params["overlap"],
+            params["batches"],
+        ):
+            errors += 1
+            continue
+
+        # Mark as processed
+        stamp_dir.mkdir(parents=True, exist_ok=True)
+        stamp_file.touch()
+
+    return errors == 0
 
 
 def split_division_section(section: str, params: Dict[str, int]) -> bool:
     """Split a GenBank division section (filter by taxid from flat files).
 
+    Processes each division separately with its own fragments subdirectory.
+    Output: <processed_data>/<section_dir>/{division}/fragments/frg_{batch}.fasta.gz
+
     Reads divisions and taxid from config, locates taxonomy, filters sequences.
+    Uses stamp file to skip re-splitting if sources have not changed.
     """
     dirs = _load_section_dirs(section)
     if not dirs:
         return False
 
     section_data = dirs["section_data"]
-    fragments_dir = dirs["fragments_dir"]
+    section_output_dir = dirs["fragments_dir"]
 
     # Get taxid and divisions from config
     taxid = section_data.get("taxid")
     divisions = section_data.get("divisions", "")
 
     if not taxid or not divisions:
-        logerror(
-            f"Section [{section}]: missing 'taxid' or 'divisions' in config"
-        )
+        logerror(f"Section [{section}]: missing 'taxid' or 'divisions' in config")
         return False
 
-    loginfo(f"Section       : {section} (division-based)")
+    loginfo(f"Section       : {section} (division-based, per-division)")
     loginfo(f"TaxID         : {taxid}")
     loginfo(f"Divisions     : {divisions}")
-    loginfo(f"Output dir    : {fragments_dir}")
 
     # Find latest GenBank release
     genbank_root = Path(config().get("directories", "genbank", "/genbank"))
@@ -259,32 +329,53 @@ def split_division_section(section: str, params: Dict[str, int]) -> bool:
 
     loginfo(f"Taxonomy      : {taxonomy}")
 
-    # Find division directories
+    # Create stamp directory
+    stamp_dir = section_output_dir / "stamp"
+
+    # Process each division separately
     div_list = divisions.split()
-    div_dirs = []
+    errors = 0
+
     for div in div_list:
         div_dir = release_dir / "fasta" / div
-        if div_dir.exists():
-            div_dirs.append(str(div_dir))
-        else:
+        if not div_dir.exists():
             logwarning(f"Division directory not found: {div_dir}")
+            continue
 
-    if not div_dirs:
-        logwarning(f"No division directories found for {divisions}")
-        return True
+        # Check stamp file
+        stamp_file = stamp_dir / f"{div}.stamp"
 
-    loginfo(f"Splitting into {params['batches']} batches...")
+        # Skip if stamp exists and is newer than sources
+        if stamp_file.exists():
+            source_mtimes = [taxonomy.stat().st_mtime, div_dir.stat().st_mtime]
+            stamp_mtime = stamp_file.stat().st_mtime
+            if stamp_mtime >= max(source_mtimes):
+                loginfo(f"  [{div}] Already processed (stamp is up-to-date)")
+                continue
 
-    # Create source command: obigrep to filter by taxid
-    source_cmd = obigrep("-t", str(taxonomy), "-r", str(taxid), *div_dirs)
+        loginfo(f"  [{div}] Splitting...")
 
-    return _run_split_pipeline(
-        source_cmd,
-        fragments_dir,
-        params["frg_size"],
-        params["overlap"],
-        params["batches"],
-    )
+        # Create output dir for this division: {section_dir}/{division}/fragments/
+        div_fragments_dir = section_output_dir / div / "fragments"
+
+        # Create source command: obigrep to filter by taxid for this division
+        source_cmd = obigrep("-t", str(taxonomy), "-r", str(taxid), str(div_dir))
+
+        if not _run_split_pipeline(
+            source_cmd,
+            div_fragments_dir,
+            params["frg_size"],
+            params["overlap"],
+            params["batches"],
+        ):
+            errors += 1
+            continue
+
+        # Mark as processed
+        stamp_dir.mkdir(parents=True, exist_ok=True)
+        stamp_file.touch()
+
+    return errors == 0
 
 
 def split_section(section: str, params: Dict[str, int]) -> bool:
