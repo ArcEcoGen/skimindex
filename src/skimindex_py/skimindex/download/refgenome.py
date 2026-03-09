@@ -446,36 +446,59 @@ def process_refgenome_section(
         if accession:
             accession_map[accession] = _get_organism_name_from_report(asm)
 
-    # Process each accession
-    errors = 0
     total = len(accession_map)
-    for i, (accession, organism_name) in enumerate(accession_map.items(), 1):
-        loginfo(f"[{section}] [{i}/{total}] {accession} — {organism_name}")
+    max_retries = 3
 
-        work_dir = work_base / accession
-        zip_file = work_dir / "download.zip"
+    # Process each accession with automatic retry on failures
+    for attempt in range(1, max_retries + 1):
+        errors = 0
+        failed_accessions = []
 
-        dl_stamp = stamps_dir / f"{accession}.download.stamp"
-        ext_stamp = stamps_dir / f"{accession}.extract.stamp"
-        cmp_stamp = stamps_dir / f"{accession}.compress.stamp"
+        for i, (accession, organism_name) in enumerate(accession_map.items(), 1):
+            work_dir = work_base / accession
+            zip_file = work_dir / "download.zip"
 
-        # Download → Extract → Compress pipeline
-        if not _download_accession(accession, zip_file, dl_stamp):
-            errors += 1
-            continue
+            dl_stamp = stamps_dir / f"{accession}.download.stamp"
+            ext_stamp = stamps_dir / f"{accession}.extract.stamp"
+            cmp_stamp = stamps_dir / f"{accession}.compress.stamp"
 
-        if not _extract_accession(accession, zip_file, work_dir, ext_stamp, dl_stamp):
-            errors += 1
-            continue
+            # Skip if already fully processed
+            if cmp_stamp.exists():
+                continue
 
-        if not _compress_accession(accession, organism_name, work_dir, output_dir, cmp_stamp):
-            errors += 1
+            loginfo(f"[{section}] [{i}/{total}] {accession} — {organism_name}")
+
+            # Download → Extract → Compress pipeline
+            if not _download_accession(accession, zip_file, dl_stamp):
+                errors += 1
+                failed_accessions.append(accession)
+                continue
+
+            if not _extract_accession(accession, zip_file, work_dir, ext_stamp, dl_stamp):
+                errors += 1
+                failed_accessions.append(accession)
+                continue
+
+            if not _compress_accession(accession, organism_name, work_dir, output_dir, cmp_stamp):
+                errors += 1
+                failed_accessions.append(accession)
+
+        # If no errors, we're done
+        if errors == 0:
+            break
+
+        # Log retry attempt
+        if attempt < max_retries:
+            logwarning(f"[{section}] Attempt {attempt}/{max_retries}: {errors} accession(s) failed, retrying...")
+        else:
+            logerror(f"[{section}] Attempt {attempt}/{max_retries}: {errors} accession(s) still failing after {max_retries} attempts")
 
     # Cleanup empty work directory
     shutil.rmtree(work_base, ignore_errors=True)
 
     if errors:
-        logerror(f"[{section}] {errors}/{total} accession(s) failed — re-run to retry")
+        logerror(f"[{section}] {errors}/{total} accession(s) failed — {', '.join(failed_accessions[:5])}" +
+                 ("..." if len(failed_accessions) > 5 else ""))
         return False
 
     loginfo(f"[{section}] ✓ All {total} accessions processed successfully")
