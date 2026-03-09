@@ -108,7 +108,9 @@ skimindex-script: $(SKIMINDEX_SH)
 
 $(SKIMINDEX_SH): $(SKIMINDEX_SH_IN) $(BUILD_USER_SCRIPT) \
                  $(PROJECT_ROOT)/scripts/__utils_functions.sh \
-                 $(wildcard $(PROJECT_ROOT)/scripts/*.sh)
+                 $(wildcard $(PROJECT_ROOT)/scripts/*.sh) \
+                 $(PROJECT_ROOT)/src/skimindex_py/pyproject.toml \
+                 $(wildcard $(PROJECT_ROOT)/src/skimindex_py/skimindex/_*.py)
 	bash $(BUILD_USER_SCRIPT) \
 		--root    $(PROJECT_ROOT) \
 		--set     IMAGE_REGISTRY=$(REGISTRY) \

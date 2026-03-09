@@ -18,11 +18,11 @@
 #   init                     Initialise a new project directory and download the default config.
 #   update                   Pull the latest container image from the registry (or refresh the SIF for apptainer).
 #   shell                    Start an interactive shell inside the container.
-#   dl                       Wrapper for Python download module
 #   download_genbank         Download GenBank flat-file divisions and convert them to
 #   download_references      Master script for the reference data pipeline.
 #   split_references         Split reference genome sequences into overlapping fragments
 #   download                 Download GenBank and reference genome data.
+#   split                    Split reference genomes into fragments for decontamination index building.
 #
 # shell options:
 #   --mount SRC:DST      Bind-mount SRC (host) to DST (container).
@@ -526,9 +526,6 @@ if [[ "$RUNTIME" == "none" ]]; then
 fi
 
 case "$SUBCMD" in
-    dl)
-        _ski_run_exec dl.sh "$@"
-        ;;
     download_genbank)
         _ski_run_exec download_genbank.sh "$@"
         ;;
@@ -540,6 +537,9 @@ case "$SUBCMD" in
         ;;
     download)
         _ski_run_exec download "$@"
+        ;;
+    split)
+        _ski_run_exec split "$@"
         ;;
     *)
         logerror "Unknown subcommand '$SUBCMD'."
