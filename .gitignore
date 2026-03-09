@@ -29,6 +29,7 @@ docker/Dockerfile
 **/*_stats.txt
 **/*.fof
 
+images
 indexes
 bin
 tmp

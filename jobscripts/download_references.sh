@@ -1,5 +1,5 @@
 #!/bin/bash
-#OAR -n download_partial_gb
+#OAR -n download_references
 #OAR -l /nodes=1/core=10,walltime=48:00:00
 #OAR --project phyloalps
 #OAR -O %jobname%.%jobid%.stdout
@@ -19,5 +19,6 @@
 
 G15x_HOME=/bettik/LECA/home/pan/G15X
 
-cd ${G15x_HOME}/docker
-make download_references
+
+cd ${G15x_HOME}
+${G15x_HOME}/skimindex.sh download_references
