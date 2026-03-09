@@ -22,7 +22,7 @@
 #   download_genbank         Download GenBank flat-file divisions and convert them to
 #   download_references      Master script for the reference data pipeline.
 #   split_references         Split reference genome sequences into overlapping fragments
-#   download                 Python module
+#   download                 Download GenBank and reference genome data.
 #
 # shell options:
 #   --mount SRC:DST      Bind-mount SRC (host) to DST (container).
