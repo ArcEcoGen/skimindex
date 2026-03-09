@@ -14,7 +14,6 @@ Example:
 """
 
 from plumbum import local
-from typing import Optional
 
 
 # Core data processing tools

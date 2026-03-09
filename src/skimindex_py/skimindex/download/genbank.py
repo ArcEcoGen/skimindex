@@ -11,7 +11,9 @@ Orchestrates GenBank data downloads and processing:
 Uses stamp files for robustness: if interrupted, relaunching skips already-processed files.
 """
 
+import os
 import re
+import shutil
 from functools import lru_cache
 from pathlib import Path
 from typing import List
@@ -21,7 +23,6 @@ from skimindex.log import loginfo, logwarning, logerror
 from skimindex.unix.download import curl_download
 from skimindex.unix.obitools import obiconvert, obitaxonomy
 from skimindex.unix.compress import pigz_test
-from plumbum import local
 
 
 # Constants
@@ -111,9 +112,11 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
     # Create directories
     (genbank_base / f"Release_{release}/stamp").mkdir(parents=True, exist_ok=True)
     (genbank_base / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
+    (genbank_base / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
 
     # Process each file
     errors = 0
+    failed_files = []
     for i, gb_file in enumerate(gb_files, 1):
         loginfo(f"[{i}/{len(gb_files)}] Processing {gb_file}")
 
@@ -124,35 +127,48 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
             loginfo(f"  Already processed (stamp exists)")
             continue
 
-        # Download and convert in one pipe: curl | obiconvert > fasta
+        # Download and convert in one pipe: curl | obiconvert > tmp file, then move to final location
         try:
             div = re.match(r"^gb(...).*$", gb_file).group(1)
             fasta_dir = genbank_base / f"Release_{release}/fasta/{div}"
             fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
 
+            # Temporary file in tmp/ — atomic move on success
+            tmp_file = genbank_base / f"Release_{release}/tmp" / gb_file.replace(".seq.gz", ".fasta.gz")
+
             fasta_dir.mkdir(parents=True, exist_ok=True)
 
             loginfo(f"  Downloading and converting to FASTA...")
 
-            # Pipe: curl downloads -> obiconvert converts -> write to file
+            # Pipe: curl downloads -> obiconvert converts -> redirect to tmp file
             curl_cmd = curl_download(f"{GBURL}/{gb_file}")
             convert_cmd = obiconvert("-Z", "--fasta-output", "--skip-empty")
 
-            with open(str(fasta_file), "w") as f:
-                (curl_cmd | convert_cmd) & f
+            ((curl_cmd | convert_cmd) > str(tmp_file))()
+
+            # Atomic move from tmp to final location
+            tmp_file.rename(fasta_file)
 
             loginfo(f"  Saved to {fasta_file}")
         except Exception as e:
             logerror(f"  Failed to download/convert {gb_file}: {e}")
-            # Clean up partial file
-            Path(fasta_file).unlink(missing_ok=True)
+            # Clean up partial tmp file
+            tmp_file.unlink(missing_ok=True)
+            failed_files.append((gb_file, str(e)))
             errors += 1
             continue
 
         # Mark as processed
         stamp_file.touch()
 
+    # Clean up tmp directory
+    tmp_dir = genbank_base / f"Release_{release}/tmp"
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
     if errors > 0:
+        logwarning(f"===== Summary: {errors} error(s) =====")
+        for gb_file, error in failed_files:
+            logwarning(f"  {gb_file}: {error}")
         logerror(f"Completed with {errors} error(s). Re-run to retry.")
         return False
 
@@ -179,8 +195,12 @@ def download_taxonomy(release: str) -> bool:
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
         loginfo("Downloading NCBI taxonomy...")
-        with local.cwd(str(output_dir)):
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(str(output_dir))
             obitaxonomy("--download-ncbi", "--out", "ncbi_taxonomy.tgz")()
+        finally:
+            os.chdir(old_cwd)
         loginfo(f"Taxonomy saved: {output_file}")
         return True
     except Exception as e:

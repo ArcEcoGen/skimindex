@@ -26,7 +26,6 @@ Example:
 """
 
 from plumbum import local
-from typing import Optional
 
 
 # Main NCBI tools — flexible API

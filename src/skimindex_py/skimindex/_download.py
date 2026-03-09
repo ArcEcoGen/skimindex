@@ -5,12 +5,16 @@ Download GenBank and reference genome data.
 Provides command-line interface for download operations.
 
 Usage:
+    download all
     download genbank [--divisions "bct pln ..."]
     download refgenome [--list] [--section NAME]
     download refgenome [--taxon TAXON] [--one-per-species|--one-per-genus]
     download refgenome
 
 Examples:
+    # Download everything (GenBank + all reference genomes using config)
+    download all
+
     # Download GenBank flat-file divisions
     download genbank
 
@@ -116,6 +120,19 @@ def refgenome_command(args) -> int:
     return process_refgenome()
 
 
+def all_command(args) -> int:
+    """Handle 'all' subcommand: download GenBank + all reference genomes using config defaults."""
+    # Download GenBank with config defaults
+    if process_genbank() != 0:
+        return 1
+
+    # Download all reference genomes with config defaults
+    if process_refgenome() != 0:
+        return 1
+
+    return 0
+
+
 def main(argv: Optional[list] = None) -> int:
     """Main entry point for the download CLI."""
     parser = argparse.ArgumentParser(
@@ -123,6 +140,9 @@ def main(argv: Optional[list] = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Download everything (GenBank + all reference genomes using config)
+  %(prog)s all
+
   # List available GenBank divisions
   %(prog)s genbank --list
 
@@ -144,12 +164,19 @@ Examples:
   # List assemblies for a taxon, filtered to one per genus
   %(prog)s refgenome --taxon Spermatophyta --one-per genus
 
-  # Download all (GenBank + all reference genome sections)
+  # Download all reference genome sections (use config)
   %(prog)s refgenome
         """,
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
+
+    # ===== all subcommand =====
+    all_parser = subparsers.add_parser(
+        "all",
+        help="Download GenBank + all reference genomes (uses config defaults)",
+    )
+    all_parser.set_defaults(func=all_command)
 
     # ===== genbank subcommand =====
     genbank_parser = subparsers.add_parser(
