@@ -57,6 +57,11 @@ def pigz_decompress(*args, **kwargs):
     return pigz("-d", *args)
 
 
+def pigz_test(*args, **kwargs):
+    """Test integrity of gzipped file(s)."""
+    return pigz("-t", *args)
+
+
 # unzip — flexible API
 def unzip(*args, **kwargs):
     """Execute an unzip command.

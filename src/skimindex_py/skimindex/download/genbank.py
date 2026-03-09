@@ -19,7 +19,8 @@ from typing import List
 from skimindex.config import config
 from skimindex.log import loginfo, logwarning, logerror
 from skimindex.unix.download import curl_download
-from skimindex.unix.obitools import obiconvert
+from skimindex.unix.obitools import obiconvert, obitaxonomy
+from skimindex.unix.compress import pigz_test
 from plumbum import local
 
 
@@ -166,14 +167,20 @@ def download_taxonomy(release: str) -> bool:
     output_file = output_dir / "ncbi_taxonomy.tgz"
 
     if output_file.exists():
-        loginfo(f"Taxonomy already downloaded: {output_file}")
-        return True
+        # Verify gzip integrity
+        try:
+            pigz_test(str(output_file))()
+            loginfo(f"Taxonomy already downloaded: {output_file}")
+            return True
+        except Exception:
+            logwarning(f"Taxonomy file corrupted: {output_file}, re-downloading...")
+            output_file.unlink(missing_ok=True)
 
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
         loginfo("Downloading NCBI taxonomy...")
         with local.cwd(str(output_dir)):
-            local["obitaxonomy"]("--download-ncbi", "--out", "ncbi_taxonomy.tgz")()
+            obitaxonomy("--download-ncbi", "--out", "ncbi_taxonomy.tgz")()
         loginfo(f"Taxonomy saved: {output_file}")
         return True
     except Exception as e:
@@ -196,17 +203,30 @@ def process_genbank(divisions: List[str] = None) -> int:
         cfg = config()
         divisions = cfg.get("genbank", "divisions", "bct pln").split()
 
+    loginfo(f"===== GenBank download pipeline =====")
+    loginfo(f"Divisions: {', '.join(divisions)}")
+
+    # Step 1: Get release number
+    loginfo(">>> Step 1: Fetching GenBank release number")
     release = get_release_number()
     if release == "unknown":
+        logerror("Step 1 failed — unable to get release number")
         return 1
+    loginfo(f"<<< Step 1 OK (Release {release})")
 
-    # Download taxonomy
+    # Step 2: Download taxonomy
+    loginfo(">>> Step 2: Downloading NCBI taxonomy")
     if not download_taxonomy(release):
+        logerror("Step 2 failed")
         return 1
+    loginfo("<<< Step 2 OK")
 
-    # Download and process GenBank files
+    # Step 3: Download and process GenBank files
+    loginfo(f">>> Step 3: Downloading and processing {len(divisions)} division(s)")
     if not download_and_process_genbank(release, divisions):
+        logerror("Step 3 failed")
         return 1
+    loginfo("<<< Step 3 OK")
 
     loginfo("===== GenBank download complete =====")
     return 0
