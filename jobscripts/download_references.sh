@@ -21,4 +21,4 @@ G15x_HOME=/bettik/LECA/home/pan/G15X
 
 
 cd ${G15x_HOME}
-${G15x_HOME}/skimindex.sh download_references
+${G15x_HOME}/skimindex.sh download all

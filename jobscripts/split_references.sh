@@ -1,6 +1,6 @@
 #!/bin/bash
-#OAR -n download_partial_gb
-#OAR -l /nodes=1/core=10,walltime=48:00:00
+#OAR -n split_references
+#OAR -l /nodes=1/core=32,walltime=24:00:00
 #OAR --project phyloalps
 #OAR -O %jobname%.%jobid%.stdout
 #OAR -E %jobname%.%jobid%.stderr
@@ -18,4 +18,4 @@
 # oarsub -S ./genbank_download.sh
 
 export PATH=/bettik/LECA/ENVIRONMENT/softs/obitools4/bin:$PATH
-make fasta_files
+./skimindex.sh split

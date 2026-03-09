@@ -175,26 +175,6 @@ writable tmpfs overlay, allowing live editing of scripts without rebuilding the 
 make run-dev
 ```
 
-### Downloading reference data
-
-Reference downloads run non-interactively inside the container. Host directories are created
-automatically if absent. Each script is resume-friendly: an interrupted download can be
-restarted by re-running the same target.
-
-Download all references in one shot (GenBank divisions + human genome + plant assemblies):
-
-```bash
-make download_references
-```
-
-Download each dataset individually:
-
-```bash
-make download_genbank    # GenBank divisions defined in genbank/Makefile (GBDIV)
-make download_human      # Human reference genome (GRCh38 / GCF_000001405.*)
-make download_plants     # All complete Spermatophyta assemblies from RefSeq + GenBank
-```
-
 #### Runtime variables
 
 | Variable        | Default                         | Description                                              |
