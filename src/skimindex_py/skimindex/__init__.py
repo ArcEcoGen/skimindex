@@ -6,8 +6,9 @@ Modules:
   - log: Logging module (colors, file output, levels)
   - unix: Unix tools wrappers (compress, ncbi, obitools)
   - download: Dataset download orchestration (refgenome)
+  - split: Fragment splitting for decontamination indices
 """
 
-from . import config, download, log, unix
+from . import config, download, log, split, unix
 
-__all__ = ["config", "download", "log", "unix"]
+__all__ = ["config", "download", "log", "split", "unix"]

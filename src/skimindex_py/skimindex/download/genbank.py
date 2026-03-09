@@ -19,11 +19,10 @@ from pathlib import Path
 from typing import List
 
 from skimindex.config import config
-from skimindex.log import loginfo, logwarning, logerror
+from skimindex.log import logerror, loginfo, logwarning
+from skimindex.unix.compress import pigz_test
 from skimindex.unix.download import curl_download
 from skimindex.unix.obitools import obiconvert, obitaxonomy
-from skimindex.unix.compress import pigz_test
-
 
 # Constants
 FTPNCBI = "ftp.ncbi.nlm.nih.gov"
@@ -82,7 +81,9 @@ def get_ftp_listing(divisions: List[str]) -> tuple:
             if match:
                 filenames.append(match.group(0))
 
-        loginfo(f"Found {len(filenames)} GenBank files for divisions: {', '.join(divisions)}")
+        loginfo(
+            f"Found {len(filenames)} GenBank files for divisions: {', '.join(divisions)}"
+        )
         return tuple(filenames)
     except Exception as e:
         logerror(f"Failed to download FTP listing: {e}")
@@ -107,7 +108,9 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
         logwarning(f"No GenBank files found for divisions: {', '.join(divisions)}")
         return True
 
-    loginfo(f"Processing {len(gb_files)} GenBank files for divisions: {', '.join(divisions)}")
+    loginfo(
+        f"Processing {len(gb_files)} GenBank files for divisions: {', '.join(divisions)}"
+    )
 
     # Create directories
     (genbank_base / f"Release_{release}/stamp").mkdir(parents=True, exist_ok=True)
@@ -134,7 +137,11 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
             fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
 
             # Temporary file in tmp/ — atomic move on success
-            tmp_file = genbank_base / f"Release_{release}/tmp" / gb_file.replace(".seq.gz", ".fasta.gz")
+            tmp_file = (
+                genbank_base
+                / f"Release_{release}/tmp"
+                / gb_file.replace(".seq.gz", ".fasta.gz")
+            )
 
             fasta_dir.mkdir(parents=True, exist_ok=True)
 
@@ -142,7 +149,9 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
 
             # Pipe: curl downloads -> obiconvert converts -> redirect to tmp file
             curl_cmd = curl_download(f"{GBURL}/{gb_file}")
-            convert_cmd = obiconvert("-Z", "--fasta-output", "--skip-empty")
+            convert_cmd = obiconvert(
+                "--batch-size", "1", "-Z", "--fasta-output", "--skip-empty"
+            )
 
             ((curl_cmd | convert_cmd) > str(tmp_file))()
 

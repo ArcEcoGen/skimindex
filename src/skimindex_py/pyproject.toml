@@ -12,3 +12,4 @@ dependencies = [
 
 [project.scripts]
 download = "skimindex._download:main"
+split = "skimindex._split:main"
