@@ -11,8 +11,15 @@ export PATH=/bettik/LECA/ENVIRONMENT/softs/obitools4/bin:$PATH
 umask 002
 
 # Launch an interactive job for 3 hours on 10 CPU
-alias G15x_interactive='oarsub -I -l "nodes=1/core=10,walltime=03:00:00" -n "interactive session" --project phyloalps'
+function G15x_interactive() {
+    local NCORE=10
 
+    if (( $# > 0 )) ; then
+        NCORE=$(( $1 + 0 ))
+    fi
+
+    oarsub -I -l "nodes=1/core=${NCORE},walltime=03:00:00" -n "interactive session" --project phyloalps
+}
 # Activate the conda environment (actually useless as it is automatically activated
 alias condaenv='. /applis/environments/conda.sh'
 alias G15x_conda='conda activate G15x'
