@@ -13,7 +13,7 @@ Equivalent to bash script's approach:
 import tempfile
 from pathlib import Path
 from plumbum import local as _plumbum_local
-from skimindex.log import loginfo, logwarning
+from skimindex.log import logwarning
 
 
 class LoggedBoundCommand:
@@ -31,25 +31,22 @@ class LoggedBoundCommand:
 
     def __call__(self, *args, **kwargs):
         """Execute command with stderr captured and sent to logs."""
-        # Redirect stderr to a temporary file
-        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.stderr') as stderr_file:
-            stderr_path = stderr_file.name
+        # Pipeline objects don't support with_stderr — execute directly
+        if not hasattr(self._cmd, 'with_stderr'):
+            return self._cmd(*args, **kwargs)
+
+        stderr_file = tempfile.NamedTemporaryFile(
+            mode='w+', delete=False, suffix='.stderr'
+        )
+        stderr_path = stderr_file.name
+        stderr_file.close()
 
         try:
-            # Execute command: redirect stderr to temp file, keep stdout
             cmd_with_stderr = self._cmd.with_stderr(stderr_path)
-            # Execute and capture stdout
-            stdout = cmd_with_stderr()
-        except Exception as e:
-            # Even on error, capture and log stderr
-            self._log_stderr_file(stderr_path)
-            raise
+            stdout = cmd_with_stderr(*args, **kwargs)
         finally:
-            # Clean up stderr file
+            self._log_stderr_file(stderr_path)
             Path(stderr_path).unlink(missing_ok=True)
-
-        # Log any captured stderr
-        self._log_stderr_file(stderr_path)
 
         return stdout
 
@@ -69,26 +66,32 @@ class LoggedBoundCommand:
             return LoggedBoundCommand(other._cmd | self._cmd)
         return LoggedBoundCommand(other | self._cmd)
 
+    def __gt__(self, target):
+        """Support output redirection with >."""
+        return LoggedBoundCommand(self._cmd > target)
+
+    def __rshift__(self, target):
+        """Support append redirection with >>."""
+        return LoggedBoundCommand(self._cmd >> target)
+
     def _log_stderr_file(self, stderr_path: str) -> None:
         """Read stderr file and log its contents."""
         try:
             with open(stderr_path, 'r') as f:
                 stderr_content = f.read().strip()
-                if stderr_content:
-                    # Send stderr to log (typically logwarning for stderr output)
-                    for line in stderr_content.split('\n'):
-                        if line:
-                            logwarning(line)
+            if stderr_content:
+                for line in stderr_content.split('\n'):
+                    if line:
+                        logwarning(line)
         except Exception:
-            # Silently ignore if we can't read the file
             pass
 
     def with_stderr(self, stderr_target):
         """Support plumbum's with_stderr for compatibility."""
         return LoggedBoundCommand(self._cmd.with_stderr(stderr_target))
 
-    # Forward other method calls to the underlying command
     def __getattr__(self, name):
+        """Forward unknown attributes to the underlying plumbum command."""
         return getattr(self._cmd, name)
 
 

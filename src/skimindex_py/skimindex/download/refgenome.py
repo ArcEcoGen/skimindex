@@ -46,7 +46,7 @@ def list_assemblies(
         cmd_args.extend(["--assembly-version", assembly_version])
 
     loginfo(f"Listing assemblies for taxon '{taxon}'...")
-    _, stdout, _ = datasets_summary_genome(*cmd_args).run()
+    stdout = datasets_summary_genome(*cmd_args)()
     return json.loads(stdout).get("reports", [])
 
 

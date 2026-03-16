@@ -10,6 +10,12 @@ dependencies = [
     "plumbum>=1.8.0",
 ]
 
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [project.scripts]
 download = "skimindex._download:main"
 split = "skimindex._split:main"

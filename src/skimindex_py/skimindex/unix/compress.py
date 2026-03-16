@@ -27,7 +27,7 @@ from skimindex.unix.base import local
 
 
 # pigz (parallel gzip) — flexible API
-def pigz(*args, **kwargs):
+def pigz(*args):
     """Execute a pigz command (parallel gzip compression).
 
     Common options:
@@ -47,23 +47,23 @@ def pigz(*args, **kwargs):
     return local["pigz"][*args]
 
 
-def pigz_compress(*args, **kwargs):
+def pigz_compress(*args):
     """Compress file(s) with parallel gzip."""
     return pigz(*args)
 
 
-def pigz_decompress(*args, **kwargs):
+def pigz_decompress(*args):
     """Decompress file(s) with parallel gzip."""
     return pigz("-d", *args)
 
 
-def pigz_test(*args, **kwargs):
+def pigz_test(*args):
     """Test integrity of gzipped file(s)."""
     return pigz("-t", *args)
 
 
 # unzip — flexible API
-def unzip(*args, **kwargs):
+def unzip(*args):
     """Execute an unzip command.
 
     Common subcommands/options:
@@ -84,30 +84,19 @@ def unzip(*args, **kwargs):
     return local["unzip"][*args]
 
 
-def unzip_list(*args, **kwargs):
+def unzip_list(*args):
     """List contents of archive."""
     return unzip("-l", *args)
 
 
-def unzip_extract(*args, **kwargs):
+def unzip_extract(*args):
     """Extract archive (unzip -d DIR archive.zip)."""
     return unzip("-d", *args)
 
 
 # Helper function to get help for any tool
 def help(tool_name: str) -> str:
-    """Get help text for a compression tool.
-
-    Args:
-        tool_name: Name of the tool ("pigz" or "unzip")
-
-    Returns:
-        Help text from the tool's --help output
-
-    Examples:
-        help("pigz")
-        help("unzip")
-    """
+    """Get help text for a compression tool."""
     try:
         cmd = local[tool_name]
         return cmd["--help"]()
