@@ -109,6 +109,11 @@ class LoggedLocalMachine:
         cmd = getattr(self._local, name)
         return LoggedBoundCommand(cmd)
 
+    def __getitem__(self, name: str):
+        """Support bracket notation: local['command']."""
+        cmd = self._local[name]
+        return LoggedBoundCommand(cmd)
+
 
 # Global instance to use instead of plumbum.local
 local = LoggedLocalMachine()
