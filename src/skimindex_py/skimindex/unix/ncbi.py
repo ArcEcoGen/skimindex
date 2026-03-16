@@ -25,7 +25,7 @@ Example:
                "--input-file", "data.json") & FG
 """
 
-from plumbum import local
+from skimindex.unix.base import local
 
 
 # Main NCBI tools — flexible API

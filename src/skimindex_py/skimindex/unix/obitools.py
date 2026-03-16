@@ -13,7 +13,7 @@ Example:
      obidistribute["-o", "output_{s}.fasta"]) & FG
 """
 
-from plumbum import local
+from skimindex.unix.base import local
 
 
 # Core data processing tools

@@ -23,7 +23,7 @@ Example:
     pigz("-p", "4", "-9", "file.txt") & FG
 """
 
-from plumbum import local
+from skimindex.unix.base import local
 
 
 # pigz (parallel gzip) — flexible API

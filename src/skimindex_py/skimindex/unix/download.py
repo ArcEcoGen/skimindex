@@ -4,7 +4,7 @@ Download utilities using curl via plumbum.
 Provides Pythonic interface to curl for HTTP/HTTPS operations.
 """
 
-from plumbum import local
+from skimindex.unix.base import local
 
 
 def curl(*args):

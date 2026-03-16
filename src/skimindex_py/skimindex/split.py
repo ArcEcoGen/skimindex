@@ -172,11 +172,13 @@ def _run_split_pipeline(
 
         # Build the pipeline commands
         split_cmd = obiscript(SPLITSEQS_LUA)
-        filter_cmd = obigrep("-v", "-s", "^[Nn]+$")
+        filter_cmd = obigrep("-v", "-s", "^[n]+$")
         dist_cmd = obidistribute(
             "-Z",
-            "-n", str(batches),
-            "-p", str(fragments_dir / "frg_%s.fasta.gz"),
+            "-n",
+            str(batches),
+            "-p",
+            str(fragments_dir / "frg_%s.fasta.gz"),
         )
 
         # Save and set env vars for the Lua script
@@ -359,7 +361,14 @@ def split_division_section(section: str, params: Dict[str, int]) -> bool:
         div_fragments_dir = section_output_dir / div / "fragments"
 
         # Create source command: obigrep to filter by taxid for this division
-        source_cmd = obigrep("-t", str(taxonomy), "-r", str(taxid), str(div_dir))
+        source_cmd = obigrep(
+            "-t",
+            str(taxonomy),
+            "-r",
+            str(taxid),
+            "--no-order",
+            str(div_dir),
+        )
 
         if not _run_split_pipeline(
             source_cmd,

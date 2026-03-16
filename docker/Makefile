@@ -30,7 +30,10 @@ MINICONDA_VERSION := latest
 # Tool versions installed inside the image
 # =============================================================================
 
-OBITOOLS_VERSION  := latest
+OBITOOLS_VERSION  := 4.4.28
+OBITOOLS_GITHUB_REPO := metabarcoding/obitools4
+OBITOOLS_LATEST_TAG := $(shell curl -s https://api.github.com/repos/$(OBITOOLS_GITHUB_REPO)/releases/latest 2>/dev/null | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": "Release_([0-9.]+)".*/\1/' || echo latest)
+
 KMINDEX_VERSION   := bioconda::kmindex
 NTCARD_VERSION    := bioconda::ntcard
 
@@ -98,10 +101,11 @@ BUILD_USER_SCRIPT := $(PROJECT_ROOT)/docker/build_user_script.sh
 # =============================================================================
 
 .PHONY: all build build-multiplatform build-dev push run run-dev \
-        skimindex-script clean clean-builder help
+        skimindex-script clean clean-builder \
+        update-obitools build-obitools build-obitools-multiplatform help
 
-## all                : Build multi-platform image, push to registry, generate skimindex.sh
-all: build-multiplatform push skimindex-script
+## all                : Build multi-platform image (with latest OBITools), push to registry, generate skimindex.sh
+all: build-obitools-multiplatform push skimindex-script
 
 ## skimindex-script   : Generate the standalone user entry-point skimindex.sh
 skimindex-script: $(SKIMINDEX_SH)
@@ -188,6 +192,23 @@ clean: clean-builder
 clean-builder:
 	docker buildx rm $(BUILDER) 2>/dev/null || true
 	rm -f .builder-ready
+
+## update-obitools    : Récupérer la dernière version d'OBITools depuis GitHub
+update-obitools:
+	@echo "Dernière version d'OBITools: $(OBITOOLS_LATEST_TAG)"
+	@sed -i.bak 's/^OBITOOLS_VERSION.*:=.*/OBITOOLS_VERSION  := $(OBITOOLS_LATEST_TAG)/' $(firstword $(MAKEFILE_LIST))
+	@rm -f $(firstword $(MAKEFILE_LIST)).bak
+	@echo "OBITOOLS_VERSION mise à jour vers: $(OBITOOLS_LATEST_TAG)"
+
+## build-obitools      : Builder avec la dernière version d'OBITools (depuis GitHub)
+build-obitools:
+	@$(MAKE) update-obitools
+	@$(MAKE) build
+
+## build-obitools-multiplatform: Builder multi-platform avec la dernière version d'OBITools
+build-obitools-multiplatform:
+	@$(MAKE) update-obitools
+	@$(MAKE) build-multiplatform
 
 ## help               : Show this help
 help:

@@ -50,6 +50,8 @@ _LOG_DIM = '\033[2m'          # timestamp/host dimmed
 # Global state
 _logfile: Optional[str] = None
 _mirror_to_stderr = False
+_logeverything = False
+_original_stderr = None  # Save original stderr fd for restoration
 
 
 def _should_use_color() -> bool:
@@ -132,15 +134,17 @@ def setloglevel(level: str) -> None:
         logwarning(f"Unknown logging level: {level}")
 
 
-def openlogfile(logpath: str, mirror: bool = False) -> None:
+def openlogfile(logpath: str, mirror: bool = False, everything: bool = False) -> None:
     """
     Open a log file for output.
 
     Args:
         logpath: Path to log file (appends if exists)
         mirror: If True, also output to stderr
+        everything: If True, redirect process stderr (fd 2) to log file,
+                   capturing all command output and stderr
     """
-    global _logfile, _mirror_to_stderr
+    global _logfile, _mirror_to_stderr, _logeverything, _original_stderr
 
     # Test write access
     try:
@@ -152,14 +156,41 @@ def openlogfile(logpath: str, mirror: bool = False) -> None:
 
     _logfile = logpath
     _mirror_to_stderr = mirror
+    _logeverything = everything
+
+    # If everything=True, redirect process stderr (fd 2) to the log file
+    if everything:
+        try:
+            # Save original stderr fd
+            _original_stderr = os.dup(2)
+            # Redirect fd 2 to the log file (append mode)
+            log_fd = os.open(logpath, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+            os.dup2(log_fd, 2)
+            os.close(log_fd)
+        except Exception as e:
+            logwarning(f"Failed to redirect stderr to log file: {e}")
+            _logeverything = False
+
     loginfo(f"Logging to file: {logpath}")
 
 
 def closelogfile() -> None:
     """Close the current log file and restore stderr output."""
-    global _logfile, _mirror_to_stderr
+    global _logfile, _mirror_to_stderr, _logeverything, _original_stderr
 
     if _logfile:
         loginfo(f"Closing log file: {_logfile}")
+
+        # Restore stderr if it was redirected (everything=True)
+        if _logeverything and _original_stderr is not None:
+            try:
+                os.dup2(_original_stderr, 2)
+                os.close(_original_stderr)
+            except Exception as e:
+                logwarning(f"Failed to restore stderr: {e}")
+            finally:
+                _original_stderr = None
+
         _logfile = None
         _mirror_to_stderr = False
+        _logeverything = False
