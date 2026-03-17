@@ -1,8 +1,8 @@
 """Unit tests for skimindex.config module."""
 
 import os
-import tempfile
 from pathlib import Path
+from unittest.mock import patch, call
 
 import pytest
 
@@ -128,3 +128,81 @@ class TestConfigRepr:
     def test_repr_contains_path(self, cfg, config_file):
         r = repr(cfg)
         assert str(config_file) in r
+
+
+_LOGGING_ENV_VARS = [
+    "SKIMINDEX__LOGGING__LEVEL",
+    "SKIMINDEX__LOGGING__FILE",
+    "SKIMINDEX__LOGGING__MIRROR",
+    "SKIMINDEX__LOGGING__EVERYTHING",
+]
+
+
+class TestApplyLogging:
+    @pytest.fixture(autouse=True)
+    def clean_logging_env(self, monkeypatch):
+        """Prevent logging env vars from leaking between tests."""
+        for var in _LOGGING_ENV_VARS:
+            monkeypatch.delenv(var, raising=False)
+
+    def _write_toml(self, tmp_path, content: bytes) -> Path:
+        p = tmp_path / "skimindex.toml"
+        p.write_bytes(content)
+        return p
+
+    def test_openlogfile_called_with_config_values(self, tmp_path):
+        logfile = str(tmp_path / "test.log")
+        toml = f"""
+[logging]
+level = "WARNING"
+file = "{logfile}"
+mirror = true
+everything = false
+""".encode()
+        p = self._write_toml(tmp_path, toml)
+        with patch("skimindex.config.openlogfile") as mock_open, \
+             patch("skimindex.config.setloglevel") as mock_level:
+            Config(p)
+        mock_level.assert_called_once_with("WARNING")
+        mock_open.assert_called_once_with(logfile, mirror=True, everything=False)
+
+    def test_no_logging_section_does_not_call_openlogfile(self, tmp_path):
+        toml = b"[decontamination]\nkmer_size = 29\n"
+        p = self._write_toml(tmp_path, toml)
+        with patch("skimindex.config.openlogfile") as mock_open:
+            Config(p)
+        mock_open.assert_not_called()
+
+    def test_logging_section_without_file_does_not_call_openlogfile(self, tmp_path):
+        toml = b"[logging]\nlevel = \"DEBUG\"\n"
+        p = self._write_toml(tmp_path, toml)
+        with patch("skimindex.config.openlogfile") as mock_open, \
+             patch("skimindex.config.setloglevel"):
+            Config(p)
+        mock_open.assert_not_called()
+
+    def test_env_var_overrides_config_logfile(self, tmp_path, monkeypatch):
+        logfile_config = str(tmp_path / "config.log")
+        logfile_env = str(tmp_path / "env.log")
+        toml = f"""
+[logging]
+file = "{logfile_config}"
+""".encode()
+        p = self._write_toml(tmp_path, toml)
+        monkeypatch.setenv("SKIMINDEX__LOGGING__FILE", logfile_env)
+        with patch("skimindex.config.openlogfile") as mock_open, \
+             patch("skimindex.config.setloglevel"):
+            Config(p)
+        mock_open.assert_called_once()
+        assert mock_open.call_args.args[0] == logfile_env
+
+    def test_mirror_false_by_default(self, tmp_path):
+        logfile = str(tmp_path / "test.log")
+        toml = f'[logging]\nfile = "{logfile}"\n'.encode()
+        p = self._write_toml(tmp_path, toml)
+        with patch("skimindex.config.openlogfile") as mock_open, \
+             patch("skimindex.config.setloglevel"):
+            Config(p)
+        _, kwargs = mock_open.call_args
+        assert kwargs["mirror"] is False
+        assert kwargs["everything"] is False

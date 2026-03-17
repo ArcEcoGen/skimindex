@@ -30,7 +30,7 @@ MINICONDA_VERSION := latest
 # Tool versions installed inside the image
 # =============================================================================
 
-OBITOOLS_VERSION  := 4.4.28
+OBITOOLS_VERSION  := 4.4.29
 OBITOOLS_GITHUB_REPO := metabarcoding/obitools4
 OBITOOLS_LATEST_TAG := $(shell curl -s https://api.github.com/repos/$(OBITOOLS_GITHUB_REPO)/releases/latest 2>/dev/null | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": "Release_([0-9.]+)".*/\1/' || echo latest)
 

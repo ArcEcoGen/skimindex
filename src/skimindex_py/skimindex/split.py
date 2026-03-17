@@ -367,6 +367,7 @@ def split_division_section(section: str, params: Dict[str, int]) -> bool:
             "-r",
             str(taxid),
             "--no-order",
+            "--update-taxid",
             str(div_dir),
         )
 

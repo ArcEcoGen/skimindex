@@ -18,7 +18,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from skimindex.log import loginfo
+from skimindex.log import loginfo, openlogfile, setloglevel
 
 
 DEFAULT_CONFIG = Path(os.environ.get("SKIMINDEX_CONFIG", "/config/skimindex.toml"))
@@ -49,6 +49,7 @@ class Config:
             self._load()
             self._identify_sections()
             self._export_env()
+            self._apply_logging()
 
     def _load(self) -> None:
         """Load and parse TOML config file."""
@@ -127,6 +128,30 @@ class Config:
             os.environ["SKIMINDEX__REF_TAXA"] = " ".join(self._ref_taxa)
         if "SKIMINDEX__REF_GENOMES" not in os.environ:
             os.environ["SKIMINDEX__REF_GENOMES"] = " ".join(self._ref_genomes)
+
+    def _apply_logging(self) -> None:
+        """Apply [logging] section: set log level and open log file."""
+        logging_section = self._data.get("logging", {})
+        if not logging_section:
+            return
+
+        level = self.get("logging", "level", "INFO")
+        setloglevel(level)
+
+        # Only open a log file if the config file itself specifies one.
+        # Environment variable overrides are still honoured via self.get(),
+        # but we require the key to exist in the TOML so that a stray
+        # SKIMINDEX__LOGGING__FILE env var doesn't silently hijack logging.
+        if "file" not in logging_section:
+            return
+
+        def _bool(val: str) -> bool:
+            return val.lower() in ("true", "1", "yes")
+
+        logfile = self.get("logging", "file")
+        mirror = _bool(self.get("logging", "mirror", "false"))
+        everything = _bool(self.get("logging", "everything", "false"))
+        openlogfile(logfile, mirror=mirror, everything=everything)
 
     def get(self, section: str, key: str, default: str = "") -> str:
         """
