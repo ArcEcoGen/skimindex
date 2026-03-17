@@ -173,3 +173,25 @@ class TestLogFile:
         log_mod.closelogfile()
         captured = capsys.readouterr()
         assert "mirrored message" in captured.err
+
+    def test_everything_true_no_double_write(self, tmp_path):
+        """When everything=True, fd 2 IS the log file. Writing via sys.stderr
+        must not produce a second entry on top of the direct open() write."""
+        logfile = str(tmp_path / "test.log")
+        log_mod.openlogfile(logfile, mirror=True, everything=True)
+        with patch.object(log_mod, '_should_use_color', return_value=False):
+            log_mod.loginfo("unique message")
+        log_mod.closelogfile()
+        content = Path(logfile).read_text()
+        occurrences = content.count("unique message")
+        assert occurrences == 1, f"Expected 1 occurrence, got {occurrences}:\n{content}"
+
+    def test_everything_true_writes_to_log_file(self, tmp_path):
+        """When everything=True, log messages must still reach the log file."""
+        logfile = str(tmp_path / "test.log")
+        log_mod.openlogfile(logfile, mirror=False, everything=True)
+        with patch.object(log_mod, '_should_use_color', return_value=False):
+            log_mod.loginfo("everything write")
+        log_mod.closelogfile()
+        content = Path(logfile).read_text()
+        assert "everything write" in content

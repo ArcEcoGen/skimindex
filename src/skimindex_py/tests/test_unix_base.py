@@ -100,13 +100,13 @@ class TestCallSingleCommand:
 
     def test_stderr_is_logged(self):
         lbc = LoggedBoundCommand(make_single_cmd(stderr="warn line\n"))
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             lbc()
         mock_warn.assert_called_with("warn line")
 
     def test_multiline_stderr_logged_per_line(self):
         lbc = LoggedBoundCommand(make_single_cmd(stderr="line1\nline2\n"))
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             lbc()
         calls = [c.args[0] for c in mock_warn.call_args_list]
         assert "line1" in calls
@@ -114,7 +114,7 @@ class TestCallSingleCommand:
 
     def test_empty_stderr_not_logged(self):
         lbc = LoggedBoundCommand(make_single_cmd(stderr=""))
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             lbc()
         mock_warn.assert_not_called()
 
@@ -122,7 +122,7 @@ class TestCallSingleCommand:
         from plumbum import ProcessExecutionError
         exc = ProcessExecutionError(["cmd"], 1, "", "error msg\n")
         lbc = LoggedBoundCommand(make_single_cmd(side_effect=exc))
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             with pytest.raises(ProcessExecutionError):
                 lbc()
         mock_warn.assert_called_with("error msg")
@@ -153,7 +153,7 @@ class TestCallPipeline:
         python = _plumbum_local['python3']
         cat = _plumbum_local['cat']
         stage = python['-c', 'import sys; print("WARN_LINE", file=sys.stderr)']
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             LoggedBoundCommand(stage | cat)()
         logged = [c.args[0] for c in mock_warn.call_args_list]
         assert any("WARN_LINE" in l for l in logged)
@@ -166,7 +166,7 @@ class TestCallPipeline:
                 f'import sys; print("{marker}", file=sys.stderr); '
                 'sys.stdout.buffer.write(sys.stdin.buffer.read())']
         pipe = stage("MARKER_A") | stage("MARKER_B") | cat
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             LoggedBoundCommand(pipe)()
         logged = [c.args[0] for c in mock_warn.call_args_list]
         assert any("MARKER_A" in l for l in logged)
@@ -175,7 +175,7 @@ class TestCallPipeline:
     def test_empty_stderr_not_logged(self):
         echo = _plumbum_local['echo']
         cat = _plumbum_local['cat']
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             LoggedBoundCommand(echo['hello'] | cat)()
         mock_warn.assert_not_called()
 
@@ -194,7 +194,7 @@ class TestCallPipeline:
         # Build right-associatively by nesting the sub-pipeline first.
         inner = stage("RIGHT_B") | cat          # plumbum Pipeline
         outer = stage("RIGHT_A") | inner        # RIGHT_A | (RIGHT_B | cat)
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             LoggedBoundCommand(outer)()
         logged = [c.args[0] for c in mock_warn.call_args_list]
         assert any("RIGHT_A" in l for l in logged)
@@ -238,7 +238,7 @@ class TestPipelineDeadlockPrevention:
         python = _plumbum_local['python3']
         cmd = python['-c', f'import sys; sys.stderr.buffer.write(b"x" * {_STDERR_FLOOD_BYTES})']
         lbc = LoggedBoundCommand(cmd)
-        with patch("skimindex.unix.base.logwarning"):
+        with patch("skimindex.unix.base.loginfo"):
             _, exc = self._run_with_timeout(lbc)
         assert exc is None
 
@@ -259,7 +259,7 @@ class TestPipelineDeadlockPrevention:
         # stage 2: just passes data through
         pipe = flooder | cat
         lbc = LoggedBoundCommand(pipe)
-        with patch("skimindex.unix.base.logwarning"):
+        with patch("skimindex.unix.base.loginfo"):
             _, exc = self._run_with_timeout(lbc)
         assert exc is None
 
@@ -273,19 +273,19 @@ class TestPipelineDeadlockPrevention:
         stage = python['-c', flood_and_pass]
         pipe = stage | stage | stage
         lbc = LoggedBoundCommand(pipe)
-        with patch("skimindex.unix.base.logwarning"):
+        with patch("skimindex.unix.base.loginfo"):
             _, exc = self._run_with_timeout(lbc)
         assert exc is None
 
     def test_intermediate_stderr_is_captured_and_logged(self):
-        """Stderr from intermediate stages must reach logwarning, not be discarded."""
+        """Stderr from intermediate stages must reach loginfo, not be discarded."""
         python = _plumbum_local['python3']
         cat = _plumbum_local['cat']
 
         emitter = python['-c', 'import sys; print("marker_line", file=sys.stderr)']
         pipe = emitter | cat
         lbc = LoggedBoundCommand(pipe)
-        with patch("skimindex.unix.base.logwarning") as mock_warn:
+        with patch("skimindex.unix.base.loginfo") as mock_warn:
             self._run_with_timeout(lbc)
         logged = [c.args[0] for c in mock_warn.call_args_list]
         assert any("marker_line" in line for line in logged), (

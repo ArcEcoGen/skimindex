@@ -12,10 +12,9 @@ Equivalent to bash script's approach:
 
 import os
 import subprocess
-import tempfile
-from pathlib import Path
+import threading
 from plumbum import local as _plumbum_local
-from skimindex.log import logwarning
+from skimindex.log import loginfo, logwarning
 
 
 class LoggedBoundCommand:
@@ -56,43 +55,61 @@ class LoggedBoundCommand:
         plumbum's Pipeline.popen() propagates stderr=PIPE to every stage.
         Intermediate 64 KB pipes fill up and block if nobody reads them.
 
-        Fix: traverse the Pipeline AST before popen(), wrap each leaf command
-        with `cmd >= tmpfile` (plumbum's stderr-to-file redirect), then run the
-        modified pipeline normally.  File redirects are applied at the command
-        level, so they override the stderr=PIPE that Pipeline.popen() propagates.
-        After execution, read and log each temp file, then delete it.
+        Fix: traverse the Pipeline AST before execution to find every leaf
+        command; create an os.pipe() per leaf; redirect that leaf's stderr to
+        the write end via /dev/fd/N; start a drain thread on the read end.
+        Threads log lines via loginfo() in real time.  After the pipeline
+        exits the parent closes the write ends so drain threads see EOF.
 
-        This approach works for both left- and right-associative pipeline
-        compositions, unlike srcproc-chain traversal which only works correctly
-        with left-associative chains.
+        AST traversal handles both left- and right-associative compositions
+        correctly, unlike walking the srcproc chain after popen().
         """
-        tmp_paths = []
+        write_fds = []
+        drain_threads = []
 
         def _redirect(cmd):
-            """Recursively replace every leaf command's stderr with a temp file."""
             if hasattr(cmd, 'srccmd'):
                 return _redirect(cmd.srccmd) | _redirect(cmd.dstcmd)
-            fd, path = tempfile.mkstemp(suffix='.stderr')
-            os.close(fd)
-            tmp_paths.append(path)
-            return cmd >= path
+            r_fd, w_fd = os.pipe()
+            write_fds.append(w_fd)
+            t = threading.Thread(
+                target=self._drain_stderr,
+                args=(os.fdopen(r_fd, 'rb'),),
+                daemon=True,
+            )
+            t.start()
+            drain_threads.append(t)
+            return cmd >= f'/dev/fd/{w_fd}'
 
         modified = _redirect(self._cmd)
         try:
             result = modified(*args, **kwargs)
         finally:
-            for path in tmp_paths:
+            # Close parent's write ends so drain threads see EOF.
+            for w_fd in write_fds:
                 try:
-                    content = Path(path).read_text(errors='replace')
-                    self._log_stderr(content)
-                except Exception:
+                    os.close(w_fd)
+                except OSError:
                     pass
-                finally:
-                    try:
-                        os.unlink(path)
-                    except Exception:
-                        pass
+            for t in drain_threads:
+                t.join()
         return result
+
+    @staticmethod
+    def _drain_stderr(pipe):
+        """Read lines from a pipe and log them via loginfo in real time."""
+        try:
+            for raw_line in pipe:
+                line = raw_line.decode(errors='replace').rstrip('\n')
+                if line:
+                    loginfo(line)
+        except Exception as e:
+            logwarning(f"[base] error draining stderr: {e}")
+        finally:
+            try:
+                pipe.close()
+            except Exception:
+                pass
 
     def __getitem__(self, args):
         """Support plumbum's bracket notation for arguments."""
@@ -124,7 +141,7 @@ class LoggedBoundCommand:
             return
         for line in text.strip().split('\n'):
             if line:
-                logwarning(line)
+                loginfo(line)
 
     def __getattr__(self, name):
         """Forward unknown attributes to the underlying plumbum command."""

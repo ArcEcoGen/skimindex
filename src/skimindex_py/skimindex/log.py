@@ -80,14 +80,17 @@ def _logwrite(color: str, label: str, *message: str) -> None:
 
     # Write to current output
     if _logfile:
-        # Write to file (strip colors)
         clean_line = re.sub(r'\x1b\[[0-9;]*m', '', log_line)
-        with open(_logfile, 'a') as f:
-            f.write(clean_line + '\n')
-
-        # Mirror to stderr if requested
-        if _mirror_to_stderr:
-            print(log_line, file=sys.stderr)
+        if _logeverything:
+            # fd 2 has been redirected to the log file at the OS level.
+            # Use os.write(2, ...) to hit that fd directly — avoids the
+            # duplicate entry that open() + mirror-to-sys.stderr would produce.
+            os.write(2, (clean_line + '\n').encode())
+        else:
+            with open(_logfile, 'a') as f:
+                f.write(clean_line + '\n')
+            if _mirror_to_stderr:
+                print(log_line, file=sys.stderr)
     else:
         # Write to stderr
         print(log_line, file=sys.stderr)

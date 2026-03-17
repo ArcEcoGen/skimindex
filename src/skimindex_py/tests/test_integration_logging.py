@@ -8,8 +8,8 @@ Each test combines:
 
 Implementation note on everything=True
 ---------------------------------------
-With our thread-based stderr drain, subprocess stderr goes through
-  pipe → drain thread → logwarning() → open(_logfile, 'a')
+Subprocess stderr goes through:
+  pipe → drain thread → loginfo() → open(_logfile, 'a')
 NOT through fd 2 of the parent process.  So everything=True does not
 change how subprocess stderr reaches the log file; it only affects direct
 writes to fd 2 / sys.stderr in the Python parent process.
