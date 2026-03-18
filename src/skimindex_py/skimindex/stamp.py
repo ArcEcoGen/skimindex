@@ -43,7 +43,7 @@ needs_run(path, *sources, dry_run, label, action) -> bool
 import os
 import shutil
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 PathLike = Union[str, Path]
 
@@ -211,6 +211,7 @@ def unstamp(path: PathLike) -> None:
 def needs_run(
     path: PathLike,
     *sources: PathLike,
+    target: Optional[PathLike] = None,
     dry_run: bool = False,
     label: str = "",
     action: str = "process",
@@ -219,7 +220,7 @@ def needs_run(
 
     Encapsulates the three-way branch repeated at every stamped pipeline step:
 
-      1. Already up-to-date (stamp exists and all sources are fresh):
+      1. Already up-to-date (stamp exists, target exists, all sources fresh):
          logs "[label] OK  (up-to-date)" and returns False.
       2. dry_run and work is needed:
          logs "[label] WOULD <action>" and returns False.
@@ -229,9 +230,18 @@ def needs_run(
     *sources* are checked with unstamp_if_newer before the stamp test,
     so the stamp is invalidated automatically when a dependency changes.
 
+    The optional *target* parameter names the real output file or directory
+    to check for existence.  Use it when the stamp key is a virtual path
+    (e.g. a work-directory sub-path) that does not match the actual output.
+    When *target* is None, *path* itself is used as the existence check.
+    If the stamp exists but the target does not, the stamp is removed and
+    the step is re-run, preventing silent data loss.
+
     Args:
-        path:    The output path whose stamp represents completion.
+        path:    The stamp key (used for stamp file lookup).
         *sources: Optional upstream files/directories to check for freshness.
+        target:  The real output whose existence is verified alongside the stamp.
+                 Defaults to *path* when None.
         dry_run: If True, do not run the step even when work is needed.
         label:   Short identifier shown in log messages (e.g. section name).
         action:  Description of the work, used in the "WOULD" log line.
@@ -239,15 +249,20 @@ def needs_run(
     Returns:
         True if the caller should run the step, False otherwise.
     """
-    from skimindex.log import loginfo  # local import to avoid circular dependency
+    from skimindex.log import loginfo, logwarning  # local import to avoid circular dependency
 
     if sources:
         unstamp_if_newer(path, *sources)
 
     if is_stamped(path):
-        prefix = f"  [{label}]" if label else " "
-        loginfo(f"{prefix} OK  (up-to-date)")
-        return False
+        check = Path(target) if target is not None else Path(path)
+        if not check.exists():
+            logwarning(f"  [{label}] stamp exists but target missing ({check}), re-running")
+            unstamp(path)
+        else:
+            prefix = f"  [{label}]" if label else " "
+            loginfo(f"{prefix} OK  (up-to-date)")
+            return False
 
     if dry_run:
         prefix = f"  [{label}]" if label else " "

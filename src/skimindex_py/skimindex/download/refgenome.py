@@ -181,6 +181,41 @@ def filter_assemblies_by_genus(assemblies: List[Dict[str, Any]]) -> List[Dict[st
     return selected
 
 
+def _is_hybrid(organism_name: str) -> bool:
+    """Return True if the organism name denotes a hybrid (contains ' x ')."""
+    return bool(re.search(r'\bx\b', organism_name, re.IGNORECASE))
+
+
+def filter_assemblies_no_hybrids(assemblies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove hybrid organisms (names containing ' x ') from the assembly list."""
+    return [a for a in assemblies if not _is_hybrid(_get_organism_name_from_report(a))]
+
+
+def _taxon_key(organism_name: str, one_per: str) -> str:
+    """Return genus or species key for an organism name."""
+    parts = _safe_name(organism_name).split("_")
+    if one_per == "genus":
+        return parts[0]
+    if one_per == "species" and len(parts) >= 2:
+        return f"{parts[0]}_{parts[1]}"
+    return _safe_name(organism_name)
+
+
+def _covered_taxa(output_dir: Path, one_per: str) -> set:
+    """Return the set of genera or species already present in *output_dir*."""
+    covered = set()
+    for f in output_dir.glob("*.gbff.gz"):
+        m = re.search(r"^(.+?)-(?:GCF|GCA)_", f.name)
+        if not m:
+            continue
+        parts = m.group(1).split("_")
+        if one_per == "genus":
+            covered.add(parts[0])
+        elif one_per == "species" and len(parts) >= 2:
+            covered.add(f"{parts[0]}_{parts[1]}")
+    return covered
+
+
 def list_sections() -> str:
     """List available reference genome sections as CSV from config."""
     cfg = config()
@@ -439,6 +474,23 @@ def process_refgenome_section(
     else:
         loginfo(f"[{section}] Processing {len(assemblies)} assemblies")
 
+    # Remove hybrids
+    before = len(assemblies)
+    assemblies = filter_assemblies_no_hybrids(assemblies)
+    if len(assemblies) < before:
+        loginfo(f"[{section}] Removed {before - len(assemblies)} hybrid(s), {len(assemblies)} remaining")
+
+    # Skip taxa already present on disk (genus/species coverage check)
+    if one_per in ("genus", "species") and output_dir.exists():
+        covered = _covered_taxa(output_dir, one_per)
+        if covered:
+            before = len(assemblies)
+            assemblies = [a for a in assemblies
+                          if _taxon_key(_get_organism_name_from_report(a), one_per) not in covered]
+            skipped = before - len(assemblies)
+            if skipped:
+                loginfo(f"[{section}] {skipped} {one_per}(s) already on disk, {len(assemblies)} new to download")
+
     # Build accession → organism_name map
     accession_map = {}
     for asm in assemblies:
@@ -462,7 +514,9 @@ def process_refgenome_section(
             ext_stamp = work_base / accession / "extract"
             cmp_stamp = work_base / accession / "compress"
 
-            if not needs_run(cmp_stamp, dry_run=dry_run,
+            safe_name_str = _safe_name(organism_name)
+            final_output = output_dir / f"{safe_name_str}-{accession}.gbff.gz"
+            if not needs_run(cmp_stamp, target=final_output, dry_run=dry_run,
                              label=accession, action=f"download {accession}"):
                 continue
 
