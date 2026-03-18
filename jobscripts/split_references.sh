@@ -1,9 +1,11 @@
 #!/bin/bash
 #OAR -n split_references
-#OAR -l /nodes=1/core=32,walltime=48:00:00
+#OAR -l /nodes=1/core=32,walltime=4:00:00
 #OAR --project phyloalps
 #OAR -O %jobname%.%jobid%.stdout
 #OAR -E %jobname%.%jobid%.stderr
+##OAR -t devel
+##OAR -l /nodes=1/core=32,walltime=00:30:00
 
 # This job download a few division of genbank useful
 # to setup genome cleaning by tagging :

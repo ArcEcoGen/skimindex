@@ -23,7 +23,7 @@
 [local_directories]
 genbank        = "genbank"
 indexes        = "indexes"
-skims          = "skims"
+raw_data       = "raw_data"
 processed_data = "processed_data"
 config         = "config"
 log            = "log"
@@ -83,3 +83,4 @@ batches          = 20             # After splitting references sequences are div
 
 [genome_indexing]
 kmer_size        = 31
+genome_directory = genomes_15x
