@@ -43,14 +43,17 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl make unzip less jq pigz sudo python3-plumbum \
     && rm -rf /var/lib/apt/lists/*
 
-# Install NCBI datasets CLI tools (architecture-aware) and C tools from src/
+# Install NCBI datasets CLI tools from GitHub Releases (architecture-aware).
+# Pin NCBI_DATASETS_VERSION to a specific tag (e.g. v18.21.0) for reproducible builds.
+# Run `make update-ncbi-datasets` to update the pinned version.
+ARG NCBI_DATASETS_VERSION=v18.21.0
 ARG TARGETARCH
 RUN mkdir -p /usr/local/bin \
-    && curl -fsSL "https://ftp.ncbi.nlm.nih.gov/pub/datasets/command-line/v2/linux-${TARGETARCH}/datasets" \
-        -o /usr/local/bin/datasets \
-    && curl -fsSL "https://ftp.ncbi.nlm.nih.gov/pub/datasets/command-line/v2/linux-${TARGETARCH}/dataformat" \
-        -o /usr/local/bin/dataformat \
-    && chmod 755 /usr/local/bin/datasets /usr/local/bin/dataformat
+    && curl -fsSL "https://github.com/ncbi/datasets/releases/download/${NCBI_DATASETS_VERSION}/linux-${TARGETARCH}.cli.package.zip" \
+        -o /tmp/ncbi_datasets.zip \
+    && unzip -o /tmp/ncbi_datasets.zip -d /usr/local/bin datasets dataformat \
+    && chmod 755 /usr/local/bin/datasets /usr/local/bin/dataformat \
+    && rm /tmp/ncbi_datasets.zip
 
 RUN conda install --yes ${KMINDEX_VERSION} ${NTCARD_VERSION} \
     && conda clean --all --yes

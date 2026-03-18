@@ -34,6 +34,10 @@ OBITOOLS_VERSION  := 4.4.29
 OBITOOLS_GITHUB_REPO := metabarcoding/obitools4
 OBITOOLS_LATEST_TAG := $(shell curl -s https://api.github.com/repos/$(OBITOOLS_GITHUB_REPO)/releases/latest 2>/dev/null | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": "Release_([0-9.]+)".*/\1/' || echo latest)
 
+NCBI_DATASETS_VERSION  := v18.21.0
+NCBI_DATASETS_GITHUB_REPO := ncbi/datasets
+NCBI_DATASETS_LATEST_TAG := $(shell curl -s https://api.github.com/repos/$(NCBI_DATASETS_GITHUB_REPO)/releases/latest 2>/dev/null | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": "([^"]+)".*/\1/' || echo latest)
+
 KMINDEX_VERSION   := bioconda::kmindex
 NTCARD_VERSION    := bioconda::ntcard
 
@@ -68,6 +72,7 @@ DOCKERFILE     := Dockerfile
 
 BUILD_ARGS := \
 	--build-arg OBITOOLS_VERSION=$(OBITOOLS_VERSION) \
+	--build-arg NCBI_DATASETS_VERSION=$(NCBI_DATASETS_VERSION) \
 	--build-arg KMINDEX_VERSION=$(KMINDEX_VERSION) \
 	--build-arg NTCARD_VERSION=$(NTCARD_VERSION) \
 	--build-arg OCI_VERSION=$(OCI_VERSION) \
@@ -192,6 +197,18 @@ clean: clean-builder
 clean-builder:
 	docker buildx rm $(BUILDER) 2>/dev/null || true
 	rm -f .builder-ready
+
+## update-ncbi-datasets : Récupérer la dernière version des outils NCBI datasets/dataformat
+update-ncbi-datasets:
+	@echo "Dernière version NCBI datasets: $(NCBI_DATASETS_LATEST_TAG)"
+	@sed -i.bak 's/^NCBI_DATASETS_VERSION.*:=.*/NCBI_DATASETS_VERSION  := $(NCBI_DATASETS_LATEST_TAG)/' $(firstword $(MAKEFILE_LIST))
+	@rm -f $(firstword $(MAKEFILE_LIST)).bak
+	@echo "NCBI_DATASETS_VERSION mise à jour vers: $(NCBI_DATASETS_LATEST_TAG)"
+
+## build-ncbi-datasets  : Builder avec la dernière version NCBI datasets
+build-ncbi-datasets:
+	@$(MAKE) update-ncbi-datasets
+	@$(MAKE) build
 
 ## update-obitools    : Récupérer la dernière version d'OBITools depuis GitHub
 update-obitools:
