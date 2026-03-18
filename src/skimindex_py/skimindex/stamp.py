@@ -59,11 +59,19 @@ STAMP_ROOT = Path(os.environ.get("SKIMINDEX_STAMP_DIR", "/stamp"))
 # ---------------------------------------------------------------------------
 
 def _stamp_path(path: PathLike) -> Path:
-    """Return the stamp file path for *path* under STAMP_ROOT."""
+    """Return the stamp file path for *path* under STAMP_ROOT.
+
+    Hidden path components (starting with '.') are made visible by replacing
+    the leading '.' with '_', so stamp files are never buried in hidden dirs.
+    Example: /genbank/Plants/.work/GCA_xxx → /stamp/genbank/Plants/_work/GCA_xxx.stamp
+    """
     resolved = Path(path).resolve()
-    # Strip leading '/' so Path() joining works, then append .stamp suffix.
-    relative = str(resolved).lstrip("/")
-    return STAMP_ROOT / (relative + ".stamp")
+    parts = [
+        "_" + part[1:] if part.startswith(".") else part
+        for part in resolved.parts
+    ]
+    visible = str(Path(*parts)).lstrip("/")
+    return STAMP_ROOT / (visible + ".stamp")
 
 
 def _max_mtime(path: Path) -> float:
@@ -84,7 +92,7 @@ def _max_mtime(path: Path) -> float:
 # Public API
 # ---------------------------------------------------------------------------
 
-def stamp(path: PathLike) -> None:
+def stamp(path: PathLike) -> bool:
     """Mark *path* as successfully processed.
 
     Creates (or updates) the stamp file that corresponds to *path*.
@@ -92,10 +100,17 @@ def stamp(path: PathLike) -> None:
 
     Args:
         path: The output path (file or directory) that has been produced.
+
+    Returns:
+        True on success, False if the stamp file could not be created.
     """
-    sp = _stamp_path(path)
-    sp.parent.mkdir(parents=True, exist_ok=True)
-    sp.touch()
+    try:
+        sp = _stamp_path(path)
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        sp.touch()
+        return True
+    except Exception:
+        return False
 
 
 def is_stamped(path: PathLike) -> bool:
@@ -193,19 +208,39 @@ def unstamp_if_newer(path: PathLike, *sources: PathLike) -> bool:
     return False
 
 
-def unstamp(path: PathLike) -> None:
+def unstamp(path: PathLike) -> bool:
     """Remove the stamp for *path*, forcing re-processing on the next run.
-
-    Does nothing if no stamp exists.
 
     Args:
         path: The output path whose stamp to remove.
+
+    Returns:
+        True if the stamp was removed, False if it did not exist.
     """
     sp = _stamp_path(path)
     try:
         sp.unlink()
+        return True
     except FileNotFoundError:
-        pass
+        return False
+
+
+def stamp_gz(path: PathLike) -> bool:
+    """Verify gzip integrity of *path* with pigz -t, then stamp it.
+
+    Args:
+        path: A .gz file that has been produced and should be stamped.
+
+    Returns:
+        True if the file passed integrity check and was stamped.
+        False if pigz -t failed (file is corrupt or incomplete).
+    """
+    from skimindex.unix.compress import pigz_test  # local import — unix layer above stamp
+    try:
+        pigz_test(str(path))()
+        return stamp(path)
+    except Exception:
+        return False
 
 
 def needs_run(

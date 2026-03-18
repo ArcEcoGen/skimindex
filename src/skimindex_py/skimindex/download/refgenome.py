@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
 from skimindex.sections import genbank_base, section_rel_dir
-from skimindex.stamp import is_stamped, needs_run, stamp, unstamp
+from skimindex.stamp import is_stamped, needs_run, stamp, stamp_gz, unstamp
 from skimindex.unix.compress import pigz, unzip
 from skimindex.unix.ncbi import datasets, datasets_summary_genome
 
@@ -277,11 +277,17 @@ def _format_dataset_flags(
 
 
 def _get_organism_name_from_report(assembly: Dict[str, Any]) -> str:
-    """Extract organism name from a datasets summary report dict."""
-    biosample = assembly.get("assembly_info", {}).get("biosample", {})
-    description = biosample.get("description", {})
-    organism = description.get("organism", {})
-    name = organism.get("organism_name", "")
+    """Extract organism name from a datasets summary report dict.
+
+    Tries multiple paths in order of preference:
+      1. organism.organism_name  (top-level, present for all assemblies)
+      2. assembly_info.biosample.description.organism.organism_name (older path)
+    Falls back to accession if neither is found.
+    """
+    name = assembly.get("organism", {}).get("organism_name", "")
+    if not name:
+        biosample = assembly.get("assembly_info", {}).get("biosample", {})
+        name = biosample.get("description", {}).get("organism", {}).get("organism_name", "")
     return name or assembly.get("accession", "unknown")
 
 
@@ -345,20 +351,23 @@ def _compress_accession(
     organism_name: str,
     work_dir: Path,
     output_path: Path,
-    stamp_key: Path,
+    out_file: Path,
 ) -> bool:
-    """Compress GBFF files for one accession. Skip if stamp exists."""
-    if is_stamped(stamp_key):
+    """Compress GBFF files for one accession and stamp the output gz file.
+
+    Uses stamp_gz to verify integrity before stamping.
+    Skip if the output is already stamped.
+    """
+    if is_stamped(out_file):
         loginfo(f"    [{accession}] Already compressed")
         return True
 
-    safe_name_str = _safe_name(organism_name)
-    out_file = output_path / f"{safe_name_str}-{accession}.gbff.gz"
-
     if out_file.exists():
-        loginfo(f"    [{accession}] Output already exists: {out_file.name}")
-        stamp(stamp_key)
-        return True
+        loginfo(f"    [{accession}] Output exists, verifying integrity...")
+        if stamp_gz(out_file):
+            return True
+        logwarning(f"    [{accession}] Integrity check failed, re-compressing...")
+        out_file.unlink(missing_ok=True)
 
     # Find GBFF files in work_dir/ncbi_dataset/data/{accession}/
     dataset_dir = work_dir / "ncbi_dataset" / "data" / accession
@@ -369,10 +378,12 @@ def _compress_accession(
     loginfo(f"    [{accession}] Compressing...")
     ok = _consolidate_accession(dataset_dir, organism_name, out_file)
     if ok:
-        stamp(stamp_key)
-        # Cleanup work directory
-        shutil.rmtree(work_dir, ignore_errors=True)
-        loginfo(f"    [{accession}] Compression complete")
+        ok = stamp_gz(out_file)
+        if ok:
+            shutil.rmtree(work_dir, ignore_errors=True)
+            loginfo(f"    [{accession}] Compression complete")
+        else:
+            logerror(f"    [{accession}] Integrity check failed after compression")
     return ok
 
 
@@ -512,11 +523,10 @@ def process_refgenome_section(
 
             dl_stamp = work_base / accession / "download"
             ext_stamp = work_base / accession / "extract"
-            cmp_stamp = work_base / accession / "compress"
 
             safe_name_str = _safe_name(organism_name)
             final_output = output_dir / f"{safe_name_str}-{accession}.gbff.gz"
-            if not needs_run(cmp_stamp, target=final_output, dry_run=dry_run,
+            if not needs_run(final_output, dry_run=dry_run,
                              label=accession, action=f"download {accession}"):
                 continue
 
@@ -533,7 +543,7 @@ def process_refgenome_section(
                 failed_accessions.append(accession)
                 continue
 
-            if not _compress_accession(accession, organism_name, work_dir, output_dir, cmp_stamp):
+            if not _compress_accession(accession, organism_name, work_dir, output_dir, final_output):
                 errors += 1
                 failed_accessions.append(accession)
 

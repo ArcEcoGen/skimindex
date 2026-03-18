@@ -10,7 +10,7 @@
 #
 #   Reference-genome stamps
 #     Old: {GENBANK}/{section_dir}/.stamps/{accession}.{step}.stamp
-#     New: {STAMP_ROOT}/{GENBANK}/{section_dir}/.work/{accession}/{step}.stamp
+#     New: {STAMP_ROOT}/{GENBANK}/{section_dir}/_work/{accession}/{step}.stamp
 #     (step ∈ download, extract, compress)
 #
 # The mtime of each old stamp is preserved so that freshness checks remain valid.
@@ -101,7 +101,7 @@ migrate_genbank() {
 # ---------------------------------------------------------------------------
 # Reference-genome stamps
 #   Old: {GENBANK}/{section_dir}/.stamps/{accession}.{step}.stamp
-#   New: {STAMP_ROOT}/{GENBANK}/{section_dir}/.work/{accession}/{step}.stamp
+#   New: {STAMP_ROOT}/{GENBANK}/{section_dir}/_work/{accession}/{step}.stamp
 # ---------------------------------------------------------------------------
 migrate_refgenome() {
     local old_stamp="$1"
@@ -117,7 +117,7 @@ migrate_refgenome() {
 
     # Strip leading '/' from GENBANK for the mirror path.
     local gb_rel="${GENBANK#/}"
-    local new_stamp="${STAMP_ROOT}/${gb_rel}/${section_dir}/.work/${accession}/${step}.stamp"
+    local new_stamp="${STAMP_ROOT}/${gb_rel}/${section_dir}/_work/${accession}/${step}.stamp"
 
     install_stamp "$old_stamp" "$new_stamp"
 }
