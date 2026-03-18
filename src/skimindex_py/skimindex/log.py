@@ -86,6 +86,8 @@ def _logwrite(color: str, label: str, *message: str) -> None:
             # Use os.write(2, ...) to hit that fd directly — avoids the
             # duplicate entry that open() + mirror-to-sys.stderr would produce.
             os.write(2, (clean_line + '\n').encode())
+            if _mirror_to_stderr and _original_stderr is not None:
+                os.write(_original_stderr, (log_line + '\n').encode())
         else:
             with open(_logfile, 'a') as f:
                 f.write(clean_line + '\n')
