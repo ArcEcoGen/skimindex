@@ -20,6 +20,7 @@
 #   shell                    Start an interactive shell inside the container.
 #   download_genbank         Download GenBank flat-file divisions and convert them to
 #   download_references      Master script for the reference data pipeline.
+#   migrate_stamps           migrate_stamps.sh — Convert old local stamp files to the new centralised layout.
 #   split_references         Split reference genome sequences into overlapping fragments
 #   download                 Download GenBank and reference genome data.
 #   split                    Split reference genomes into fragments for decontamination index building.
@@ -531,6 +532,9 @@ case "$SUBCMD" in
         ;;
     download_references)
         _ski_run_exec download_references.sh "$@"
+        ;;
+    migrate_stamps)
+        _ski_run_exec migrate_stamps.sh "$@"
         ;;
     split_references)
         _ski_run_exec split_references.sh "$@"

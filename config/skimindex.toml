@@ -27,6 +27,7 @@ skims          = "skims"
 processed_data = "processed_data"
 config         = "config"
 log            = "log"
+stamp          = "stamp"
 
 # Logging configuration.
 [logging]

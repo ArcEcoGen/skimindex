@@ -16,8 +16,8 @@ Uses configuration parameters:
   - directories.processed_data : output directory for fragments
 
 Output structure:
-  - Taxon sections (per genome): <processed_data>/<section_dir>/{genome_name}/fragments/frg_{batch}.fasta.gz
-  - Division sections: <processed_data>/<section_dir>/fragments/frg_{batch}.fasta.gz
+  - Taxon sections (per genome): <processed_data>/<section_dir>/{genome_name}/parts/frg_{batch}.fasta.gz
+  - Division sections: <processed_data>/<section_dir>/parts/frg_{batch}.fasta.gz
 """
 
 import os
@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
+from skimindex.stamp import is_stamped, remove_if_not_stamped, stamp, unstamp_if_newer
 from skimindex.unix.obitools import obiconvert, obidistribute, obigrep, obiscript
 
 # Path to the Lua script for sequence splitting
@@ -207,14 +208,14 @@ def _run_split_pipeline(
         return False
 
 
-def split_taxon_section(section: str, params: Dict[str, int]) -> bool:
+def split_taxon_section(section: str, params: Dict[str, int], dry_run: bool = False) -> bool:
     """Split a taxon section (pre-downloaded FASTA/GBFF files).
 
-    Processes each genome separately with its own fragments subdirectory.
+    Processes each genome separately with its own parts subdirectory.
     Directory name uses the source filename without extensions.
-    Output: <processed_data>/<section_dir>/{genome_name}/fragments/frg_{batch}.fasta.gz
+    Output: <processed_data>/<section_dir>/{genome_name}/parts/frg_{batch}.fasta.gz
 
-    Example: Homo_sapiens-GCF_000001405.40.gbff.gz → Homo_sapiens-GCF_000001405.40/fragments/
+    Example: Homo_sapiens-GCF_000001405.40.gbff.gz → Homo_sapiens-GCF_000001405.40/parts/
 
     Reads .fasta.gz and .gbff.gz files from the section directory.
     Uses stamp files to skip re-splitting if source has not changed.
@@ -244,9 +245,6 @@ def split_taxon_section(section: str, params: Dict[str, int]) -> bool:
 
     loginfo(f"Processing {len(input_files)} genome(s)...")
 
-    # Create stamp directory
-    stamp_dir = section_output_dir / "stamp"
-
     errors = 0
     for f in input_files:
         # Use filename without extensions as directory name
@@ -255,20 +253,23 @@ def split_taxon_section(section: str, params: Dict[str, int]) -> bool:
         # Remove .gz, then .gbff or .fasta (last 2 extensions)
         genome_key = ".".join(parts[:-2]) if len(parts) > 2 else f.stem
 
-        # Check stamp file
-        stamp_file = stamp_dir / f"{genome_key}.stamp"
+        genome_output_dir = section_output_dir / genome_key / "parts"
 
-        # Skip if stamp exists and is newer than source
-        if stamp_file.exists() and stamp_file.stat().st_mtime >= f.stat().st_mtime:
-            loginfo(f"  [{genome_key}] Already processed (stamp is up-to-date)")
+        # Invalidate stamp if source file changed, then skip if still valid.
+        unstamp_if_newer(genome_output_dir, f)
+        if is_stamped(genome_output_dir):
+            loginfo(f"  [{genome_key}] SKIP   (stamp up-to-date)")
+            continue
+
+        if dry_run:
+            loginfo(f"  [{genome_key}] WOULD split  {f.name}")
             continue
 
         loginfo(f"  [{genome_key}] Splitting...")
 
-        # Create subdirectory for this genome: {section_dir}/{genome_key}/fragments/
-        genome_output_dir = section_output_dir / genome_key / "fragments"
+        # Clean up any partial output from a previous interrupted run.
+        remove_if_not_stamped(genome_output_dir)
 
-        # Create source command: obiconvert on this file
         source_cmd = obiconvert(str(f))
 
         if not _run_split_pipeline(
@@ -281,18 +282,16 @@ def split_taxon_section(section: str, params: Dict[str, int]) -> bool:
             errors += 1
             continue
 
-        # Mark as processed
-        stamp_dir.mkdir(parents=True, exist_ok=True)
-        stamp_file.touch()
+        stamp(genome_output_dir)
 
     return errors == 0
 
 
-def split_division_section(section: str, params: Dict[str, int]) -> bool:
+def split_division_section(section: str, params: Dict[str, int], dry_run: bool = False) -> bool:
     """Split a GenBank division section (filter by taxid from flat files).
 
     Processes each division separately with its own fragments subdirectory.
-    Output: <processed_data>/<section_dir>/{division}/fragments/frg_{batch}.fasta.gz
+    Output: <processed_data>/<section_dir>/{division}/parts/frg_{batch}.fasta.gz
 
     Reads divisions and taxid from config, locates taxonomy, filters sequences.
     Uses stamp file to skip re-splitting if sources have not changed.
@@ -331,9 +330,6 @@ def split_division_section(section: str, params: Dict[str, int]) -> bool:
 
     loginfo(f"Taxonomy      : {taxonomy}")
 
-    # Create stamp directory
-    stamp_dir = section_output_dir / "stamp"
-
     # Process each division separately
     div_list = divisions.split()
     errors = 0
@@ -344,23 +340,23 @@ def split_division_section(section: str, params: Dict[str, int]) -> bool:
             logwarning(f"Division directory not found: {div_dir}")
             continue
 
-        # Check stamp file
-        stamp_file = stamp_dir / f"{div}.stamp"
+        div_fragments_dir = section_output_dir / div / "parts"
 
-        # Skip if stamp exists and is newer than sources
-        if stamp_file.exists():
-            source_mtimes = [taxonomy.stat().st_mtime, div_dir.stat().st_mtime]
-            stamp_mtime = stamp_file.stat().st_mtime
-            if stamp_mtime >= max(source_mtimes):
-                loginfo(f"  [{div}] Already processed (stamp is up-to-date)")
-                continue
+        # Invalidate stamp if taxonomy or division data changed, then skip if valid.
+        unstamp_if_newer(div_fragments_dir, taxonomy, div_dir)
+        if is_stamped(div_fragments_dir):
+            loginfo(f"  [{div}] SKIP   (stamp up-to-date)")
+            continue
+
+        if dry_run:
+            loginfo(f"  [{div}] WOULD split  {div_dir}")
+            continue
 
         loginfo(f"  [{div}] Splitting...")
 
-        # Create output dir for this division: {section_dir}/{division}/fragments/
-        div_fragments_dir = section_output_dir / div / "fragments"
+        # Clean up any partial output from a previous interrupted run.
+        remove_if_not_stamped(div_fragments_dir)
 
-        # Create source command: obigrep to filter by taxid for this division
         source_cmd = obigrep(
             "-t",
             str(taxonomy),
@@ -381,14 +377,12 @@ def split_division_section(section: str, params: Dict[str, int]) -> bool:
             errors += 1
             continue
 
-        # Mark as processed
-        stamp_dir.mkdir(parents=True, exist_ok=True)
-        stamp_file.touch()
+        stamp(div_fragments_dir)
 
     return errors == 0
 
 
-def split_section(section: str, params: Dict[str, int]) -> bool:
+def split_section(section: str, params: Dict[str, int], dry_run: bool = False) -> bool:
     """Split a section (dispatch to taxon or division handler).
 
     Args:
@@ -402,11 +396,9 @@ def split_section(section: str, params: Dict[str, int]) -> bool:
 
     # Determine section type: taxon-based or division-based
     if section in cfg.ref_genomes:
-        # Taxon section (from NCBI download)
-        return split_taxon_section(section, params)
+        return split_taxon_section(section, params, dry_run=dry_run)
     else:
-        # Division section (GenBank division)
-        return split_division_section(section, params)
+        return split_division_section(section, params, dry_run=dry_run)
 
 
 def process_split(
@@ -414,6 +406,7 @@ def process_split(
     frg_size: Optional[int] = None,
     overlap: Optional[int] = None,
     batches: Optional[int] = None,
+    dry_run: bool = False,
 ) -> int:
     """Main entry point: split genome sections into fragments.
 
@@ -440,7 +433,7 @@ def process_split(
     # Load parameters
     params = _load_split_params(frg_size, overlap, batches)
 
-    loginfo(f"===== Fragment splitting pipeline =====")
+    loginfo(f"===== Fragment splitting pipeline =====" + (" [DRY-RUN]" if dry_run else ""))
     loginfo(f"Fragment size : {params['frg_size']}")
     loginfo(f"Overlap       : {params['overlap']}")
     loginfo(f"Batches       : {params['batches']}")
@@ -450,7 +443,7 @@ def process_split(
     errors = 0
     for section in sections:
         loginfo(f">>> Splitting: {section}")
-        if split_section(section, params):
+        if split_section(section, params, dry_run=dry_run):
             loginfo(f"<<< {section} OK")
         else:
             logerror(f"<<< {section} FAILED")

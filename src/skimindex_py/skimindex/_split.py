@@ -84,6 +84,11 @@ Examples:
         help="Number of output batches (default: from config decontamination.batches)",
         metavar="N",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be processed without running any pipeline or modifying stamps",
+    )
 
     args = parser.parse_args(argv)
 
@@ -104,6 +109,7 @@ Examples:
         frg_size=args.frg_size,
         overlap=args.overlap,
         batches=args.batches,
+        dry_run=args.dry_run,
     )
 
 
