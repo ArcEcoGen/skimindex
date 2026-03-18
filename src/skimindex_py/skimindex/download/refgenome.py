@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
+from skimindex.stamp import is_stamped, stamp, unstamp
 from skimindex.unix.compress import pigz, unzip
 from skimindex.unix.ncbi import datasets, datasets_summary_genome
 
@@ -249,9 +250,9 @@ def _get_organism_name_from_report(assembly: Dict[str, Any]) -> str:
     return name or assembly.get("accession", "unknown")
 
 
-def _download_accession(accession: str, zip_file: Path, stamp: Path) -> bool:
+def _download_accession(accession: str, zip_file: Path, stamp_key: Path) -> bool:
     """Download a single accession ZIP. Skip if stamp exists."""
-    if stamp.exists():
+    if is_stamped(stamp_key):
         loginfo(f"    [{accession}] Already downloaded (stamp exists)")
         return True
 
@@ -263,7 +264,7 @@ def _download_accession(accession: str, zip_file: Path, stamp: Path) -> bool:
             "--include", "gbff",
             "--filename", str(zip_file),
         )()
-        stamp.touch()
+        stamp(stamp_key)
         loginfo(f"    [{accession}] Download complete")
         return True
     except Exception as e:
@@ -273,13 +274,13 @@ def _download_accession(accession: str, zip_file: Path, stamp: Path) -> bool:
 
 
 def _extract_accession(
-    accession: str, zip_file: Path, work_dir: Path, stamp: Path, dl_stamp: Path
+    accession: str, zip_file: Path, work_dir: Path, stamp_key: Path, dl_stamp_key: Path
 ) -> bool:
     """Extract a single accession ZIP. Skip if stamp exists.
 
     On failure, removes ZIP and dl_stamp to force re-download on retry.
     """
-    if stamp.exists():
+    if is_stamped(stamp_key):
         loginfo(f"    [{accession}] Already extracted")
         return True
 
@@ -291,7 +292,7 @@ def _extract_accession(
         loginfo(f"    [{accession}] Extracting...")
         work_dir.mkdir(parents=True, exist_ok=True)
         unzip("-o", "-d", str(work_dir), str(zip_file))()
-        stamp.touch()
+        stamp(stamp_key)
         # Suppress ZIP after extraction
         zip_file.unlink(missing_ok=True)
         loginfo(f"    [{accession}] Extraction complete")
@@ -300,7 +301,7 @@ def _extract_accession(
         logerror(f"    [{accession}] Extract failed: {e}")
         # Clean up corrupted ZIP and dl_stamp to force re-download on retry
         zip_file.unlink(missing_ok=True)
-        dl_stamp.unlink(missing_ok=True)
+        unstamp(dl_stamp_key)
         return False
 
 
@@ -309,10 +310,10 @@ def _compress_accession(
     organism_name: str,
     work_dir: Path,
     output_path: Path,
-    stamp: Path,
+    stamp_key: Path,
 ) -> bool:
     """Compress GBFF files for one accession. Skip if stamp exists."""
-    if stamp.exists():
+    if is_stamped(stamp_key):
         loginfo(f"    [{accession}] Already compressed")
         return True
 
@@ -321,7 +322,7 @@ def _compress_accession(
 
     if out_file.exists():
         loginfo(f"    [{accession}] Output already exists: {out_file.name}")
-        stamp.touch()
+        stamp(stamp_key)
         return True
 
     # Find GBFF files in work_dir/ncbi_dataset/data/{accession}/
@@ -333,7 +334,7 @@ def _compress_accession(
     loginfo(f"    [{accession}] Compressing...")
     ok = _consolidate_accession(dataset_dir, organism_name, out_file)
     if ok:
-        stamp.touch()
+        stamp(stamp_key)
         # Cleanup work directory
         shutil.rmtree(work_dir, ignore_errors=True)
         loginfo(f"    [{accession}] Compression complete")
@@ -411,9 +412,7 @@ def process_refgenome_section(
 
     # Create directories
     output_dir.mkdir(parents=True, exist_ok=True)
-    stamps_dir = output_dir / ".stamps"
     work_base = output_dir / ".work"
-    stamps_dir.mkdir(exist_ok=True)
 
     # Log configuration
     loginfo(f"[{section}] Taxon: {taxon}")
@@ -458,12 +457,12 @@ def process_refgenome_section(
             work_dir = work_base / accession
             zip_file = work_dir / "download.zip"
 
-            dl_stamp = stamps_dir / f"{accession}.download.stamp"
-            ext_stamp = stamps_dir / f"{accession}.extract.stamp"
-            cmp_stamp = stamps_dir / f"{accession}.compress.stamp"
+            dl_stamp = work_base / accession / "download"
+            ext_stamp = work_base / accession / "extract"
+            cmp_stamp = work_base / accession / "compress"
 
             # Skip if already fully processed
-            if cmp_stamp.exists():
+            if is_stamped(cmp_stamp):
                 continue
 
             loginfo(f"[{section}] [{i}/{total}] {accession} — {organism_name}")

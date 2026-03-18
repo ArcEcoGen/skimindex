@@ -20,6 +20,7 @@ from typing import Dict, List
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
+from skimindex.stamp import is_stamped, stamp
 from skimindex.unix.compress import pigz_test
 from skimindex.unix.download import curl_download
 from skimindex.unix.obitools import obiconvert, obitaxonomy
@@ -116,7 +117,6 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
     )
 
     # Create directories
-    (genbank_base / f"Release_{release}/stamp").mkdir(parents=True, exist_ok=True)
     (genbank_base / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
     (genbank_base / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
 
@@ -142,18 +142,16 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
             file_counter += 1
             loginfo(f"  [{file_counter}/{total_files}] {gb_file}")
 
-            stamp_file = genbank_base / f"Release_{release}/stamp/{gb_file}.stamp"
+            fasta_dir = genbank_base / f"Release_{release}/fasta/{div}"
+            fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
 
             # Skip if already processed
-            if stamp_file.exists():
+            if is_stamped(fasta_file):
                 loginfo(f"    Already processed (stamp exists)")
                 continue
 
             # Download and convert in one pipe: curl | obiconvert > tmp file, then move to final location
             try:
-                fasta_dir = genbank_base / f"Release_{release}/fasta/{div}"
-                fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
-
                 # Temporary file in tmp/ — atomic move on success
                 tmp_file = (
                     genbank_base
@@ -186,7 +184,7 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
                 continue
 
             # Mark as processed
-            stamp_file.touch()
+            stamp(fasta_file)
 
     # Clean up tmp directory
     tmp_dir = genbank_base / f"Release_{release}/tmp"
