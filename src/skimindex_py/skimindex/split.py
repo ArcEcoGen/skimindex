@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
 from skimindex.sections import genbank_base, latest_release, section_dirs
-from skimindex.stamp import is_stamped, remove_if_not_stamped, stamp, unstamp_if_newer
+from skimindex.stamp import needs_run, remove_if_not_stamped, stamp
 from skimindex.unix.obitools import obiconvert, obidistribute, obigrep, obiscript
 
 # Path to the Lua script for sequence splitting
@@ -211,14 +211,8 @@ def split_taxon_section(section: str, params: Dict[str, int], dry_run: bool = Fa
 
         genome_output_dir = section_output_dir / genome_key / "parts"
 
-        # Invalidate stamp if source file changed, then skip if still valid.
-        unstamp_if_newer(genome_output_dir, f)
-        if is_stamped(genome_output_dir):
-            loginfo(f"  [{genome_key}] SKIP   (stamp up-to-date)")
-            continue
-
-        if dry_run:
-            loginfo(f"  [{genome_key}] WOULD split  {f.name}")
+        if not needs_run(genome_output_dir, f,
+                         dry_run=dry_run, label=genome_key, action=f"split {f.name}"):
             continue
 
         loginfo(f"  [{genome_key}] Splitting...")
@@ -297,14 +291,8 @@ def split_division_section(section: str, params: Dict[str, int], dry_run: bool =
 
         div_fragments_dir = section_output_dir / div / "parts"
 
-        # Invalidate stamp if taxonomy or division data changed, then skip if valid.
-        unstamp_if_newer(div_fragments_dir, taxonomy, div_dir)
-        if is_stamped(div_fragments_dir):
-            loginfo(f"  [{div}] SKIP   (stamp up-to-date)")
-            continue
-
-        if dry_run:
-            loginfo(f"  [{div}] WOULD split  {div_dir}")
+        if not needs_run(div_fragments_dir, taxonomy, div_dir,
+                         dry_run=dry_run, label=div, action=f"split {div_dir}"):
             continue
 
         loginfo(f"  [{div}] Splitting...")

@@ -31,6 +31,13 @@ unstamp_if_newer(path, *sources) -> bool
     Remove the stamp for *path* if any of *sources* (or any file inside
     them, checked recursively) is newer than it.
     Invalidates a downstream stamp when an upstream dependency changes.
+
+needs_run(path, *sources, dry_run, label, action) -> bool
+    Single call that covers the three-way branch at every pipeline step:
+      - already stamped (and all sources still fresh) → log "OK" and return False
+      - dry_run and not stamped → log "WOULD <action>" and return False
+      - otherwise → return True (caller should run the step and call stamp())
+    Sources are checked with unstamp_if_newer before the stamp test.
 """
 
 import os
@@ -199,3 +206,52 @@ def unstamp(path: PathLike) -> None:
         sp.unlink()
     except FileNotFoundError:
         pass
+
+
+def needs_run(
+    path: PathLike,
+    *sources: PathLike,
+    dry_run: bool = False,
+    label: str = "",
+    action: str = "process",
+) -> bool:
+    """Return True only when the pipeline step must actually run.
+
+    Encapsulates the three-way branch repeated at every stamped pipeline step:
+
+      1. Already up-to-date (stamp exists and all sources are fresh):
+         logs "[label] OK  (up-to-date)" and returns False.
+      2. dry_run and work is needed:
+         logs "[label] WOULD <action>" and returns False.
+      3. Work is needed and dry_run is False:
+         returns True — the caller should execute the step then call stamp().
+
+    *sources* are checked with unstamp_if_newer before the stamp test,
+    so the stamp is invalidated automatically when a dependency changes.
+
+    Args:
+        path:    The output path whose stamp represents completion.
+        *sources: Optional upstream files/directories to check for freshness.
+        dry_run: If True, do not run the step even when work is needed.
+        label:   Short identifier shown in log messages (e.g. section name).
+        action:  Description of the work, used in the "WOULD" log line.
+
+    Returns:
+        True if the caller should run the step, False otherwise.
+    """
+    from skimindex.log import loginfo  # local import to avoid circular dependency
+
+    if sources:
+        unstamp_if_newer(path, *sources)
+
+    if is_stamped(path):
+        prefix = f"  [{label}]" if label else " "
+        loginfo(f"{prefix} OK  (up-to-date)")
+        return False
+
+    if dry_run:
+        prefix = f"  [{label}]" if label else " "
+        loginfo(f"{prefix} WOULD {action}")
+        return False
+
+    return True

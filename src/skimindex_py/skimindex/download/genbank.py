@@ -21,7 +21,7 @@ from typing import Dict, List
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
 from skimindex.sections import genbank_base
-from skimindex.stamp import is_stamped, stamp
+from skimindex.stamp import needs_run, stamp
 from skimindex.unix.compress import pigz_test
 from skimindex.unix.download import curl_download
 from skimindex.unix.obitools import obiconvert, obitaxonomy
@@ -87,7 +87,7 @@ def get_ftp_listing(divisions: List[str]) -> tuple:
         return ()
 
 
-def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
+def download_and_process_genbank(release: str, divisions: List[str], dry_run: bool = False) -> bool:
     """Download and convert GenBank files, grouped by division.
 
     Processes each division separately, downloading and converting files
@@ -141,16 +141,15 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
             fasta_dir = gb_root / f"Release_{release}/fasta/{div}"
             fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
 
-            # Skip if already processed
-            if is_stamped(fasta_file):
-                loginfo(f"    Already processed (stamp exists)")
+            if not needs_run(fasta_file, dry_run=dry_run,
+                             label=gb_file, action=f"download and convert {gb_file}"):
                 continue
 
             # Download and convert in one pipe: curl | obiconvert > tmp file, then move to final location
             try:
                 # Temporary file in tmp/ — atomic move on success
                 tmp_file = (
-                    genbank_base
+                    gb_root
                     / f"Release_{release}/tmp"
                     / gb_file.replace(".seq.gz", ".fasta.gz")
                 )
@@ -229,7 +228,7 @@ def download_taxonomy(release: str) -> bool:
         return False
 
 
-def process_genbank(divisions: List[str] = None) -> int:
+def process_genbank(divisions: List[str] = None, dry_run: bool = False) -> int:
     """Main entry point: download release, taxonomy, and process GenBank files.
 
     Args:
@@ -264,7 +263,7 @@ def process_genbank(divisions: List[str] = None) -> int:
 
     # Step 3: Download and process GenBank files
     loginfo(f">>> Step 3: Downloading and processing {len(divisions)} division(s)")
-    if not download_and_process_genbank(release, divisions):
+    if not download_and_process_genbank(release, divisions, dry_run=dry_run):
         logerror("Step 3 failed")
         return 1
     loginfo("<<< Step 3 OK")

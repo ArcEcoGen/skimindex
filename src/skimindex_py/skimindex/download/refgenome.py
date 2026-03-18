@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
 from skimindex.sections import genbank_base, section_rel_dir
-from skimindex.stamp import is_stamped, stamp, unstamp
+from skimindex.stamp import is_stamped, needs_run, stamp, unstamp
 from skimindex.unix.compress import pigz, unzip
 from skimindex.unix.ncbi import datasets, datasets_summary_genome
 
@@ -388,6 +388,7 @@ def _consolidate_accession(accession_dir: Path, organism: str, out_file: Path) -
 def process_refgenome_section(
     section: str,
     one_per: Optional[str] = None,
+    dry_run: bool = False,
 ) -> bool:
     """Download and process a single reference genome section, accession by accession.
 
@@ -461,8 +462,8 @@ def process_refgenome_section(
             ext_stamp = work_base / accession / "extract"
             cmp_stamp = work_base / accession / "compress"
 
-            # Skip if already fully processed
-            if is_stamped(cmp_stamp):
+            if not needs_run(cmp_stamp, dry_run=dry_run,
+                             label=accession, action=f"download {accession}"):
                 continue
 
             loginfo(f"[{section}] [{i}/{total}] {accession} — {organism_name}")
@@ -504,7 +505,7 @@ def process_refgenome_section(
     return True
 
 
-def process_refgenome(sections: List[str] = None) -> int:
+def process_refgenome(sections: List[str] = None, dry_run: bool = False) -> int:
     """Main entry point: process reference genome sections.
 
     Args:
@@ -528,7 +529,7 @@ def process_refgenome(sections: List[str] = None) -> int:
     # Process each section
     errors = 0
     for section in sections:
-        if not process_refgenome_section(section):
+        if not process_refgenome_section(section, dry_run=dry_run):
             errors += 1
 
     if errors > 0:

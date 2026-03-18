@@ -42,7 +42,7 @@ genbank_cmd = SkimCommand(
 
 @genbank_cmd.handler
 def _(sections, args, dry_run):
-    return process_genbank(sections)
+    return process_genbank(sections, dry_run=dry_run)
 
 
 main_genbank = genbank_cmd.main
@@ -131,10 +131,10 @@ def _(sections, args, dry_run):
     # Download a single section.
     if sections:
         one_per = getattr(args, "one_per", None)
-        return 0 if process_refgenome_section(sections[0], one_per) else 1
+        return 0 if process_refgenome_section(sections[0], one_per, dry_run=dry_run) else 1
 
     # Download all configured sections.
-    return process_refgenome()
+    return process_refgenome(dry_run=dry_run)
 
 
 main_refgenome = refgenome_cmd.main
