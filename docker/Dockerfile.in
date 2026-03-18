@@ -74,8 +74,7 @@ COPY config/ /config/
 COPY src/skimindex_py/ /tmp/skimindex_py/
 
 RUN chmod +x /usr/local/bin/obi* \
-             /app/scripts/[A-Za-z]*.sh \
-             /app/scripts/_[A-Za-z]*.sh \
+    && find /app/scripts -maxdepth 1 -name '*.sh' -exec chmod +x {} \; \
     && find /tmp/src-built -maxdepth 2 -type f -executable -exec cp {} /app/bin/ \; \
     && rm -rf /tmp/src-built \
     && pip install --no-build-isolation /tmp/skimindex_py \
