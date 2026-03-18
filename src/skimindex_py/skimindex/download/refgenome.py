@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
+from skimindex.sections import genbank_base, section_rel_dir
 from skimindex.stamp import is_stamped, stamp, unstamp
 from skimindex.unix.compress import pigz, unzip
 from skimindex.unix.ncbi import datasets, datasets_summary_genome
@@ -200,9 +201,8 @@ def _load_section_config(section: str) -> Dict[str, Any]:
             return {}
 
         # Get output directory
-        genbank_root = cfg.get("directories", "genbank", "/genbank")
-        rel_dir = section_data.get("directory", section.lower())
-        output_dir = Path(genbank_root) / rel_dir
+        rel_dir = section_rel_dir(section)
+        output_dir = genbank_base() / rel_dir
 
         # Get optional filters
         reference = str(section_data.get("reference", "false")).lower() == "true"

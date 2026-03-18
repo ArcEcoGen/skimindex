@@ -20,6 +20,7 @@ from typing import Dict, List
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
+from skimindex.sections import genbank_base
 from skimindex.stamp import is_stamped, stamp
 from skimindex.unix.compress import pigz_test
 from skimindex.unix.download import curl_download
@@ -38,11 +39,6 @@ def list_divisions() -> str:
     divisions = cfg.get("genbank", "divisions", "bct pln").split()
     return ",".join(divisions) if divisions else ""
 
-
-def _get_genbank_base() -> Path:
-    """Get the base GenBank directory from config."""
-    cfg = config()
-    return Path(cfg.get("directories", "genbank", "/genbank"))
 
 
 @lru_cache(maxsize=1)
@@ -104,7 +100,7 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
     Returns:
         True on success, False if any files failed.
     """
-    genbank_base = _get_genbank_base()
+    gb_root = genbank_base()
 
     # Get listing (parse and filter by division)
     gb_files = get_ftp_listing(divisions)
@@ -117,8 +113,8 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
     )
 
     # Create directories
-    (genbank_base / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
-    (genbank_base / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
+    (gb_root / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
+    (gb_root / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
 
     # Group files by division
     division_groups: Dict[str, List[str]] = {}
@@ -142,7 +138,7 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
             file_counter += 1
             loginfo(f"  [{file_counter}/{total_files}] {gb_file}")
 
-            fasta_dir = genbank_base / f"Release_{release}/fasta/{div}"
+            fasta_dir = gb_root / f"Release_{release}/fasta/{div}"
             fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
 
             # Skip if already processed
@@ -187,7 +183,7 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
             stamp(fasta_file)
 
     # Clean up tmp directory
-    tmp_dir = genbank_base / f"Release_{release}/tmp"
+    tmp_dir = gb_root / f"Release_{release}/tmp"
     shutil.rmtree(tmp_dir, ignore_errors=True)
 
     if errors > 0:
@@ -203,8 +199,8 @@ def download_and_process_genbank(release: str, divisions: List[str]) -> bool:
 
 def download_taxonomy(release: str) -> bool:
     """Download NCBI taxonomy."""
-    genbank_base = _get_genbank_base()
-    output_dir = genbank_base / f"Release_{release}/taxonomy"
+    gb_root = genbank_base()
+    output_dir = gb_root / f"Release_{release}/taxonomy"
     output_file = output_dir / "ncbi_taxonomy.tgz"
 
     if output_file.exists():

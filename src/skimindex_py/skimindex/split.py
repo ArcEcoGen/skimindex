@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
+from skimindex.sections import genbank_base, latest_release, section_dirs
 from skimindex.stamp import is_stamped, remove_if_not_stamped, stamp, unstamp_if_newer
 from skimindex.unix.obitools import obiconvert, obidistribute, obigrep, obiscript
 
@@ -107,51 +108,6 @@ def _load_split_params(
     }
 
 
-def _load_section_dirs(section: str) -> Optional[Dict[str, Any]]:
-    """Load input/output directories for a section from config.
-
-    Returns:
-        Dict with: rel_dir, input_dir (genbank), fragments_dir (processed_data)
-        None if section not found
-    """
-    cfg = config()
-    section_data = cfg.data.get(section, {})
-
-    if not section_data:
-        logerror(f"Section [{section}] not found in config")
-        return None
-
-    genbank_root = cfg.get("directories", "genbank", "/genbank")
-    processed_root = cfg.get("directories", "processed_data", "/processed_data")
-
-    rel_dir = section_data.get("directory", section.lower())
-
-    input_dir = Path(genbank_root) / rel_dir
-    fragments_dir = Path(processed_root) / rel_dir
-
-    return {
-        "rel_dir": rel_dir,
-        "input_dir": input_dir,
-        "fragments_dir": fragments_dir,
-        "section_data": section_data,
-    }
-
-
-def _find_latest_release(genbank_root: Path) -> Optional[Path]:
-    """Find the most recent Release_* directory under genbank_root.
-
-    Returns:
-        Path to Release_* directory, or None if not found
-    """
-    try:
-        releases = sorted(
-            genbank_root.glob("Release_*"),
-            key=lambda p: float(p.name.split("_")[1]) if "_" in p.name else 0,
-        )
-        return releases[-1] if releases else None
-    except Exception as e:
-        logerror(f"Error finding release directory: {e}")
-        return None
 
 
 def _run_split_pipeline(
@@ -220,7 +176,7 @@ def split_taxon_section(section: str, params: Dict[str, int], dry_run: bool = Fa
     Reads .fasta.gz and .gbff.gz files from the section directory.
     Uses stamp files to skip re-splitting if source has not changed.
     """
-    dirs = _load_section_dirs(section)
+    dirs = section_dirs(section)
     if not dirs:
         return False
 
@@ -296,7 +252,7 @@ def split_division_section(section: str, params: Dict[str, int], dry_run: bool =
     Reads divisions and taxid from config, locates taxonomy, filters sequences.
     Uses stamp file to skip re-splitting if sources have not changed.
     """
-    dirs = _load_section_dirs(section)
+    dirs = section_dirs(section)
     if not dirs:
         return False
 
@@ -316,8 +272,7 @@ def split_division_section(section: str, params: Dict[str, int], dry_run: bool =
     loginfo(f"Divisions     : {divisions}")
 
     # Find latest GenBank release
-    genbank_root = Path(config().get("directories", "genbank", "/genbank"))
-    release_dir = _find_latest_release(genbank_root)
+    release_dir = latest_release(genbank_base())
 
     if not release_dir:
         logerror(f"No GenBank release directory found under {genbank_root}")
