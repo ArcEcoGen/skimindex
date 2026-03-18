@@ -146,9 +146,21 @@ main_refgenome = refgenome_cmd.main
 
 def main(argv: Optional[list] = None) -> int:
     """Download everything: GenBank divisions then all reference genome sections."""
-    if process_genbank() != 0:
+    import argparse
+    parser = argparse.ArgumentParser(
+        prog="download",
+        description="Download everything (GenBank + all reference genomes)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be downloaded without executing anything",
+    )
+    args = parser.parse_args(argv)
+
+    if process_genbank(dry_run=args.dry_run) != 0:
         return 1
-    return process_refgenome()
+    return process_refgenome(dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

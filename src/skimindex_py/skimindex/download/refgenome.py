@@ -411,9 +411,9 @@ def process_refgenome_section(
     # CLI arguments override TOML config
     one_per = one_per if one_per is not None else config_vals.get("one_per", "")
 
-    # Create directories
-    output_dir.mkdir(parents=True, exist_ok=True)
     work_base = output_dir / ".work"
+    if not dry_run:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     # Log configuration
     loginfo(f"[{section}] Taxon: {taxon}")

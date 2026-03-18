@@ -112,9 +112,9 @@ def download_and_process_genbank(release: str, divisions: List[str], dry_run: bo
         f"Processing {len(gb_files)} GenBank files for divisions: {', '.join(divisions)}"
     )
 
-    # Create directories
-    (gb_root / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
-    (gb_root / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
+    if not dry_run:
+        (gb_root / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
+        (gb_root / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
 
     # Group files by division
     division_groups: Dict[str, List[str]] = {}
@@ -196,7 +196,7 @@ def download_and_process_genbank(release: str, divisions: List[str], dry_run: bo
     return True
 
 
-def download_taxonomy(release: str) -> bool:
+def download_taxonomy(release: str, dry_run: bool = False) -> bool:
     """Download NCBI taxonomy."""
     gb_root = genbank_base()
     output_dir = gb_root / f"Release_{release}/taxonomy"
@@ -211,6 +211,10 @@ def download_taxonomy(release: str) -> bool:
         except Exception:
             logwarning(f"Taxonomy file corrupted: {output_file}, re-downloading...")
             output_file.unlink(missing_ok=True)
+
+    if dry_run:
+        loginfo(f"WOULD download NCBI taxonomy → {output_file}")
+        return True
 
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -256,7 +260,7 @@ def process_genbank(divisions: List[str] = None, dry_run: bool = False) -> int:
 
     # Step 2: Download taxonomy
     loginfo(">>> Step 2: Downloading NCBI taxonomy")
-    if not download_taxonomy(release):
+    if not download_taxonomy(release, dry_run=dry_run):
         logerror("Step 2 failed")
         return 1
     loginfo("<<< Step 2 OK")
