@@ -121,7 +121,7 @@ BUILD_USER_SCRIPT := $(PROJECT_ROOT)/docker/build_user_script.sh
         venv test docs docs-stop docs-build help
 
 ## all                : Build multi-platform image (with latest OBITools), push to registry, generate skimindex.sh
-all: build-obitools-multiplatform push skimindex-script
+all: build-obitools-multiplatform push skimindex-script docs
 
 ## skimindex-script   : Generate the standalone user entry-point skimindex.sh
 skimindex-script: $(SKIMINDEX_SH)

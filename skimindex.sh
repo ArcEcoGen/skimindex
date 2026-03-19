@@ -20,6 +20,7 @@
 #   shell                    Start an interactive shell inside the container.
 #   download                 Download GenBank and reference genome data.
 #   split                    Split reference genomes into fragments for decontamination index building.
+#   validate                 Validate the skimindex configuration file.
 #
 # shell options:
 #   --mount SRC:DST      Bind-mount SRC (host) to DST (container).
@@ -528,6 +529,9 @@ case "$SUBCMD" in
         ;;
     split)
         _ski_run_exec split "$@"
+        ;;
+    validate)
+        _ski_run_exec validate "$@"
         ;;
     *)
         logerror "Unknown subcommand '$SUBCMD'."
