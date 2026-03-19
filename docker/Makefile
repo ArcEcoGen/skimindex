@@ -87,6 +87,16 @@ PROJECT_ROOT := $(abspath $(BUILD_CONTEXT))
 CONFIG_FILE  := $(PROJECT_ROOT)/config/skimindex.toml
 
 # =============================================================================
+# Development virtual environment
+# =============================================================================
+
+PYTHON       := python3
+VENV         := $(PROJECT_ROOT)/.venv
+VENV_PYTHON  := $(VENV)/bin/python
+VENV_PIP     := $(VENV)/bin/pip
+PKG_DIR      := $(PROJECT_ROOT)/src/skimindex_py
+
+# =============================================================================
 # GitHub repository
 # =============================================================================
 
@@ -107,7 +117,8 @@ BUILD_USER_SCRIPT := $(PROJECT_ROOT)/docker/build_user_script.sh
 
 .PHONY: all build build-multiplatform build-dev push run run-dev \
         skimindex-script clean clean-builder \
-        update-obitools build-obitools build-obitools-multiplatform help
+        update-obitools build-obitools build-obitools-multiplatform \
+        venv test docs docs-stop docs-build help
 
 ## all                : Build multi-platform image (with latest OBITools), push to registry, generate skimindex.sh
 all: build-obitools-multiplatform push skimindex-script
@@ -188,10 +199,49 @@ push: $(OCI_ARCHIVE)
 		oci-archive:$(OCI_ARCHIVE) \
 		docker://$(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 
+## venv               : Create development venv with skimindex[test,docs] installed (editable)
+venv: $(VENV_PYTHON)
+
+$(VENV_PYTHON):
+	$(PYTHON) -m venv $(VENV)
+	$(VENV_PIP) install --upgrade pip
+	$(VENV_PIP) install -e "$(PKG_DIR)[test,docs]"
+	@echo "Venv ready: $(VENV)"
+	@echo "Activate with: source $(VENV)/bin/activate"
+
+## test               : Run the test suite inside the dev venv
+test: $(VENV_PYTHON)
+	$(VENV)/bin/pytest $(PKG_DIR)/tests/
+
+DOCS_PID := $(PROJECT_ROOT)/.mkdocs.pid
+
+## docs               : Start the documentation server as a daemon (live-reload on docs/ changes)
+docs: $(VENV_PYTHON) docs-stop
+	nohup $(VENV)/bin/mkdocs serve --config-file $(PROJECT_ROOT)/mkdocs.yml \
+		> $(PROJECT_ROOT)/log/mkdocs.log 2>&1 & echo $$! > $(DOCS_PID)
+	@echo "Docs server started (pid $$(cat $(DOCS_PID))) → http://127.0.0.1:8000"
+	@echo "Logs: $(PROJECT_ROOT)/log/mkdocs.log"
+
+## docs-stop          : Stop the documentation daemon
+docs-stop:
+	@if [ -f $(DOCS_PID) ]; then \
+		kill $$(cat $(DOCS_PID)) 2>/dev/null && echo "Docs server stopped." || true; \
+		rm -f $(DOCS_PID); \
+	fi
+
+## docs-build         : Build the static HTML documentation into site/
+docs-build: $(VENV_PYTHON)
+	$(VENV)/bin/mkdocs build --config-file $(PROJECT_ROOT)/mkdocs.yml
+
 ## clean              : Remove the local Docker image, the OCI archive and generated files
-clean: clean-builder
+clean: clean-builder clean-venv docs-stop
 	docker rmi --force $(FULL_IMAGE) 2>/dev/null || true
 	rm -f $(OCI_ARCHIVE) $(DOCKERFILE)
+	rm -rf $(PROJECT_ROOT)/site
+
+## clean-venv         : Remove the development virtual environment
+clean-venv:
+	rm -rf $(VENV)
 
 ## clean-builder      : Remove the buildx builder ($(BUILDER))
 clean-builder:

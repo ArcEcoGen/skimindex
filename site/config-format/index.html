@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Configuration Format - skimindex</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Configuration Format";
+        var mkdocs_page_input_path = "config-format.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> skimindex
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../directory-structure/">Directory Structure</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Configuration Format</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#configuration-sections">Configuration Sections</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#local_directories">[local_directories]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#logging">[logging]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#processed_data">[processed_data]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#indexes">[indexes]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#stamp">[stamp]</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#source-sections">Source Sections</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#ncbi">[ncbi]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#genbank">[genbank]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#internal">[internal]</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#role-sections">Role Sections</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#decontamination">[decontamination]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#genomes">[genomes]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#genome_skims">[genome_skims]</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#processing-sections">Processing Sections</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#split">[split]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#kmercount">[kmercount]</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#data-sections">Data Sections</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#classification-keys">Classification Keys</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#common-keys">Common Keys</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#source-specific-keys">Source-specific Keys</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#source-ncbi">source = "ncbi"</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#source-genbank">source = "genbank"</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#source-internal">source = "internal"</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#role-specific-keys">Role-specific Keys</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#role-decontamination">role = "decontamination"</a>
+    </li>
+        </ul>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#examples">Examples</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#current-data-sections">Current data sections</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#future-data-sections-not-yet-active">Future data sections (not yet active)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#validation-rules">Validation Rules</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">skimindex</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Configuration Format</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="skimindex-configuration-file-format">skimindex Configuration File Format</h1>
+<h2 id="overview">Overview</h2>
+<p>The skimindex configuration file (<code>config/skimindex.toml</code>) uses TOML format.
+Sections fall into five categories:</p>
+<ul>
+<li><strong>Configuration sections</strong> — infrastructure settings (paths, logging, pipeline storage locations)</li>
+<li><strong>Source sections</strong> — one per data origin, defines where raw data are stored</li>
+<li><strong>Role sections</strong> — one per data usage, defines processing parameters</li>
+<li><strong>Processing sections</strong> — one per pipeline step, defines step parameters and output subdirectory</li>
+<li><strong>Data sections</strong> — describe a dataset, require both <code>source</code> and <code>role</code> keys</li>
+</ul>
+<p>The pipeline flow is: raw data live under their <strong>source</strong> directory → processed
+outputs go to <strong><code>[processed_data]</code></strong> → k-mer indexes go to **`[indexes]``.</p>
+<p>The resulting directory layout is described in
+<a href="../directory-structure/">Directory Structure</a>.</p>
+<p>Reserved section names (configuration, sources, roles) must <strong>not</strong> contain
+<code>source</code> or <code>role</code> keys. Data sections must contain both.</p>
+<hr />
+<h2 id="configuration-sections">Configuration Sections</h2>
+<h3 id="local_directories"><code>[local_directories]</code></h3>
+<p>Host-side paths for container bind-mounts. Each key <code>&lt;k&gt;</code> defines the host
+path mounted to <code>${SKIMINDEX_ROOT}/&lt;k&gt;</code> inside the container. See
+<a href="../directory-structure/#usage-directories">Usage Directories</a> for the full
+runtime layout.</p>
+<p><code>SKIMINDEX_ROOT</code> defaults to <code>/</code> inside the container, so by default the mount
+point is <code>/&lt;k&gt;</code>. Set <code>SKIMINDEX_ROOT</code> to a different value to relocate all
+mount points at once (e.g. for testing outside a container).</p>
+<pre><code class="language-toml">[local_directories]
+genbank        = &quot;genbank&quot;
+indexes        = &quot;indexes&quot;
+raw_data       = &quot;raw_data&quot;
+processed_data = &quot;processed_data&quot;
+config         = &quot;config&quot;
+log            = &quot;log&quot;
+stamp          = &quot;stamp&quot;
+</code></pre>
+<h3 id="logging"><code>[logging]</code></h3>
+<p>Log level, output file, and mirroring behaviour.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> whose mount point is used as the log directory. The log file is written as <code>${SKIMINDEX_ROOT}/&lt;directory&gt;/&lt;file&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>file</code></td>
+<td>string</td>
+<td>Log filename within <code>directory</code> (default: <code>skimindex.log</code>)</td>
+</tr>
+<tr>
+<td><code>level</code></td>
+<td>string</td>
+<td><code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, or <code>ERROR</code></td>
+</tr>
+<tr>
+<td><code>mirror</code></td>
+<td>boolean</td>
+<td><code>true</code> → tee logs to screen AND file</td>
+</tr>
+<tr>
+<td><code>everything</code></td>
+<td>boolean</td>
+<td><code>true</code> → redirect all stderr (commands, bash errors) to log as well</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[logging]
+directory  = &quot;log&quot;                # references [local_directories] key → ${SKIMINDEX_ROOT}/log/
+file       = &quot;skimindex.log&quot;      # filename within directory
+level      = &quot;INFO&quot;               # DEBUG | INFO | WARNING | ERROR
+mirror     = true                 # tee to screen AND file
+everything = true                 # redirect stderr to log as well
+</code></pre>
+<h3 id="processed_data"><code>[processed_data]</code></h3>
+<p>Root location for all pipeline outputs (processed sequences, statistics, etc.).</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> where all processed data are stored</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[processed_data]
+directory = &quot;processed_data&quot;      # references [local_directories] key → ${SKIMINDEX_ROOT}/processed_data/
+</code></pre>
+<h3 id="indexes"><code>[indexes]</code></h3>
+<p>Root location for k-mer index storage (final step of the pipeline).</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> where k-mer indexes are stored</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[indexes]
+directory = &quot;indexes&quot;             # references [local_directories] key → ${SKIMINDEX_ROOT}/indexes/
+</code></pre>
+<h3 id="stamp"><code>[stamp]</code></h3>
+<p>Root location for stamp files used to track completed pipeline steps.
+Stamp files allow interrupted runs to resume without reprocessing already-completed steps.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> where stamp files are stored</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[stamp]
+directory = &quot;stamp&quot;               # references [local_directories] key → ${SKIMINDEX_ROOT}/stamp/
+</code></pre>
+<hr />
+<h2 id="source-sections">Source Sections</h2>
+<p>One section per data origin. Each source section has a <code>directory</code> key
+referencing a <code>[local_directories]</code> entry, which gives the root mount point
+where raw data for that source are stored.</p>
+<h3 id="ncbi"><code>[ncbi]</code></h3>
+<p>Data downloaded via the NCBI Datasets CLI.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> where NCBI downloads are stored</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[ncbi]
+directory = &quot;genbank&quot;             # references [local_directories] key → ${SKIMINDEX_ROOT}/genbank/
+</code></pre>
+<h3 id="genbank"><code>[genbank]</code></h3>
+<p>Data to download from GenBank (FTP/HTTPS site) as flat-files.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> where GenBank flat-files are stored</td>
+</tr>
+<tr>
+<td><code>divisions</code></td>
+<td>array of strings</td>
+<td>GenBank division codes to download.<br>Valid codes: <code>bct inv mam phg pln pri rod vrl vrt</code></td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[genbank]
+directory = &quot;genbank&quot;             # references [local_directories] key → ${SKIMINDEX_ROOT}/genbank/
+divisions = [&quot;bct&quot;, &quot;pln&quot;]
+</code></pre>
+<h3 id="internal"><code>[internal]</code></h3>
+<p>Internal sequencing data produced in-house.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> where internal data are stored</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[internal]
+directory = &quot;raw_data&quot;            # references [local_directories] key → ${SKIMINDEX_ROOT}/raw_data/
+</code></pre>
+<hr />
+<h2 id="role-sections">Role Sections</h2>
+<p>One section per data usage. The role name appears as an intermediate path
+component for processed and indexed data, giving the full layout:</p>
+<p>For species-organised data (<code>by_species = true</code>, default):</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raw</td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[source].directory&gt;/&lt;data.directory&gt;/</code></td>
+</tr>
+<tr>
+<td>Processed</td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[processed_data].directory&gt;/&lt;[role].directory&gt;/&lt;data.directory&gt;/&lt;species&gt;/&lt;accession&gt;/&lt;[processing].directory&gt;/</code></td>
+</tr>
+<tr>
+<td>Indexes</td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[indexes].directory&gt;/&lt;[role].directory&gt;/…</code>  (to be specified)</td>
+</tr>
+</tbody>
+</table>
+<p>For non-species-organised data (<code>by_species = false</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raw</td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[source].directory&gt;/&lt;data.directory&gt;/</code></td>
+</tr>
+<tr>
+<td>Processed</td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[processed_data].directory&gt;/&lt;[role].directory&gt;/&lt;data.directory&gt;/&lt;[processing].directory&gt;/</code></td>
+</tr>
+<tr>
+<td>Indexes</td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[indexes].directory&gt;/&lt;[role].directory&gt;/…</code>  (to be specified)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="decontamination"><code>[decontamination]</code></h3>
+<p>Parameters for the decontamination filter role.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Subdirectory name within source and processed data mounts</td>
+</tr>
+<tr>
+<td><code>kmer_size</code></td>
+<td>integer</td>
+<td>K-mer size used to build decontamination indices</td>
+</tr>
+<tr>
+<td><code>frg_size</code></td>
+<td>integer</td>
+<td>Fragment size (bp) when splitting reference sequences</td>
+</tr>
+<tr>
+<td><code>batches</code></td>
+<td>integer</td>
+<td>Number of batches for split reference sequences</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[decontamination]
+directory = &quot;decontamination&quot;
+kmer_size = 29
+frg_size  = 200
+batches   = 20
+</code></pre>
+<h3 id="genomes"><code>[genomes]</code></h3>
+<p>Parameters for the complete reference genomes role.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Subdirectory name within source and processed data mounts</td>
+</tr>
+<tr>
+<td><code>kmer_size</code></td>
+<td>integer</td>
+<td>K-mer size used for genome analyses</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[genomes]
+directory = &quot;genomes_15x&quot;
+kmer_size = 31
+</code></pre>
+<h3 id="genome_skims"><code>[genome_skims]</code></h3>
+<p>Parameters for the low-coverage skim-sequenced genomes role.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Subdirectory name within source and processed data mounts</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[genome_skims]
+directory = &quot;skims&quot;
+</code></pre>
+<hr />
+<h2 id="processing-sections">Processing Sections</h2>
+<p>One section per pipeline processing step. Each processing section has a
+<code>directory</code> key giving the subdirectory name used inside the processed data
+tree. The section name defaults as the <code>directory</code> value if absent.</p>
+<h3 id="split"><code>[split]</code></h3>
+<p>Splitting reference sequences into overlapping fragments.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Subdirectory name for split fragment outputs</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[split]
+directory = &quot;split&quot;
+</code></pre>
+<h3 id="kmercount"><code>[kmercount]</code></h3>
+<p>Counting k-mers in split fragments to build decontamination indices.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Subdirectory name for k-mer count outputs</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[kmercount]
+directory = &quot;kmercount&quot;
+</code></pre>
+<hr />
+<h2 id="data-sections">Data Sections</h2>
+<p>Every data section <strong>must</strong> contain both <code>source</code> and <code>role</code>.</p>
+<h3 id="classification-keys">Classification Keys</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Allowed values</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source</code></td>
+<td><code>"ncbi"</code></td>
+<td>Downloaded via the NCBI Datasets CLI</td>
+</tr>
+<tr>
+<td></td>
+<td><code>"genbank"</code></td>
+<td>Filtered from GenBank flat-files (FTP)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>"internal"</code></td>
+<td>Internal sequencing data produced in-house</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td><code>"decontamination"</code></td>
+<td>Sequences used to build the decontamination filter</td>
+</tr>
+<tr>
+<td></td>
+<td><code>"genomes"</code></td>
+<td>Complete reference genomes</td>
+</tr>
+<tr>
+<td></td>
+<td><code>"genome_skims"</code></td>
+<td>Low-coverage skim-sequenced genomes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="common-keys">Common Keys</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Subdirectory name for this dataset. Defaults to the section name if absent.</td>
+</tr>
+<tr>
+<td><code>by_species</code></td>
+<td>boolean</td>
+<td>Whether data is organised per species/accession (default: <code>true</code>). Set to <code>false</code> for bulk sources such as GenBank flat-files where sequences are not separated by species. Controls the layout of processed data paths (see <a href="#role-sections">Role Sections</a> and <a href="../directory-structure/#processed_data-processed-data">processed_data</a>).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="source-specific-keys">Source-specific Keys</h3>
+<h4 id="source-ncbi"><code>source = "ncbi"</code></h4>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taxon</code></td>
+<td>string</td>
+<td>Taxon name passed to <code>datasets download genome</code></td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>boolean</td>
+<td>Pass <code>--reference</code> filter to datasets</td>
+</tr>
+<tr>
+<td><code>assembly_source</code></td>
+<td>string</td>
+<td><code>refseq</code> or <code>genbank</code></td>
+</tr>
+<tr>
+<td><code>assembly_level</code></td>
+<td>string</td>
+<td><code>complete</code>, <code>chromosome</code>, <code>scaffold</code>, or <code>contig</code></td>
+</tr>
+<tr>
+<td><code>assembly_version</code></td>
+<td>string</td>
+<td><code>latest</code> or <code>all</code></td>
+</tr>
+<tr>
+<td><code>one_per</code></td>
+<td>string</td>
+<td>Keep one assembly per <code>genus</code> or <code>species</code> (optional)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="source-genbank"><code>source = "genbank"</code></h4>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taxid</code></td>
+<td>integer</td>
+<td>NCBI taxonomy ID used to filter sequences</td>
+</tr>
+<tr>
+<td><code>divisions</code></td>
+<td>array of strings</td>
+<td>GenBank division codes for this dataset</td>
+</tr>
+</tbody>
+</table>
+<h4 id="source-internal"><code>source = "internal"</code></h4>
+<p>No additional keys beyond the common <code>directory</code>.</p>
+<h3 id="role-specific-keys">Role-specific Keys</h3>
+<h4 id="role-decontamination"><code>role = "decontamination"</code></h4>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>example</code></td>
+<td>boolean</td>
+<td><code>true</code> = positive example; <code>false</code> = counter-example (sequences that must <strong>not</strong> be filtered out)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="examples">Examples</h2>
+<h3 id="current-data-sections">Current data sections</h3>
+<pre><code class="language-toml">[human]
+source           = &quot;ncbi&quot;
+role             = &quot;decontamination&quot;
+example          = true
+taxon            = &quot;human&quot;
+reference        = true
+assembly_source  = &quot;refseq&quot;
+assembly_level   = &quot;chromosome&quot;
+assembly_version = &quot;latest&quot;
+
+[fungi]
+source    = &quot;genbank&quot;
+role      = &quot;decontamination&quot;
+example   = true
+taxid     = 4751
+divisions = [&quot;pln&quot;]
+
+[bacteria]
+source    = &quot;genbank&quot;
+role      = &quot;decontamination&quot;
+example   = true
+taxid     = 1
+divisions = [&quot;bct&quot;]
+
+[plants]
+source           = &quot;ncbi&quot;
+role             = &quot;decontamination&quot;
+example          = false            # counter-example: must NOT be filtered out
+taxon            = &quot;Spermatophyta&quot;
+reference        = false
+assembly_level   = &quot;complete&quot;
+assembly_version = &quot;latest&quot;
+one_per          = &quot;genus&quot;
+</code></pre>
+<h3 id="future-data-sections-not-yet-active">Future data sections (not yet active)</h3>
+<pre><code class="language-toml"># Complete reference genome downloaded from NCBI
+# [arabidopsis]
+# source           = &quot;ncbi&quot;
+# role             = &quot;genomes&quot;
+# taxon            = &quot;Arabidopsis thaliana&quot;
+# assembly_level   = &quot;chromosome&quot;
+# assembly_version = &quot;latest&quot;
+
+# Internal skim-sequenced genome
+# [betula_nana]
+# source    = &quot;internal&quot;
+# role      = &quot;genome_skims&quot;
+# directory = &quot;Betula_nana&quot;
+</code></pre>
+<hr />
+<h2 id="validation-rules">Validation Rules</h2>
+<ol>
+<li>Every section that is <strong>not</strong> a reserved section must have both <code>source</code> and <code>role</code>.</li>
+<li>Reserved sections must <strong>not</strong> have <code>source</code> or <code>role</code>.</li>
+<li><code>source</code> must be one of: <code>"ncbi"</code>, <code>"genbank"</code>, <code>"internal"</code>.</li>
+<li><code>role</code> must be one of: <code>"decontamination"</code>, <code>"genomes"</code>, <code>"genome_skims"</code>.</li>
+<li>For <code>role = "decontamination"</code>, the <code>example</code> key is required (<code>true</code> or <code>false</code>).</li>
+<li>For <code>source = "ncbi"</code>, the <code>taxon</code> key is required.</li>
+<li>For <code>source = "genbank"</code>, both <code>taxid</code> and <code>divisions</code> are required.</li>
+</ol>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../directory-structure/" class="btn btn-neutral float-left" title="Directory Structure"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../directory-structure/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

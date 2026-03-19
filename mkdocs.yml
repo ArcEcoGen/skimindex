@@ -1,0 +1,12 @@
+site_name: skimindex
+docs_dir: docs
+site_dir: site
+
+nav:
+  - Home: index.md
+  - Directory Structure: directory-structure.md
+  - Configuration Format: config-format.md
+  - Processing Model: processing.md
+
+theme:
+  name: readthedocs

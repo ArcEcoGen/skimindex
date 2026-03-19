@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Directory Structure - skimindex</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Directory Structure";
+        var mkdocs_page_input_path = "directory-structure.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> skimindex
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Directory Structure</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#usage-directories">Usage Directories</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#supported-sequence-file-formats">Supported sequence file formats</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#public-database-raw-data-source-ncbi-and-genbank">Public database raw data (source: ncbi and genbank)</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#file-naming-convention-for-ncbi-genome-files">File naming convention for NCBI genome files</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#internal-raw-data-source-internal">Internal raw data (source: internal)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#processed_data-processed-data">processed_data/ — Processed data</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#indexes-k-mer-indexes">indexes/ — K-mer indexes</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#config-configuration">config/ — Configuration</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#log-logs">log/ — Logs</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#stamp-stamp-files">stamp/ — Stamp files</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#development-directories">Development Directories</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#src-source-code">src/ — Source code</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#docker-container-build">docker/ — Container build</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#docs-documentation">docs/ — Documentation</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#config-pipeline-configuration-host-side">config/ — Pipeline configuration (host side)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#scripts-internal-shell-scripts">scripts/ — Internal shell scripts</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#jobscripts-hpc-job-scripts">jobscripts/ — HPC job scripts</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#bin-compiled-binaries-generated">bin/ — Compiled binaries (generated)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#skimindexsh-main-entry-point">skimindex.sh — Main entry point</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../config-format/">Configuration Format</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">skimindex</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Directory Structure</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="skimindex-directory-structure">skimindex Directory Structure</h1>
+<h2 id="overview">Overview</h2>
+<p>skimindex uses two distinct directory trees:</p>
+<ul>
+<li><strong>Usage directories</strong> — runtime data, managed by the pipeline (bind-mounted into the container)</li>
+<li><strong>Development directories</strong> — source code, configuration, and build artefacts (project repository)</li>
+</ul>
+<p>All usage directories are bind-mounted into the container at
+<code>${SKIMINDEX_ROOT}/&lt;name&gt;</code> (default <code>SKIMINDEX_ROOT=/</code>). Host-side paths are
+declared in
+<a href="../config-format/#local_directories"><code>[local_directories]</code></a>
+inside <code>config/skimindex.toml</code>.</p>
+<hr />
+<h2 id="usage-directories">Usage Directories</h2>
+<h3 id="supported-sequence-file-formats">Supported sequence file formats</h3>
+<p>All sequence data — whether from public databases or internal sequencing — may
+be stored in any format supported by OBITools4, both compressed and
+uncompressed:</p>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Extensions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FASTA</td>
+<td><code>.fasta</code>, <code>.fa</code>, <code>.fasta.gz</code>, <code>.fa.gz</code></td>
+</tr>
+<tr>
+<td>FASTQ</td>
+<td><code>.fastq</code>, <code>.fastq.gz</code></td>
+</tr>
+<tr>
+<td>EMBL</td>
+<td><code>.embl</code>, <code>.embl.gz</code></td>
+</tr>
+<tr>
+<td>GenBank flat-file</td>
+<td><code>.gbff</code>, <code>.gbff.gz</code></td>
+</tr>
+</tbody>
+</table>
+<p>OBITools4 detects the format automatically from the file content.</p>
+<hr />
+<h3 id="public-database-raw-data-source-ncbi-and-genbank">Public database raw data (source: <code>ncbi</code> and <code>genbank</code>)</h3>
+<p>Stores all raw sequence data downloaded from public databases. Both the <code>ncbi</code>
+and <code>genbank</code> sources point to a <code>[local_directories]</code> entry via their
+<code>directory</code> key. By default both are configured to use the same mount point:</p>
+<pre><code class="language-toml">[ncbi]
+directory = &quot;genbank&quot;     # → ${SKIMINDEX_ROOT}/genbank/
+
+[genbank]
+directory = &quot;genbank&quot;     # → ${SKIMINDEX_ROOT}/genbank/
+</code></pre>
+<p>The generic layout inside that mount point is:</p>
+<p><strong>Species-organised data</strong> (<a href="../config-format/#common-keys"><code>by_species = true</code></a>, default) — one subdirectory
+per data section, files named with the canonical <code>--</code> separator:</p>
+<pre><code>{source-directory}/
+└── {data.directory}/
+    │
+    │  # Level 0 — one file per species (single accession)
+    ├── {Species_name}--{accession}.&lt;ext&gt;
+    │
+    │  # Level 1 — multiple accessions, one file each
+    ├── {Species_name}/
+    │   ├── {accession_1}.&lt;ext&gt;
+    │   └── {accession_2}.&lt;ext&gt;
+    │
+    │  # Level 2 — multiple accessions, multiple files each
+    └── {Species_name}/
+        ├── {accession_1}/
+        │   └── *.&lt;ext&gt;
+        └── {accession_2}/
+            └── *.&lt;ext&gt;
+</code></pre>
+<p><strong>Non-species-organised data</strong> (<a href="../config-format/#common-keys"><code>by_species = false</code></a>) — applies to bulk
+GenBank flat-file sources where sequences are not separated by species:</p>
+<pre><code>{source-directory}/
+└── Release_{N}/                 # one subdirectory per GenBank flat-file release
+    ├── fasta/
+    │   └── {division}/          # e.g. bct/, pln/
+    │       └── gb{div}{N}.fasta.gz
+    └── taxonomy/
+        └── ncbi_taxonomy.tgz
+</code></pre>
+<p>With the default configuration this resolves to <code>${SKIMINDEX_ROOT}/genbank/</code>.</p>
+<h4 id="file-naming-convention-for-ncbi-genome-files">File naming convention for NCBI genome files</h4>
+<p>NCBI genome files are named <code>{Taxon_name}-{accession}.gbff.gz</code> where
+<code>{Taxon_name}</code> follows these rules:</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Convention</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Species</td>
+<td><code>Genus_species</code></td>
+<td><code>Arabidopsis_thaliana--GCA_946409825.1.gbff.gz</code></td>
+</tr>
+<tr>
+<td>Subspecies</td>
+<td><code>Genus_species_subsp._subspecies</code></td>
+<td><code>Brassica_rapa_subsp._chinensis--GCA_052186795.1.gbff.gz</code></td>
+</tr>
+<tr>
+<td>Variety</td>
+<td><code>Genus_species_var._variety</code></td>
+<td><code>Oryza_sativa_var._japonica--GCA_….gbff.gz</code></td>
+</tr>
+<tr>
+<td>Hybrid (species × species)</td>
+<td><code>Genus_species_x_other</code></td>
+<td><code>Mentha_aquatica_x_spicata--GCA_….gbff.gz</code></td>
+</tr>
+<tr>
+<td>Hybrid (genus level)</td>
+<td><code>Genus_x_name</code></td>
+<td><code>Mentha_x_piperita--GCA_….gbff.gz</code></td>
+</tr>
+</tbody>
+</table>
+<p>The general rules for producing a canonical filename are:</p>
+<ol>
+<li><strong>Spaces → underscores</strong>: every space is replaced by <code>_</code>.</li>
+<li><strong>Ambiguous characters removed</strong>: any character that is not alphanumeric,
+   <code>_</code>, <code>-</code>, or <code>.</code> is deleted. This includes parentheses, quotes, slashes,
+   brackets, and other shell-special characters.</li>
+<li><strong>Rank markers preserved</strong>: <code>subsp.</code>, <code>var.</code>, and <code>x</code> are kept as literal
+   strings surrounded by underscores.</li>
+</ol>
+<p>The canonical filename is:</p>
+<pre><code>{canonical_taxon_name}--{canonical_accession}.{ext}
+</code></pre>
+<p><code>--</code> is the <strong>reserved separator</strong> between the taxon name and the accession.
+The accession is always the part after the <strong>last <code>--</code></strong> in the filename stem.
+The sequence <code>--</code> is consequently forbidden inside both the taxon name and the
+accession (treated as a degenerate case).</p>
+<p>Examples:
+- <code>Arabidopsis_thaliana--GCA_946409825.1.gbff.gz</code>
+- <code>Brassica_rapa_subsp._chinensis--GCA_052186795.1.gbff.gz</code>
+- <code>Mentha_x_piperita--GCA_….gbff.gz</code></p>
+<h3 id="internal-raw-data-source-internal">Internal raw data (source: <code>internal</code>)</h3>
+<p>Stores internal sequencing data produced in-house. The <code>internal</code> source points
+to a <code>[local_directories]</code> entry via its <code>directory</code> key. By default:</p>
+<pre><code class="language-toml">[internal]
+directory = &quot;raw_data&quot;    # → ${SKIMINDEX_ROOT}/raw_data/
+</code></pre>
+<p>The generic layout inside that mount point is:</p>
+<p>Internal data follows the same species-organised layout (<code>by_species = true</code>
+by default):</p>
+<pre><code>{source-directory}/
+└── {data.directory}/
+    │
+    │  # Level 0 — one file per species (single accession)
+    ├── {Species_name}--{accession}.&lt;ext&gt;
+    │
+    │  # Level 1 — multiple accessions, one file each
+    ├── {Species_name}/
+    │   ├── {accession_1}.&lt;ext&gt;
+    │   └── {accession_2}.&lt;ext&gt;
+    │
+    │  # Level 2 — multiple accessions, multiple files each
+    └── {Species_name}/
+        ├── {accession_1}/
+        │   └── *.&lt;ext&gt;
+        └── {accession_2}/
+            └── *.&lt;ext&gt;
+</code></pre>
+<h3 id="processed_data-processed-data"><code>processed_data/</code> — Processed data</h3>
+<p>Stores all pipeline outputs. Layout depends on whether the data section is
+species-organised (<code>by_species</code>). The <code>{processing.directory}</code> level names
+the processing step (e.g. <code>split</code>, <code>kmercount</code>).
+Mounted read-write at <code>${SKIMINDEX_ROOT}/processed_data/</code>.</p>
+<p><strong>Species-organised</strong> (<code>by_species = true</code>):</p>
+<pre><code>{[processed_data].directory}/
+└── {[role].directory}/          # e.g. decontamination/, genomes/
+    └── {data.directory}/
+        └── {Species_name}/
+            └── {accession}/     # &quot;default&quot; if source was a level-0 flat file
+                └── {[processing].directory}/
+                    └── *.&lt;ext&gt;
+</code></pre>
+<p><strong>Non-species-organised</strong> (<code>by_species = false</code>):</p>
+<pre><code>{[processed_data].directory}/
+└── {[role].directory}/          # e.g. decontamination/
+    └── {data.directory}/
+        └── {[processing].directory}/
+            └── *.&lt;ext&gt;
+</code></pre>
+<h3 id="indexes-k-mer-indexes"><code>indexes/</code> — K-mer indexes</h3>
+<p>Stores k-mer indexes built from processed data.
+Mounted read-write at <code>${SKIMINDEX_ROOT}/indexes/</code>.</p>
+<p>The top-level organisation by role is fixed. The internal structure below that
+level is not yet specified.</p>
+<pre><code>{indexes}/
+└── {role}/                      # e.g. decontamination/
+    └── ...                      # to be specified
+</code></pre>
+<h3 id="config-configuration"><code>config/</code> — Configuration</h3>
+<p>Mounted read-only at <code>${SKIMINDEX_ROOT}/config/</code>. See
+<a href="../config-format/">Configuration File Format</a> for the full specification.</p>
+<pre><code>config/
+└── skimindex.toml               # main pipeline configuration
+</code></pre>
+<h3 id="log-logs"><code>log/</code> — Logs</h3>
+<p>Mounted read-write at <code>${SKIMINDEX_ROOT}/log/</code>.</p>
+<pre><code>log/
+└── skimindex.log                # main pipeline log (filename set in [logging])
+</code></pre>
+<h3 id="stamp-stamp-files"><code>stamp/</code> — Stamp files</h3>
+<p>Stamp files track completed pipeline steps, allowing interrupted runs to resume
+without reprocessing. The <code>stamp/</code> tree mirrors the full <code>${SKIMINDEX_ROOT}</code>
+tree (excluding <code>stamp/</code> itself): for any output path, the stamp file is at
+<code>${SKIMINDEX_ROOT}/stamp/&lt;relative-path&gt;.stamp</code>.</p>
+<p>Mounted read-write at <code>${SKIMINDEX_ROOT}/stamp/</code>.</p>
+<pre><code>stamp/
+├── genbank/
+│   └── Plants/
+│       └── Arabidopsis_thaliana--GCA_946409825.1.gbff.gz.stamp
+├── processed_data/
+│   └── decontamination/
+│       └── human/
+│           └── Homo_sapiens--GCF_000001405.40/
+│               └── default/
+│                   └── split/
+│                       └── frg_1.fasta.gz.stamp
+└── ...
+</code></pre>
+<hr />
+<h2 id="development-directories">Development Directories</h2>
+<h3 id="src-source-code"><code>src/</code> — Source code</h3>
+<pre><code>src/
+├── skimindex_py/                # Python package
+│   ├── pyproject.toml
+│   ├── skimindex/               # main package
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── cli.py               # command-line interface
+│   │   ├── config.py            # TOML config loading and env var export
+│   │   ├── log.py               # logging (colors, file output, levels)
+│   │   ├── sequences.py         # sequence file discovery utilities
+│   │   ├── stamp.py             # stamp file management
+│   │   ├── decontamination/     # decontamination pipeline
+│   │   │   ├── sections.py      # directory helpers for decontamination sections
+│   │   │   ├── split.py         # reference genome splitting into fragments
+│   │   │   └── kmercount.py     # k-mer counting for decontamination indices
+│   │   ├── download/            # download orchestration
+│   │   │   ├── genbank.py       # GenBank flat-file download and conversion
+│   │   │   └── refgenome.py     # NCBI reference genome download
+│   │   └── unix/                # Unix CLI tool wrappers (plumbum-based)
+│   │       ├── base.py          # LoggedBoundCommand base class
+│   │       ├── compress.py      # pigz, unzip
+│   │       ├── download.py      # curl
+│   │       ├── ncbi.py          # datasets, dataformat
+│   │       ├── ntcard.py        # ntCard k-mer counter
+│   │       └── obitools.py      # OBITools4 bioinformatics suite
+│   └── tests/                   # unit tests
+│       ├── test_cli.py
+│       ├── test_config.py
+│       ├── test_download_logic.py
+│       ├── test_integration_logging.py
+│       ├── test_log.py
+│       ├── test_sequences.py
+│       ├── test_stamp.py
+│       ├── test_unix_base.py
+│       └── test_unix_wrappers.py
+└── kmerasm/                     # C source for k-mer assembler
+    ├── Makefile
+    └── kmerasm.c
+</code></pre>
+<h3 id="docker-container-build"><code>docker/</code> — Container build</h3>
+<pre><code>docker/
+├── Dockerfile                   # final container image
+├── Dockerfile.in                # Dockerfile template
+├── Makefile                     # build targets
+├── build_user_script.sh         # generates the skimindex user script
+├── install_obitools.sh          # OBITools4 installation helper
+└── skimindex.sh.in              # entry-point script template
+</code></pre>
+<h3 id="docs-documentation"><code>docs/</code> — Documentation</h3>
+<pre><code>docs/
+├── config-format.md             # configuration file format specification
+└── directory-structure.md       # this file
+</code></pre>
+<h3 id="config-pipeline-configuration-host-side"><code>config/</code> — Pipeline configuration (host side)</h3>
+<pre><code>config/
+└── skimindex.toml               # pipeline configuration (bind-mounted read-only)
+</code></pre>
+<h3 id="scripts-internal-shell-scripts"><code>scripts/</code> — Internal shell scripts</h3>
+<pre><code>scripts/
+├── __skimindex_config.sh        # config parsing helpers (bash)
+├── __utils_functions.sh         # shared utility functions
+├── __download_functions.sh      # download helpers
+└── _download_refgenome.sh       # reference genome download script
+</code></pre>
+<h3 id="jobscripts-hpc-job-scripts"><code>jobscripts/</code> — HPC job scripts</h3>
+<p>Slurm/PBS job scripts for running pipeline steps on a cluster.</p>
+<pre><code>jobscripts/
+├── download_references.sh
+├── split_references.sh
+├── contaminent_build.sh
+└── ...
+</code></pre>
+<h3 id="bin-compiled-binaries-generated"><code>bin/</code> — Compiled binaries (generated)</h3>
+<p>Built artefacts, not tracked by git.</p>
+<h3 id="skimindexsh-main-entry-point"><code>skimindex.sh</code> — Main entry point</h3>
+<p>Wrapper script that sets up bind-mounts and launches the container.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="Home"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../config-format/" class="btn btn-neutral float-right" title="Configuration Format">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href=".." style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../config-format/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

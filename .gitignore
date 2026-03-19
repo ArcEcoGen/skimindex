@@ -19,6 +19,8 @@
 **/ncbitaxo.tgz
 **/*.sif
 
+.venv
+
 genbank
 !genbank/Makefile
 

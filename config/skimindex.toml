@@ -2,19 +2,21 @@
 # skimindex pipeline configuration
 # =============================================================================
 # Mounted read-only at /config inside the container.
-# Scripts read values via __skimindex_config.sh.
+# See docs/config-format.md for the full specification.
 #
-# Genome download sections:
-#   Any section with a 'taxon' key is treated as a genome download target.
-#   Reserved sections (logging, local_directories, genbank) are never treated
-#   as genome targets regardless of their content.
-#   Each genome section may define a 'directory' key (relative to the genbank
-#   mount point /genbank); if absent the section name is used as the subdir.
-#
-# Container-side paths are derived automatically from [local_directories]:
-#   each key <k> is bind-mounted to /<k> inside the container.
+# Section types:
+#   Configuration : [local_directories], [logging], [processed_data],
+#                   [indexes], [stamp]
+#   Sources       : [source.ncbi], [source.genbank], [source.internal]
+#   Roles         : [role.decontamination], [role.genomes], [role.genome_skims]
+#   Processing    : [processing.split], [processing.kmercount]
+#   Data          : [data.<name>] — requires source + role keys
 # =============================================================================
 
+
+# -----------------------------------------------------------------------------
+# Configuration sections (root level)
+# -----------------------------------------------------------------------------
 
 # Host-side paths for each container mount point.
 # Each key <k> defines the host path that is bind-mounted to /<k> inside
@@ -31,57 +33,149 @@ stamp          = "stamp"
 
 # Logging configuration.
 [logging]
-level  = "INFO"             # DEBUG | INFO | WARNING | ERROR
-file   = "/log/skimindex.log"
-mirror     = true          # true → tee logs to screen AND file; false → file only
-everything = true          # true → also redirect all stderr (commands, bash errors) to log
+directory  = "log"             # references [local_directories] key → ${SKIMINDEX_ROOT}/log/
+file       = "skimindex.log"   # filename within directory
+level      = "INFO"            # DEBUG | INFO | WARNING | ERROR
+mirror     = true              # true → tee logs to screen AND file; false → file only
+everything = true              # true → also redirect all stderr (commands, bash errors) to log
 
-# GenBank flat-file divisions to download.
-# Space-separated list of two-letter division codes.
-# Full list: bct inv mam phg pln pri rod vrl vrt
-[genbank]
-divisions = "bct pln"       # bacteria + land plants/fungi (contamination filter)
+# Root location for all pipeline outputs.
+[processed_data]
+directory = "processed_data"   # references [local_directories] key → ${SKIMINDEX_ROOT}/processed_data/
+
+# Root location for k-mer index storage.
+[indexes]
+directory = "indexes"          # references [local_directories] key → ${SKIMINDEX_ROOT}/indexes/
+
+# Root location for stamp files used to track completed pipeline steps.
+[stamp]
+directory = "stamp"            # references [local_directories] key → ${SKIMINDEX_ROOT}/stamp/
+
+
+# -----------------------------------------------------------------------------
+# Source sections
+# -----------------------------------------------------------------------------
+
+# Data downloaded via the NCBI Datasets CLI.
+[source.ncbi]
+directory = "genbank"          # references [local_directories] key → ${SKIMINDEX_ROOT}/genbank/
+
+# Data to download from GenBank (FTP/HTTPS site) as flat-files.
+[source.genbank]
+directory = "genbank"          # references [local_directories] key → ${SKIMINDEX_ROOT}/genbank/
+divisions = ["bct", "pln"]     # divisions to download: bacteria + land plants/fungi
+
+# Internal sequencing data produced in-house.
+[source.internal]
+directory = "raw_data"         # references [local_directories] key → ${SKIMINDEX_ROOT}/raw_data/
+
+
+# -----------------------------------------------------------------------------
+# Role sections
+# -----------------------------------------------------------------------------
+
+# Parameters for the decontamination filter role.
+[role.decontamination]
+directory = "decontamination"
+run       = "prepare_decontam" # references [processing.prepare_decontam]
+
+# Parameters for the complete reference genomes role.
+[role.genomes]
+directory = "genomes_15x"
+kmer_size = 31
+
+# Parameters for the low-coverage skim-sequenced genomes role.
+[role.genome_skims]
+directory = "skims"
+
+
+# -----------------------------------------------------------------------------
+# Processing sections
+# -----------------------------------------------------------------------------
+
+# Atomic: split reference sequences into overlapping fragments.
+[processing.split_decontam]
+type      = "split"
+directory = "split"
+size      = 200                # fragment size in bp
+overlap   = 28                 # overlap = kmer_size - 1
+
+# Atomic: count k-mers in split fragments.
+[processing.count_kmers_decontam]
+type      = "kmercount"
+directory = "kmercount"
+kmer_size = 29
+
+# Composite: full decontamination preparation pipeline.
+# Referenced by [role.decontamination] via run = "prepare_decontam".
+[processing.prepare_decontam]
+directory = "prepared"
+steps = [
+  "split_decontam",                       # saved to split/
+  {type = "remove_n_only"},               # temporary
+  "count_kmers_decontam",                 # saved to kmercount/
+]
+
+
+# -----------------------------------------------------------------------------
+# Data sections
+# -----------------------------------------------------------------------------
 
 # Human reference genome — single canonical assembly from RefSeq.
-[human]
+[data.human]
+source           = "ncbi"
+role             = "decontamination"
+example          = true
 taxon            = "human"
-directory        = "Human"        # relative to the genbank mount → /genbank/Human
-reference        = true           # pass --reference filter to datasets
-assembly_source  = "refseq"       # refseq | genbank
-assembly_level   = "chromosome"   # complete | chromosome | scaffold | contig
-assembly_version = "latest"       # latest | all
-example          = true           # used as decontamination example
+reference        = true
+assembly_source  = "refseq"
+assembly_level   = "chromosome"
+assembly_version = "latest"
 
-[fungi]
-type             = "decontamination"
-taxid            = 4751           # taxon:4751 [Fungi]@kingdom
-divisions        = "pln"          # GenBank division to considere for selecting sequences
-directory        = "Fungi"
-example          = true          # used as decontamination example
+# Fungi sequences filtered from GenBank plant flat-files by taxid.
+[data.fungi]
+source     = "genbank"
+role       = "decontamination"
+example    = true
+by_species = false             # bulk flat-file source; obidistribute support planned (not yet implemented)
+divisions  = ["pln"]           # subset of [source.genbank] divisions
+taxid      = 4751              # taxonomic filter: Fungi kingdom
 
-[bacteria]
-taxid            = 1             # taxon:1 [root]@no rank
-divisions        = "bct"         # GenBank division to considere for selecting sequences
-directory        = "Bacteria"
-example          = true          # used as decontamination example
+# Bacteria sequences from GenBank bacterial flat-files.
+[data.bacteria]
+source     = "genbank"
+role       = "decontamination"
+example    = true
+by_species = false             # bulk flat-file source; obidistribute support planned (not yet implemented)
+divisions  = ["bct"]           # subset of [source.genbank] divisions
+taxid      = 1                 # taxonomic filter: root (all bacteria)
 
-# Spermatophyta — bulk download of all assemblies matching the filters.
-[plants]
+# Spermatophyta (seed plants) — counter-examples: must NOT be filtered out.
+[data.plants]
+source           = "ncbi"
+role             = "decontamination"
+example          = false       # counter-example: must NOT be filtered out
 taxon            = "Spermatophyta"
-directory        = "Plants"       # relative to the genbank mount → /genbank/Plants
 reference        = false
-assembly_level   = "complete"     # complete | chromosome | scaffold | contig
-assembly_version = "latest"       # latest | all
-one_per          = "genus"        # Keep only one genome per "genus" or "species"
-example          = false          # used as decontamination contre-example
+assembly_level   = "complete"
+assembly_version = "latest"
+one_per          = "genus"
 
-[decontamination]
-kmer_size        = 29             # kmer size used to build decontamination indices
-frg_size         = 200            # reference sequences are splitted in small fragments
-                                  # overlaping by kmer_size-1
-batches          = 20             # After splitting references sequences are divided in
-                                  # this given number of batches
 
-[genomes]
-kmer_size        = 31
-directory        = genomes_15x
+# -----------------------------------------------------------------------------
+# Future data sections (not yet active)
+# -----------------------------------------------------------------------------
+
+# Complete reference genome downloaded from NCBI
+# [data.arabidopsis]
+# source           = "ncbi"
+# role             = "genomes"
+# taxon            = "Arabidopsis thaliana"
+# assembly_level   = "chromosome"
+# assembly_version = "latest"
+
+# Internal skim-sequenced genome
+# [data.betula_nana]
+# source    = "internal"
+# role      = "genome_skims"
+# directory = "Betula_nana"
