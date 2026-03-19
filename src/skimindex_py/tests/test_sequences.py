@@ -184,7 +184,7 @@ def genome_dir(tmp_path):
 class TestSpeciesList:
     def test_returns_all_species(self, genome_dir):
         result = species_list(genome_dir)
-        assert set(result.keys()) == {"Betula_nana", "Betula_pubescens", "Salix_alba", "Potamogeton"}
+        assert set(result.keys()) == {"Betula nana", "Betula pubescens", "Salix alba", "Potamogeton"}
 
     def test_sorted_keys(self, genome_dir):
         result = species_list(genome_dir)
@@ -192,16 +192,16 @@ class TestSpeciesList:
 
     def test_relative_mode(self, genome_dir):
         result = species_list(genome_dir, mode="relative")
-        assert result["Betula_nana"] == Path("species/Betula_nana")
+        assert result["Betula nana"] == Path("species/Betula_nana")
 
     def test_absolute_mode(self, genome_dir):
         result = species_list(genome_dir, mode="absolute")
-        assert result["Betula_nana"].is_absolute()
-        assert result["Betula_nana"].name == "Betula_nana"
+        assert result["Betula nana"].is_absolute()
+        assert result["Betula nana"].name == "Betula_nana"
 
     def test_prefixed_mode(self, genome_dir):
         result = species_list(genome_dir, mode="prefixed")
-        assert result["Betula_nana"] == Path("genomes_15x/species/Betula_nana")
+        assert result["Betula nana"] == Path("genomes_15x/species/Betula_nana")
 
     def test_hybrid_dir_excluded(self, genome_dir):
         result = species_list(genome_dir)

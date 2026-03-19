@@ -146,7 +146,7 @@ def species_list(
         return {}
 
     return {
-        entry.name: apply(entry)
+        entry.name.replace("_", " "): apply(entry)
         for entry in sorted(species_root.iterdir())
         if entry.is_dir()
     }
