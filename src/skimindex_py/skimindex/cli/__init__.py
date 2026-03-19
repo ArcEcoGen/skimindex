@@ -137,9 +137,13 @@ class SkimCommand:
         description: str,
         list_fn: Callable[[], str],
         examples: list[str] | None = None,
+        section_arg: str = "dataset",
+        section_metavar: str = "NAME",
+        section_help: str = "Process a single named entry (e.g. human, fungi)",
     ):
         self._list_fn = list_fn
         self._handler: Callable | None = None
+        self._section_arg = section_arg.replace("-", "_")
 
         epilog = ""
         if examples:
@@ -156,12 +160,12 @@ class SkimCommand:
         self._parser.add_argument(
             "--list",
             action="store_true",
-            help="Print available sections as CSV and exit",
+            help="Print available entries as CSV and exit",
         )
         self._parser.add_argument(
-            "--section",
-            metavar="NAME",
-            help="Process a single named section (e.g. human, fungi)",
+            f"--{section_arg}",
+            metavar=section_metavar,
+            help=section_help,
         )
         self._parser.add_argument(
             "--dry-run",
@@ -213,5 +217,6 @@ class SkimCommand:
             print(self._list_fn() or "")
             return 0
 
-        sections = [args.section] if args.section else None
+        section_val = getattr(args, self._section_arg, None)
+        sections = [section_val] if section_val else None
         return self._handler(sections, args, args.dry_run)

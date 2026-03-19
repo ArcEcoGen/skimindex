@@ -6,10 +6,15 @@ configured directory under SKIMINDEX_ROOT.
 
 Usage
 -----
-    from skimindex.sources import source_dir, dataset_download_dir
+    from skimindex.sources import (
+        source_dir, dataset_download_dir,
+        output_dir, dataset_output_dir,
+    )
 
-    genbank_root = source_dir("genbank")          # Path to genbank source root
-    human_dir    = dataset_download_dir("human")  # Path to human dataset downloads
+    genbank_root  = source_dir("genbank")
+    human_dl_dir  = dataset_download_dir("human")
+    decontam_root = output_dir("role", "decontamination")
+    human_out_dir = dataset_output_dir("human")
 """
 
 from pathlib import Path
@@ -44,3 +49,44 @@ def dataset_download_dir(dataset_name: str) -> Path:
     source = ds.get("source", "ncbi")
     directory = ds.get("directory", dataset_name)
     return source_dir(source) / directory
+
+
+def output_dir(section_kind: str, section_name: str) -> Path:
+    """Processing output directory for a named config section.
+
+    Reads the section's 'directory' key and resolves it under the
+    appropriate root for the section kind:
+      - "role"  → processed_data_dir() / section.directory
+      - "index" → indexes_dir()        / section.directory
+
+    Args:
+        section_kind: "role" or "index"
+        section_name: Name of the sub-section, e.g. "decontamination"
+
+    Examples:
+        output_dir("role", "decontamination") → /processed_data/decontamination
+        output_dir("role", "genomes")         → /processed_data/genomes_15x
+    """
+    cfg = config()
+    sections: dict = getattr(cfg, section_kind + "s", {})
+    directory = sections.get(section_name, {}).get("directory", section_name)
+    if section_kind == "role":
+        return cfg.processed_data_dir() / directory
+    if section_kind == "index":
+        return cfg.indexes_dir() / directory
+    raise ValueError(f"Unknown section_kind: {section_kind!r}. Expected 'role' or 'index'.")
+
+
+def dataset_output_dir(dataset_name: str) -> Path:
+    """Processing output directory for a dataset, resolved under its role.
+
+    Resolves: output_dir("role", dataset.role) / dataset.directory
+
+    Example:
+        dataset_output_dir("human")  → /processed_data/decontamination/human
+        dataset_output_dir("plants") → /processed_data/decontamination/Plants
+    """
+    ds = dataset_config(dataset_name)
+    role = ds.get("role", "")
+    directory = ds.get("directory", dataset_name)
+    return output_dir("role", role) / directory

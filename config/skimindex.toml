@@ -93,28 +93,21 @@ directory = "skims"
 # Processing sections
 # -----------------------------------------------------------------------------
 
-# Atomic: split reference sequences into overlapping fragments.
-[processing.split_decontam]
-type      = "split"
-directory = "split"
-size      = 200                # fragment size in bp
-overlap   = 28                 # overlap = kmer_size - 1
+# Composite: prepare decontamination reference sequences.
+# Chains split → filter_n_only → distribute atomics.
+[processing.prepare_decontam]
+directory = "parts"            # output subdirectory under each genome/division dir
+steps = [
+  {type = "split",         size = 200, overlap = 28},  # obiscript → STDOUT
+  {type = "filter_n_only"},                             # obigrep   → STDOUT
+  {type = "distribute",    batches = 20},               # obidistribute → parts/
+]
 
 # Atomic: count k-mers in split fragments.
 [processing.count_kmers_decontam]
 type      = "kmercount"
 directory = "kmercount"
 kmer_size = 29
-
-# Composite: full decontamination preparation pipeline.
-# Referenced by [role.decontamination] via run = "prepare_decontam".
-[processing.prepare_decontam]
-directory = "prepared"
-steps = [
-  "split_decontam",                       # saved to split/
-  {type = "remove_n_only"},               # temporary
-  "count_kmers_decontam",                 # saved to kmercount/
-]
 
 
 # -----------------------------------------------------------------------------

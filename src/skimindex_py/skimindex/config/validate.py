@@ -167,6 +167,11 @@ def _validate_role_sections(cfg: "Config") -> list[ConfigError]:
     errors: list[ConfigError] = []
     declared_processing = cfg.processing
 
+    # Collect roles that have at least one dataset assigned
+    roles_with_datasets: set[str] = {
+        ds.get("role") for ds in cfg.datasets.values() if ds.get("role")
+    }
+
     for name, role in cfg.roles.items():
         sec = f"role.{name}"
 
@@ -177,6 +182,14 @@ def _validate_role_sections(cfg: "Config") -> list[ConfigError]:
         # B12 — run (if present) must reference processing with directory
         if "run" in role:
             errors += _check_run_ref(sec, "run", role["run"], declared_processing)
+
+        # B13 — run required when datasets are assigned to this role
+        elif name in roles_with_datasets:
+            errors.append(ConfigError(
+                sec, "run",
+                f"required: {len([d for d in cfg.datasets.values() if d.get('role') == name])} "
+                f"dataset(s) are assigned to this role but no processing pipeline is declared"
+            ))
 
     return errors
 

@@ -22,8 +22,6 @@ from skimindex.sources.download.ncbi import (
 )
 from skimindex.sources.download.status import (
     download_status,
-    genbank_status,
-    ncbi_status,
     print_status,
     print_genbank_status,
     print_ncbi_status,
@@ -42,9 +40,12 @@ _genbank_cmd = SkimCommand(
         "%(prog)s",
         "%(prog)s --list",
         "%(prog)s --status",
-        "%(prog)s --section pln",
+        "%(prog)s --division pln",
         "%(prog)s --dry-run",
     ],
+    section_arg="division",
+    section_metavar="DIV",
+    section_help="Process a single GenBank division (e.g. pln, bct)",
 )
 _genbank_cmd.add_argument("--status", action="store_true",
     help="Show download status for GenBank (no download)")
@@ -70,10 +71,13 @@ _ncbi_cmd = SkimCommand(
         "%(prog)s",
         "%(prog)s --list",
         "%(prog)s --status",
-        "%(prog)s --section human",
+        "%(prog)s --dataset human",
         "%(prog)s --taxon Spermatophyta --one-per species",
         "%(prog)s --dry-run",
     ],
+    section_arg="dataset",
+    section_metavar="NAME",
+    section_help="Process a single NCBI dataset (e.g. human, plants)",
 )
 
 _ncbi_cmd.add_argument(

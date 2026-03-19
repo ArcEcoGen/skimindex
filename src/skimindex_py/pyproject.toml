@@ -18,6 +18,6 @@ docs = ["mkdocs>=1.6"]
 testpaths = ["tests"]
 
 [project.scripts]
-download = "skimindex._download:main"
-split = "skimindex._split:main"
-validate = "skimindex._validate:main"
+download  = "skimindex._download:main"
+decontam  = "skimindex._decontam:main"
+validate  = "skimindex._validate:main"

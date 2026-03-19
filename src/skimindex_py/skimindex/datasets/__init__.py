@@ -6,18 +6,141 @@ Each dataset binds a source (ncbi, genbank, internal) to a role
 
 Usage
 -----
-    from skimindex.datasets import datasets_for_source, dataset_config
+    from skimindex.datasets import Dataset, datasets_for_role
 
-    # All NCBI datasets configured for download
-    for name in datasets_for_source("ncbi"):
-        cfg = dataset_config(name)
-        taxon = cfg["taxon"]
+    for ds in datasets_for_role("decontamination"):
+        for data in ds.to_data():
+            pipeline(data, ds.output_dir, dry_run=False)
 """
 
-from typing import Any
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Iterator
 
 from skimindex.config import config
 
+
+# ---------------------------------------------------------------------------
+# Dataset
+# ---------------------------------------------------------------------------
+
+class Dataset:
+    """A configured [data.X] block with typed access and Data conversion.
+
+    Attributes
+    ----------
+    name   : dataset name (the X in [data.X])
+    source : "ncbi", "genbank", or "internal"
+    role   : "decontamination", "genomes", etc.
+    """
+
+    def __init__(self, name: str, cfg: dict[str, Any]) -> None:
+        self.name   = name
+        self._cfg   = cfg
+
+    # ------------------------------------------------------------------
+    # Typed accessors
+    # ------------------------------------------------------------------
+
+    @property
+    def source(self) -> str:
+        return self._cfg.get("source", "ncbi")
+
+    @property
+    def role(self) -> str:
+        return self._cfg.get("role", "")
+
+    @property
+    def directory(self) -> str:
+        return self._cfg.get("directory", self.name)
+
+    @property
+    def download_dir(self) -> Path:
+        """Directory where source files were downloaded."""
+        from skimindex.sources import dataset_download_dir
+        return dataset_download_dir(self.name)
+
+    @property
+    def output_dir(self) -> Path:
+        """Processing output directory for this dataset."""
+        from skimindex.sources import dataset_output_dir
+        return dataset_output_dir(self.name)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._cfg.get(key, default)
+
+    # ------------------------------------------------------------------
+    # Data conversion
+    # ------------------------------------------------------------------
+
+    def to_data(self) -> Iterator["Data"]:  # noqa: F821
+        """Yield one or more Data objects representing this dataset's input.
+
+        - ncbi    : FILES — one Data per genome file (.fasta.gz / .gbff.gz)
+        - genbank : STREAM — one Data (obigrep-filtered by taxid)
+        """
+        if self.source == "ncbi":
+            yield from self._ncbi_data()
+        elif self.source == "genbank":
+            yield from self._genbank_data()
+        else:
+            raise ValueError(
+                f"Dataset [{self.name}]: unsupported source {self.source!r}"
+            )
+
+    def _ncbi_data(self) -> Iterator["Data"]:  # noqa: F821
+        from skimindex.config import config
+        from skimindex.naming import output_subdir_for
+        from skimindex.processing.data import files_data
+        from skimindex.sequences import list_sequence_files
+
+        base = self.output_dir.relative_to(config().processed_data_dir())
+        dl = self.download_dir
+        for f in list_sequence_files(dl, mode="absolute", recursive=True):
+            suffix = "".join(f.suffixes).lstrip(".")
+            rel = f.relative_to(dl)
+            subdir = base / output_subdir_for(rel)
+            yield files_data(f, format=suffix, subdir=subdir)
+
+    def _genbank_data(self) -> Iterator["Data"]:  # noqa: F821
+        from skimindex.config import config
+        from skimindex.processing.data import files_data
+        from skimindex.processing.filter_taxid import filter_taxid
+        from skimindex.sources.genbank import division_dir, latest_release, release_dir
+
+        base     = self.output_dir.relative_to(config().processed_data_dir())
+        taxid    = self._cfg.get("taxid")
+        divisions = self._cfg.get("divisions", [])
+        release  = self._cfg.get("release") or latest_release()
+
+        # Inputs: one Data per division, or the full release directory
+        if divisions:
+            inputs = [
+                (div, division_dir(release, div))
+                for div in divisions
+                if division_dir(release, div).exists()
+            ]
+        else:
+            inputs = [("", release_dir(release))]
+
+        # Build filter_taxid runner once if taxid is declared
+        taxid_filter = filter_taxid({"taxid": taxid}) if taxid else None
+
+        for label, path in inputs:
+            subdir = base / label if label else base
+            data = files_data([path], format="fasta", subdir=subdir)
+            if taxid_filter is not None:
+                data = taxid_filter(data)
+            yield data
+
+    def __repr__(self) -> str:
+        return f"Dataset({self.name!r}, source={self.source!r}, role={self.role!r})"
+
+
+# ---------------------------------------------------------------------------
+# Registry accessors
+# ---------------------------------------------------------------------------
 
 def all_datasets() -> dict[str, dict[str, Any]]:
     """Return all [data.X] sections keyed by dataset name."""
@@ -37,14 +160,15 @@ def datasets_for_source(source: str) -> list[str]:
     ]
 
 
-def datasets_for_role(role: str) -> list[str]:
-    """Return dataset names whose role matches *role*.
+def datasets_for_role(role: str) -> list[Dataset]:
+    """Return Dataset objects whose role matches *role*.
 
     Example:
-        datasets_for_role("decontamination") → ["human", "bacteria"]
+        datasets_for_role("decontamination") → [Dataset("human"), Dataset("bacteria")]
     """
     return [
-        name for name, ds in all_datasets().items()
+        Dataset(name, ds)
+        for name, ds in all_datasets().items()
         if ds.get("role") == role
     ]
 
@@ -57,3 +181,14 @@ def dataset_config(name: str) -> dict[str, Any]:
                                     "taxon": "human", "example": True}
     """
     return all_datasets().get(name, {})
+
+
+def get_dataset(name: str) -> Dataset:
+    """Return a Dataset object for a named dataset.
+
+    Raises KeyError if the dataset is not found.
+    """
+    cfg = all_datasets()
+    if name not in cfg:
+        raise KeyError(f"Dataset {name!r} not found in config")
+    return Dataset(name, cfg[name])

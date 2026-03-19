@@ -6,14 +6,13 @@ Inspects local directories to report what has been downloaded and stamped.
 
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from skimindex.config import config
 from skimindex.datasets import datasets_for_source
-from skimindex.sources import dataset_download_dir, source_dir
+from skimindex.sources import dataset_download_dir
+from skimindex.sources import genbank as gb_source
 from skimindex.stamp import is_stamped
 
 
@@ -78,24 +77,15 @@ class DownloadStatus:
 
 def genbank_status() -> GenBankStatus:
     """Inspect GenBank download status from local disk (no network calls)."""
-    gb_root = source_dir("genbank")
     configured_divisions = config().sources.get("genbank", {}).get("divisions", [])
 
-    # Find Release_* directories
-    releases = []
-    if gb_root.exists():
-        releases = sorted(
-            [p.name for p in gb_root.iterdir() if p.is_dir() and p.name.startswith("Release_")],
-            key=lambda n: float(n.split("_")[1]) if "_" in n else 0,
-        )
+    releases = gb_source.available_releases()
     current_release = releases[-1] if releases else None
 
-    # Per-division file counts in the current release
     division_statuses = []
     if current_release:
-        fasta_root = gb_root / current_release / "fasta"
         for div in configured_divisions:
-            div_dir = fasta_root / div
+            div_dir = gb_source.division_dir(current_release, div)
             if div_dir.exists():
                 files = list(div_dir.glob("*.fasta.gz"))
                 stamped = sum(1 for f in files if is_stamped(f))
@@ -105,16 +95,14 @@ def genbank_status() -> GenBankStatus:
     else:
         division_statuses = [DivisionStatus(div, 0, 0) for div in configured_divisions]
 
-    # Taxonomy
-    taxonomy_present = False
-    if current_release:
-        taxonomy_file = gb_root / current_release / "taxonomy" / "ncbi_taxonomy.tgz"
-        taxonomy_present = taxonomy_file.exists()
+    taxonomy_present = (
+        gb_source.taxonomy(current_release).exists() if current_release else False
+    )
 
     return GenBankStatus(
         configured_divisions=configured_divisions,
-        releases_on_disk=releases,
-        current_release=current_release,
+        releases_on_disk=[f"Release_{r}" for r in releases],
+        current_release=f"Release_{current_release}" if current_release else None,
         divisions=division_statuses,
         taxonomy_present=taxonomy_present,
     )

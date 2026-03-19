@@ -1,275 +1,116 @@
 """
 Fragment splitting for decontamination index building.
 
-Splits reference genome sequences into overlapping fragments for constructing
-decontamination indices. Handles both taxon-based sections (pre-downloaded
-FASTA/GBFF files) and GenBank division sections (filtered by taxid).
+Registers three atomic processing types:
+  split         — obiscript(splitseqs.lua)       STREAM
+  filter_n_only — obigrep(-v -s '^[n]+$')        STREAM
+  distribute    — obidistribute(-Z -n N -p ...)  DIRECTORY
 
-Fragment pipeline:
-  obiscript(splitseqs.lua) → obigrep(filter Ns) → obidistribute(batches)
+The TOML composite [processing.split_decontam] chains these three
+via its 'steps' list and is executed by processing.build().
 
-Uses configuration parameters:
-  - decontamination.frg_size   : fragment size (default: 200)
-  - decontamination.kmer_size  : for overlap calculation (default: 29)
-  - decontamination.batches    : number of output batches (default: 20)
-  - directories.genbank        : GenBank root directory
-  - directories.processed_data : output directory for fragments
-
-Output structure:
-  - Taxon sections (per genome): <processed_data>/<section_dir>/{genome_name}/parts/frg_{batch}.fasta.gz
-  - Division sections: <processed_data>/<section_dir>/parts/frg_{batch}.fasta.gz
+Public entry points
+-------------------
+list_sections()     → CSV of dataset names with role="decontamination"
+process_split(...)  → run split_decontam on one or all datasets (returns 0/1)
 """
 
-import os
 from pathlib import Path
-from typing import Any
 
 from skimindex.config import config
+from skimindex.datasets import datasets_for_role, dataset_config
 from skimindex.log import logerror, loginfo, logwarning
-from skimindex.decontamination.sections import genbank_base, latest_release, section_dirs
+from typing import Callable
+from skimindex.processing.data import Data, DataKind, files_data, stream_data
+from skimindex.processing.distribute import distribute      # noqa: F401 — triggers registration
+from skimindex.processing.filter_n_only import filter_n_only  # noqa: F401 — triggers registration
+from skimindex.processing.filter_taxid import filter_taxid    # noqa: F401 — triggers registration
+from skimindex.processing.split import split                  # noqa: F401 — triggers registration
+from skimindex.sources import dataset_download_dir, dataset_output_dir
 from skimindex.stamp import needs_run, remove_if_not_stamped, stamp
-from skimindex.unix.obitools import obiconvert, obidistribute, obigrep, obiscript
-
-# Path to the Lua script for sequence splitting
-SPLITSEQS_LUA = "/app/obiluascripts/splitseqs.lua"
 
 
-def _extract_genome_info_from_filename(filename: str) -> tuple | None:
-    """Extract genome name and accession from filename.
+# ---------------------------------------------------------------------------
+# Helper — resolve split_decontam config
+# ---------------------------------------------------------------------------
 
-    Expected pattern: {name}-{ACCESSION}.{ext}
-    Example: Homo_sapiens-GCF_000001405.40.gbff.gz
-             → ("Homo_sapiens", "GCF_000001405.40")
-
-    Returns:
-        Tuple of (name, accession), or None if pattern not matched.
-    """
-    import re
-
-    # Match pattern: {name}-{ACCESSION}.{ext} where ACCESSION starts with GCF_ or GCA_
-    match = re.search(r"^(.+?)-((GCF|GCA)_[^.]+\.[0-9]+)", filename)
-    if match:
-        return (match.group(1), match.group(2))
-    return None
+def _split_output_subdir() -> str:
+    """Return the output subdirectory name from [processing.split_decontam]."""
+    return config().processing.get("split_decontam", {}).get("directory", "split_decontam")
 
 
-def _extract_accession_from_filename(filename: str) -> str | None:
-    """Extract accession (GCF_/GCA_) from genome filename.
+# ---------------------------------------------------------------------------
+# Per-dataset split logic
+# ---------------------------------------------------------------------------
 
-    Expected pattern: {name}-{ACCESSION}.{ext}
-    Example: Homo_sapiens-GCF_000001405.40.gbff.gz → GCF_000001405.40
+def _split_genome_file(f: Path, genome_output_dir: Path, pipeline, dry_run: bool) -> bool:
+    """Split a single genome file into fragments."""
+    parts = f.name.split(".")
+    genome_key = ".".join(parts[:-2]) if len(parts) > 2 else f.stem
 
-    Returns:
-        Accession string, or None if pattern not matched.
-    """
-    result = _extract_genome_info_from_filename(filename)
-    return result[1] if result else None
+    parts_dir = genome_output_dir / genome_key / _split_output_subdir()
 
-
-def list_sections() -> str:
-    """List available genome sections (all taxa) as CSV from config."""
-    cfg = config()
-    sections = cfg.ref_taxa
-    return ",".join(sections) if sections else ""
-
-
-def _load_split_params(
-    frg_size_opt: int | None = None,
-    overlap_opt: int | None = None,
-    batches_opt: int | None = None,
-) -> dict[str, int]:
-    """Load decontamination parameters from config with CLI overrides.
-
-    Args:
-        frg_size_opt: Override fragment size (None → use config)
-        overlap_opt: Override overlap (None → use config: kmer_size - 1)
-        batches_opt: Override batch count (None → use config)
-
-    Returns:
-        Dict with keys: frg_size, overlap, batches
-    """
-    cfg = config()
-
-    frg_size = frg_size_opt
-    if frg_size is None:
-        frg_size = int(cfg.get("decontamination", "frg_size", "200"))
-
-    kmer_size = int(cfg.get("decontamination", "kmer_size", "29"))
-    overlap = overlap_opt if overlap_opt is not None else (kmer_size - 1)
-
-    batches = batches_opt
-    if batches is None:
-        batches = int(cfg.get("decontamination", "batches", "20"))
-
-    return {
-        "frg_size": frg_size,
-        "overlap": overlap,
-        "batches": batches,
-    }
-
-
-
-
-def _run_split_pipeline(
-    source_cmd,
-    fragments_dir: Path,
-    frg_size: int,
-    overlap: int,
-    batches: int,
-) -> bool:
-    """Execute the common split pipeline.
-
-    Pipeline:
-        source → obiscript(splitseqs.lua) → obigrep(filter Ns) → obidistribute(batches)
-
-    Sets FRAGMENT_SIZE and OVERLAP env vars for the Lua script.
-    """
-    try:
-        fragments_dir.mkdir(parents=True, exist_ok=True)
-
-        # Build the pipeline commands
-        split_cmd = obiscript(SPLITSEQS_LUA)
-        filter_cmd = obigrep("-v", "-s", "^[n]+$")
-        dist_cmd = obidistribute(
-            "-Z",
-            "-n",
-            str(batches),
-            "-p",
-            str(fragments_dir / "frg_%s.fasta.gz"),
-        )
-
-        # Save and set env vars for the Lua script
-        old_env = {
-            "FRAGMENT_SIZE": os.environ.get("FRAGMENT_SIZE"),
-            "OVERLAP": os.environ.get("OVERLAP"),
-        }
-        try:
-            os.environ["FRAGMENT_SIZE"] = str(frg_size)
-            os.environ["OVERLAP"] = str(overlap)
-
-            # Execute pipeline
-            (source_cmd | split_cmd | filter_cmd | dist_cmd)()
-
-        finally:
-            # Restore env vars
-            for k, v in old_env.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
-
+    if not needs_run(parts_dir, f, dry_run=dry_run,
+                     label=genome_key, action=f"split {f.name}"):
         return True
-    except Exception as e:
-        logerror(f"Pipeline failed: {e}")
+
+    loginfo(f"  [{genome_key}] Splitting...")
+    remove_if_not_stamped(parts_dir)
+
+    input_data = files_data(f, format=f.suffix.lstrip("."))
+    if not pipeline(input_data, parts_dir, dry_run=dry_run):
+        logerror(f"  [{genome_key}] Pipeline failed")
         return False
 
+    stamp(parts_dir)
+    return True
 
-def split_taxon_section(section: str, params: dict[str, int], dry_run: bool = False) -> bool:
-    """Split a taxon section (pre-downloaded FASTA/GBFF files).
 
-    Processes each genome separately with its own parts subdirectory.
-    Directory name uses the source filename without extensions.
-    Output: <processed_data>/<section_dir>/{genome_name}/parts/frg_{batch}.fasta.gz
+def _split_taxon_dataset(dataset_name: str, pipeline, dry_run: bool) -> bool:
+    """Split a taxon-based dataset (per-genome FASTA/GBFF files)."""
+    input_dir = dataset_download_dir(dataset_name)
+    output_dir = dataset_output_dir(dataset_name)
 
-    Example: Homo_sapiens-GCF_000001405.40.gbff.gz → Homo_sapiens-GCF_000001405.40/parts/
-
-    Reads .fasta.gz and .gbff.gz files from the section directory.
-    Uses stamp files to skip re-splitting if source has not changed.
-    """
-    dirs = section_dirs(section)
-    if not dirs:
-        return False
-
-    input_dir = dirs["input_dir"]
-    section_output_dir = dirs["fragments_dir"]
-
-    loginfo(f"Section       : {section} (taxon-based, per-genome)")
+    loginfo(f"Dataset       : {dataset_name} (taxon-based, per-genome)")
     loginfo(f"Input dir     : {input_dir}")
 
     if not input_dir.exists():
         logwarning(f"Input directory not found: {input_dir}")
-        return True  # Not an error, section is empty
+        return True
 
-    # Find all .fasta.gz and .gbff.gz files
-    input_files = sorted(
-        list(input_dir.glob("*.fasta.gz")) + list(input_dir.glob("*.gbff.gz"))
-    )
-
+    from skimindex.sequences import list_sequence_files
+    input_files = list_sequence_files(input_dir, mode="absolute")
     if not input_files:
-        logwarning(f"No .fasta.gz or .gbff.gz files found in {input_dir}")
+        logwarning(f"No sequence files found in {input_dir}")
         return True
 
     loginfo(f"Processing {len(input_files)} genome(s)...")
-
     errors = 0
     for f in input_files:
-        # Use filename without extensions as directory name
-        # e.g., "Homo_sapiens-GCF_000001405.40.gbff.gz" → "Homo_sapiens-GCF_000001405.40"
-        parts = f.name.split(".")
-        # Remove .gz, then .gbff or .fasta (last 2 extensions)
-        genome_key = ".".join(parts[:-2]) if len(parts) > 2 else f.stem
-
-        genome_output_dir = section_output_dir / genome_key / "parts"
-
-        if not needs_run(genome_output_dir, f,
-                         dry_run=dry_run, label=genome_key, action=f"split {f.name}"):
-            continue
-
-        loginfo(f"  [{genome_key}] Splitting...")
-
-        # Clean up any partial output from a previous interrupted run.
-        remove_if_not_stamped(genome_output_dir)
-
-        source_cmd = obiconvert(str(f))
-
-        if not _run_split_pipeline(
-            source_cmd,
-            genome_output_dir,
-            params["frg_size"],
-            params["overlap"],
-            params["batches"],
-        ):
+        if not _split_genome_file(f, output_dir, pipeline, dry_run):
             errors += 1
-            continue
-
-        stamp(genome_output_dir)
-
     return errors == 0
 
 
-def split_division_section(section: str, params: dict[str, int], dry_run: bool = False) -> bool:
-    """Split a GenBank division section (filter by taxid from flat files).
+def _split_division_dataset(dataset_name: str, pipeline, dry_run: bool) -> bool:
+    """Split a GenBank division dataset (filtered by taxid from flat files)."""
+    from skimindex.decontamination.sections import genbank_base, latest_release
 
-    Processes each division separately with its own fragments subdirectory.
-    Output: <processed_data>/<section_dir>/{division}/parts/frg_{batch}.fasta.gz
-
-    Reads divisions and taxid from config, locates taxonomy, filters sequences.
-    Uses stamp file to skip re-splitting if sources have not changed.
-    """
-    dirs = section_dirs(section)
-    if not dirs:
-        return False
-
-    section_data = dirs["section_data"]
-    section_output_dir = dirs["fragments_dir"]
-
-    # Get taxid and divisions from config
-    taxid = section_data.get("taxid")
-    divisions = section_data.get("divisions", "")
+    ds = dataset_config(dataset_name)
+    taxid     = ds.get("taxid")
+    divisions = ds.get("divisions", [])
 
     if not taxid or not divisions:
-        logerror(f"Section [{section}]: missing 'taxid' or 'divisions' in config")
+        logerror(f"Dataset [{dataset_name}]: missing 'taxid' or 'divisions' in config")
         return False
 
-    loginfo(f"Section       : {section} (division-based, per-division)")
+    loginfo(f"Dataset       : {dataset_name} (division-based, per-division)")
     loginfo(f"TaxID         : {taxid}")
     loginfo(f"Divisions     : {divisions}")
 
-    # Find latest GenBank release
     release_dir = latest_release(genbank_base())
-
     if not release_dir:
-        logerror(f"No GenBank release directory found under {genbank_root}")
+        logerror(f"No GenBank release directory found")
         return False
 
     taxonomy = release_dir / "taxonomy" / "ncbi_taxonomy.tgz"
@@ -279,122 +120,99 @@ def split_division_section(section: str, params: dict[str, int], dry_run: bool =
 
     loginfo(f"Taxonomy      : {taxonomy}")
 
-    # Process each division separately
-    div_list = divisions.split()
+    output_base = dataset_output_dir(dataset_name)
+    subdir      = _split_output_subdir()
     errors = 0
 
-    for div in div_list:
+    for div in divisions:
         div_dir = release_dir / "fasta" / div
         if not div_dir.exists():
             logwarning(f"Division directory not found: {div_dir}")
             continue
 
-        div_fragments_dir = section_output_dir / div / "parts"
+        parts_dir = output_base / div / subdir
 
-        if not needs_run(div_fragments_dir, taxonomy, div_dir,
+        if not needs_run(parts_dir, taxonomy, div_dir,
                          dry_run=dry_run, label=div, action=f"split {div_dir}"):
             continue
 
         loginfo(f"  [{div}] Splitting...")
+        remove_if_not_stamped(parts_dir)
 
-        # Clean up any partial output from a previous interrupted run.
-        remove_if_not_stamped(div_fragments_dir)
-
-        source_cmd = obigrep(
-            "-t",
-            str(taxonomy),
-            "-r",
-            str(taxid),
-            "--no-order",
-            "--update-taxid",
+        input_cmd = obigrep(
+            "-t", str(taxonomy),
+            "-r", str(taxid),
+            "--no-order", "--update-taxid",
             str(div_dir),
         )
-
-        if not _run_split_pipeline(
-            source_cmd,
-            div_fragments_dir,
-            params["frg_size"],
-            params["overlap"],
-            params["batches"],
-        ):
+        input_data = stream_data(input_cmd, format="fasta")
+        if not pipeline(input_data, parts_dir, dry_run=dry_run):
+            logerror(f"  [{div}] Pipeline failed")
             errors += 1
             continue
 
-        stamp(div_fragments_dir)
+        stamp(parts_dir)
 
     return errors == 0
 
 
-def split_section(section: str, params: dict[str, int], dry_run: bool = False) -> bool:
-    """Split a section (dispatch to taxon or division handler).
+def _split_dataset(dataset_name: str, pipeline, dry_run: bool) -> bool:
+    """Dispatch to taxon or division split handler."""
+    ds = dataset_config(dataset_name)
+    if ds.get("source") == "ncbi":
+        return _split_taxon_dataset(dataset_name, pipeline, dry_run)
+    return _split_division_dataset(dataset_name, pipeline, dry_run)
 
-    Args:
-        section: Section name
-        params: Dict with frg_size, overlap, batches
 
-    Returns:
-        True on success, False on failure
-    """
-    cfg = config()
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
-    # Determine section type: taxon-based or division-based
-    if section in cfg.ref_genomes:
-        return split_taxon_section(section, params, dry_run=dry_run)
-    else:
-        return split_division_section(section, params, dry_run=dry_run)
+def list_sections() -> str:
+    """List dataset names with role='decontamination' as CSV."""
+    return ",".join(datasets_for_role("decontamination"))
 
 
 def process_split(
     sections: list[str] | None = None,
-    frg_size: int | None = None,
-    overlap: int | None = None,
-    batches: int | None = None,
     dry_run: bool = False,
 ) -> int:
-    """Main entry point: split genome sections into fragments.
+    """Run split_decontam on one or all decontamination datasets.
 
     Args:
-        sections: List of section names to split.
-                 If None, uses all configured sections.
-        frg_size: Override fragment size
-        overlap: Override overlap
-        batches: Override batch count
+        sections: Dataset names to process. None → all decontamination datasets.
+        dry_run:  If True, show what would be done without executing.
 
     Returns:
-        0 on success, 1 if any section failed.
+        0 on success, 1 if any dataset failed.
     """
-    cfg = config()
+    from skimindex.processing import build
 
-    # Use provided sections or get from config
     if sections is None:
-        sections = cfg.ref_taxa
+        sections = datasets_for_role("decontamination")
 
     if not sections:
-        logwarning("No genome sections configured")
+        logwarning("No decontamination datasets configured")
         return 0
 
-    # Load parameters
-    params = _load_split_params(frg_size, overlap, batches)
+    # Build the pipeline once — shared across all datasets
+    pipeline = build("split_decontam")
 
-    loginfo(f"===== Fragment splitting pipeline =====" + (" [DRY-RUN]" if dry_run else ""))
-    loginfo(f"Fragment size : {params['frg_size']}")
-    loginfo(f"Overlap       : {params['overlap']}")
-    loginfo(f"Batches       : {params['batches']}")
-    loginfo(f"Processing {len(sections)} section(s)")
+    loginfo(f"===== Split pipeline =====" + (" [DRY-RUN]" if dry_run else ""))
+    loginfo(f"Processing {len(sections)} dataset(s)")
 
-    # Process each section
     errors = 0
-    for section in sections:
-        loginfo(f">>> Splitting: {section}")
-        if split_section(section, params, dry_run=dry_run):
-            loginfo(f"<<< {section} OK")
+    for dataset_name in sections:
+        loginfo(f">>> Splitting: {dataset_name}")
+        if _split_dataset(dataset_name, pipeline, dry_run=dry_run):
+            loginfo(f"<<< {dataset_name} OK")
         else:
-            logerror(f"<<< {section} FAILED")
+            logerror(f"<<< {dataset_name} FAILED")
             errors += 1
 
-    if errors > 0:
-        logerror(f"===== {errors} section(s) failed =====")
+    if errors:
+        logerror(f"===== {errors} dataset(s) failed =====")
         return 1
 
-    loginfo("===== All sections split successfully =====")
+    loginfo("===== All datasets split successfully =====")
     return 0

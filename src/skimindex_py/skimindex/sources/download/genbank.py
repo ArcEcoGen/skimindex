@@ -15,11 +15,10 @@ import os
 import re
 import shutil
 from functools import lru_cache
-from pathlib import Path
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
-from skimindex.sources import source_dir
+from skimindex.sources import genbank as gb_source
 from skimindex.stamp import needs_run, stamp
 from skimindex.unix.compress import pigz_test
 from skimindex.unix.download import curl_download
@@ -94,8 +93,6 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
     Returns:
         True on success, False if any files failed.
     """
-    gb_root = source_dir("genbank")
-
     gb_files = get_ftp_listing(divisions)
     if not gb_files:
         logwarning(f"No GenBank files found for divisions: {', '.join(divisions)}")
@@ -103,9 +100,10 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
 
     loginfo(f"Processing {len(gb_files)} GenBank files for divisions: {', '.join(divisions)}")
 
+    tmp_dir = gb_source.release_dir(release) / "tmp"
     if not dry_run:
-        (gb_root / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
-        (gb_root / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
+        (gb_source.release_dir(release) / "fasta").mkdir(parents=True, exist_ok=True)
+        tmp_dir.mkdir(parents=True, exist_ok=True)
 
     # Group files by division
     division_groups: dict[str, list[str]] = {}
@@ -128,7 +126,7 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
             file_counter += 1
             loginfo(f"  [{file_counter}/{total_files}] {gb_file}")
 
-            fasta_dir = gb_root / f"Release_{release}/fasta/{div}"
+            fasta_dir = gb_source.division_dir(release, div)
             fasta_file = fasta_dir / gb_file.replace(".seq.gz", ".fasta.gz")
 
             if not needs_run(fasta_file, dry_run=dry_run,
@@ -136,11 +134,7 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
                 continue
 
             try:
-                tmp_file = (
-                    gb_root
-                    / f"Release_{release}/tmp"
-                    / gb_file.replace(".seq.gz", ".fasta.gz")
-                )
+                tmp_file = tmp_dir / gb_file.replace(".seq.gz", ".fasta.gz")
 
                 fasta_dir.mkdir(parents=True, exist_ok=True)
 
@@ -164,7 +158,7 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
 
             stamp(fasta_file)
 
-    shutil.rmtree(gb_root / f"Release_{release}/tmp", ignore_errors=True)
+    shutil.rmtree(tmp_dir, ignore_errors=True)
 
     if errors > 0:
         logwarning(f"===== Summary: {errors} error(s) =====")
@@ -179,9 +173,8 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
 
 def download_taxonomy(release: str, dry_run: bool = False) -> bool:
     """Download NCBI taxonomy."""
-    gb_root = source_dir("genbank")
-    output_dir = gb_root / f"Release_{release}/taxonomy"
-    output_file = output_dir / "ncbi_taxonomy.tgz"
+    output_file = gb_source.taxonomy(release)
+    output_dir = output_file.parent
 
     if output_file.exists():
         try:

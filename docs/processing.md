@@ -142,10 +142,81 @@ run       = "prepare_decontam"
 
 ---
 
+## Data model
+
+Data flowing between processing steps is represented as a `Data` object.
+The plumbum execution layer is an implementation detail — pipeline orchestration
+only sees `Data`.
+
+Three kinds, aligned with `OutputKind`:
+
+| Kind | Description | Carries |
+|------|-------------|---------|
+| **STREAM** | A deferred pipeline not yet executed | a plumbum command/pipe |
+| **FILES** | One or more files on disk | `list[Path]` |
+| **DIRECTORY** | A directory of files | a single `Path` |
+
+Every processing type has the uniform interface `Data → Data`.
+The pipeline executor chains steps by passing the `Data` output of one step as
+the `Data` input of the next.
+
+Initial data (downloaded sources) is wrapped into `Data` before entering the
+pipeline:
+
+```python
+files_data(Path("genome.gbff.gz"), format="gbff.gz")   # single genome file
+files_data(list(dir.glob("*.fasta.gz")), format="fasta.gz")  # batch of files
+directory_data(Path("/genbank/fasta/bct"))              # directory of FASTA files
+stream_data(cmd, format="fasta")                        # pre-filtered stream
+```
+
+The `to_stream_command(data)` adapter is the **only** place where `Data` touches
+plumbum — it converts any `Data` kind into a plumbum source command via
+`obiconvert`. Atomic type implementations call it internally; pipeline
+orchestration never sees plumbum objects.
+
+---
+
+## Output resolution
+
+### Effective output directory
+
+The effective output directory of a processing section is determined as follows:
+
+- **Atomic** with `directory`: its own `directory`.
+- **Atomic** without `directory`: no persistent output (temporary / piped).
+- **Composite** with `directory`: its own `directory` (ignores last step's directory).
+- **Composite** without `directory`: the effective output directory of its **last step**
+  (which itself must have one, otherwise the composite has no persistent output).
+
+The output type (STREAM / DIRECTORY / FILE) of a composite is always the output type
+of its **last step**, regardless of whether the composite has its own `directory`.
+
+### Output filename for STREAM and FILE types
+
+When a STREAM or FILE output must be persisted to disk (because a `directory` is
+declared), the filename is determined by the processing **type implementation**, not
+by the TOML config. Each registered processing type declares its `output_filename` in
+code (e.g. `"filtered.fasta.gz"`), because the type knows its own output format.
+
+A type with no declared `output_filename` cannot be persisted and must remain
+temporary; declaring a `directory` for such a type is a validation error.
+
+### Runnability
+
+A processing section is **runnable as a top-level step** only if it has an effective
+output directory. Sections without a persistent output can only appear as intermediate
+steps inside a composite.
+
+---
+
 ## Validation rules
 
 1. A `[processing.X]` section must have exactly one of `type` or `steps`.
 2. A section with `steps` is composite; all elements must be strings or inline tables with `type`.
 3. Inline tables inside `steps` must not have `steps` (inline steps are always atomic).
-4. Any processing section referenced by a `run` key must have `directory`.
-5. `type` values must match a registered `@processing` function in `skimindex.processing`.
+4. Any processing section referenced by a `run` key must have a runnable effective output directory.
+5. `type` values must match a registered `@processing_type` function in `skimindex.processing`.
+6. A STREAM/FILE atomic with `directory` must have a declared `output_filename` in its type.
+7. Composite sections (`steps`) are **not** registered in the `@processing_type` registry.
+   They are structural constructs executed by the pipeline runner, not named operations.
