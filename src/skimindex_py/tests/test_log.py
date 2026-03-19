@@ -13,14 +13,31 @@ import skimindex.log as log_mod
 
 @pytest.fixture(autouse=True)
 def reset_log_state():
-    """Reset global log state before each test."""
+    """Reset ALL global log state before and after each test.
+
+    Calls closelogfile() rather than just wiping globals so that fd 2 is
+    properly restored when a test used everything=True.
+    """
     original_level = log_mod.LOG_LEVEL
-    original_logfile = log_mod._logfile
-    original_mirror = log_mod._mirror_to_stderr
+
+    # Ensure clean state at test start (prior test may have leaked)
+    if log_mod._logfile:
+        log_mod.closelogfile()
+    log_mod._logfile = None
+    log_mod._mirror_to_stderr = False
+    log_mod._logeverything = False
+    log_mod._original_stderr = None
+
     yield
+
+    # Teardown: close properly so fd 2 is restored if redirected
+    if log_mod._logfile:
+        log_mod.closelogfile()
     log_mod.LOG_LEVEL = original_level
-    log_mod._logfile = original_logfile
-    log_mod._mirror_to_stderr = original_mirror
+    log_mod._logfile = None
+    log_mod._mirror_to_stderr = False
+    log_mod._logeverything = False
+    log_mod._original_stderr = None
 
 
 class TestLogLevelFiltering:

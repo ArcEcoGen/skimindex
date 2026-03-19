@@ -28,6 +28,12 @@ from pathlib import Path
 from typing import Any
 
 from skimindex.log import openlogfile, setloglevel
+from skimindex.config.validate import (  # noqa: E402 — after class definitions below
+    ConfigError,
+    ConfigValidationError,
+    validate,
+    validate_or_raise,
+)
 
 
 DEFAULT_CONFIG = Path(os.environ.get("SKIMINDEX_CONFIG", "/config/skimindex.toml"))
