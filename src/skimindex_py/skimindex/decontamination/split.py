@@ -26,7 +26,7 @@ from typing import Any
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
-from skimindex.sections import genbank_base, latest_release, section_dirs
+from skimindex.decontamination.sections import genbank_base, latest_release, section_dirs
 from skimindex.stamp import needs_run, remove_if_not_stamped, stamp
 from skimindex.unix.obitools import obiconvert, obidistribute, obigrep, obiscript
 

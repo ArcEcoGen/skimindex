@@ -9,9 +9,6 @@ Key functions
 genbank_base() -> Path
     Root GenBank directory from config (directories.genbank).
 
-processed_base() -> Path
-    Root processed-data directory from config (directories.processed_data).
-
 section_rel_dir(section) -> str
     Relative directory name for a section (config key or section.lower()).
 
@@ -26,18 +23,13 @@ latest_release(genbank_root) -> Path | None
 from pathlib import Path
 from typing import Any
 
-from skimindex.config import config
+from skimindex.config import config, processed_data_dir
 from skimindex.log import logerror
 
 
 def genbank_base() -> Path:
     """Return the root GenBank directory from config."""
     return Path(config().get("directories", "genbank", "/genbank"))
-
-
-def processed_base() -> Path:
-    """Return the root processed-data directory from config."""
-    return Path(config().get("directories", "processed_data", "/processed_data"))
 
 
 def section_rel_dir(section: str) -> str:
@@ -56,7 +48,7 @@ def section_dirs(section: str) -> dict[str, Any] | None:
     Returns a dict with:
         rel_dir       — relative directory name
         input_dir     — <genbank_base>/<rel_dir>
-        fragments_dir — <processed_base>/<rel_dir>
+        fragments_dir — <processed_data_dir>/<rel_dir>
         section_data  — raw section dict from config
 
     Returns None if the section is not found in config.
@@ -73,7 +65,7 @@ def section_dirs(section: str) -> dict[str, Any] | None:
     return {
         "rel_dir": rel_dir,
         "input_dir": genbank_base() / rel_dir,
-        "fragments_dir": processed_base() / rel_dir,
+        "fragments_dir": processed_data_dir() / rel_dir,
         "section_data": section_data,
     }
 

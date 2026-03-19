@@ -19,7 +19,7 @@ from pathlib import Path
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
-from skimindex.sections import genbank_base
+from skimindex.decontamination.sections import genbank_base
 from skimindex.stamp import needs_run, stamp
 from skimindex.unix.compress import pigz_test
 from skimindex.unix.download import curl_download

@@ -26,6 +26,7 @@ DEFAULT_CONFIG = Path(os.environ.get("SKIMINDEX_CONFIG", "/config/skimindex.toml
 # Built-in defaults (priority: env > config file > these)
 DEFAULTS = {
     ("directories", "genbank"): "/genbank",
+    ("directories", "raw_data"): "/raw_data",
     ("directories", "processed_data"): "/processed_data",
     ("genbank", "divisions"): "bct pln",
     ("decontamination", "kmer_size"): "29",
@@ -184,6 +185,16 @@ class Config:
 
     def __repr__(self) -> str:
         return f"Config(path={self._path}, sections={list(self._data.keys())})"
+
+
+def raw_data_dir() -> Path:
+    """Return the root raw-data directory from config (directories.raw_data)."""
+    return Path(config().get("directories", "raw_data", "/raw_data"))
+
+
+def processed_data_dir() -> Path:
+    """Return the root processed-data directory from config (directories.processed_data)."""
+    return Path(config().get("directories", "processed_data", "/processed_data"))
 
 
 def load(path: Path = DEFAULT_CONFIG) -> Config:

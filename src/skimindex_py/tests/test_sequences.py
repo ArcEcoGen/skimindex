@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from skimindex.sequences import list_sequence_files, species_list, SEQUENCE_EXTENSIONS
+from skimindex.sequences import list_sequence_files, species_list, genome_species_list, SEQUENCE_EXTENSIONS
 
 
 @pytest.fixture()

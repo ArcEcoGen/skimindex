@@ -33,6 +33,8 @@ from pathlib import Path
 from collections.abc import Callable, Iterator
 from typing import Literal
 
+DataType = Literal["raw", "processed"]
+
 PathLike = str | Path
 
 # Base extensions (without .gz) — both compressed and uncompressed variants are found.
@@ -150,3 +152,33 @@ def species_list(
         for entry in sorted(species_root.iterdir())
         if entry.is_dir()
     }
+
+
+def genome_species_list(
+    mode: PathMode = "relative",
+    data_type: DataType = "raw",
+) -> dict[str, Path]:
+    """Return the species list for the genome dataset, using paths from config.
+
+    Reads ``[genomes] directory`` and the appropriate base directory
+    (``raw_data`` or ``processed_data`` from ``[local_directories]``) to build
+    the path, then delegates to :func:`species_list`.
+
+    Args:
+        mode:      Path mode — ``"relative"``, ``"absolute"`` or ``"prefixed"``.
+        data_type: Which data tree to inspect:
+                     ``"raw"``       — raw sequencing reads (``/raw_data/…``)
+                     ``"processed"`` — pipeline outputs    (``/processed_data/…``)
+
+    Returns:
+        Sorted dict ``{species_name: path}`` (species names use spaces, not underscores).
+
+    Raises:
+        FileNotFoundError: if the resolved genome directory does not exist.
+        ValueError: if *mode* is invalid.
+    """
+    from skimindex.config import config, processed_data_dir, raw_data_dir  # local — avoids circular dep
+
+    genome_subdir = config().get("genomes", "directory", "genomes_15x")
+    base = raw_data_dir() if data_type == "raw" else processed_data_dir()
+    return species_list(base / genome_subdir, mode=mode)

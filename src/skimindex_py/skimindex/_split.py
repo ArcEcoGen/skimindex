@@ -3,7 +3,7 @@ Split reference genomes into fragments for decontamination index building.
 """
 
 from skimindex.cli import SkimCommand
-from skimindex.split import list_sections, process_split
+from skimindex.decontamination.split import list_sections, process_split
 
 cmd = SkimCommand(
     name="split",

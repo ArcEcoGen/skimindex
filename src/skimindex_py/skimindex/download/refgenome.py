@@ -18,7 +18,7 @@ from typing import Any
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
-from skimindex.sections import genbank_base, section_rel_dir
+from skimindex.decontamination.sections import genbank_base, section_rel_dir
 from skimindex.stamp import is_stamped, needs_run, stamp, stamp_gz, unstamp
 from skimindex.unix.compress import pigz, unzip
 from skimindex.unix.ncbi import datasets, datasets_summary_genome

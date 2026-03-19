@@ -53,6 +53,7 @@ assembly_version = "latest"       # latest | all
 example          = true           # used as decontamination example
 
 [fungi]
+type             = "decontamination"
 taxid            = 4751           # taxon:4751 [Fungi]@kingdom
 divisions        = "pln"          # GenBank division to considere for selecting sequences
 directory        = "Fungi"

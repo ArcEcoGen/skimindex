@@ -5,10 +5,10 @@ Modules:
   - config: Read and parse TOML configuration with automatic env var export
   - log: Logging module (colors, file output, levels)
   - unix: Unix tools wrappers (compress, ncbi, obitools)
-  - download: Dataset download orchestration (refgenome)
-  - split: Fragment splitting for decontamination indices
+  - download: Dataset download orchestration (refgenome, genbank)
+  - decontamination: Fragment splitting and k-mer counting for decontamination indices
 """
 
-from . import config, download, log, split, unix
+from . import config, decontamination, download, log, unix
 
-__all__ = ["config", "download", "log", "split", "unix"]
+__all__ = ["config", "decontamination", "download", "log", "unix"]
