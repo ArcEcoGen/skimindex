@@ -111,7 +111,7 @@ role      = "decontamination"
 input     = "prepare_decontam"   # reads from parts/ produced by prepare_decontam
 directory = "kmercount"
 kmer_size = 29
-
+threads   = 10
 
 # -----------------------------------------------------------------------------
 # Data sections
