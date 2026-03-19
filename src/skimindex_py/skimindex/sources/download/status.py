@@ -4,7 +4,6 @@ Download status inspection — no network calls.
 Inspects local directories to report what has been downloaded and stamped.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path

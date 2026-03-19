@@ -50,11 +50,16 @@ genome_filename(species, accession, ext, compressed) → str
 
 canonical_species(name) → str
     Normalise a raw species/taxon name to the canonical underscore form.
+
+scan_species_dir(directory) → Iterator[tuple[Path, Path]]
+    Scan a species-organised directory and yield (absolute_file, subdir) pairs.
+    subdir is the species/accession relative path, derived from directory
+    structure for level-1/2, and from the filename for level-0.
 """
 
-from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 from skimindex.sequences import SEQUENCE_EXTENSIONS
@@ -258,3 +263,57 @@ def parse_division_path(path: Path | str) -> tuple[str, str, str, bool]:
     filename = parts[-1]
     _, ext, compressed = _split_ext(filename)
     return division, filename, ext, compressed
+
+
+# ---------------------------------------------------------------------------
+# Species-organised: scan a directory
+# ---------------------------------------------------------------------------
+
+def scan_species_dir(directory: Path | str) -> Iterator[tuple[Path, Path]]:
+    """Scan a species-organised directory and yield (absolute_file, subdir) pairs.
+
+    subdir is the species/accession path (e.g. Homo_sapiens/GCF_000001405.40),
+    derived from directory structure for level-1 and level-2, and from the
+    filename (using the '--' separator) for level-0.
+
+    Three layouts are recognised (relative to *directory*):
+
+    Level 0 — flat file:
+        {Species}--{accession}.ext  →  subdir = Species/accession
+
+    Level 1 — species subdirectory:
+        {Species}/{accession}.ext   →  subdir = Species/accession
+
+    Level 2 — species+accession subdirectories:
+        {Species}/{accession}/*.ext →  subdir = Species/accession
+
+    Files that cannot be parsed (unknown extension, missing separator at
+    level-0) are silently skipped.
+
+    Yields:
+        (absolute_path, subdir) where subdir is a relative Path.
+    """
+    from skimindex.sequences import list_sequence_files
+
+    directory = Path(directory)
+    for f in list_sequence_files(directory, mode="absolute", recursive=True):
+        rel = f.relative_to(directory)
+        depth = len(rel.parts) - 1  # number of directory components
+        try:
+            if depth == 0:
+                # Level 0: derive subdir from filename via parse_genome_path
+                species, accession, _, _ = parse_genome_path(rel)
+                subdir = genome_subdir(species, accession)
+            elif depth == 1:
+                # Level 1: Species/accession.ext
+                species = rel.parts[0]
+                stem, _, _ = _split_ext(rel.name)
+                subdir = genome_subdir(species, stem)
+            else:
+                # Level 2+: Species/accession/...
+                species = rel.parts[0]
+                accession = rel.parts[1]
+                subdir = genome_subdir(species, accession)
+        except ValueError:
+            continue
+        yield f, subdir

@@ -13,7 +13,6 @@ Usage
             pipeline(data, ds.output_dir, dry_run=False)
 """
 
-from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Iterator
@@ -91,17 +90,14 @@ class Dataset:
 
     def _ncbi_data(self) -> Iterator["Data"]:  # noqa: F821
         from skimindex.config import config
-        from skimindex.naming import output_subdir_for
+        from skimindex.naming import scan_species_dir
         from skimindex.processing.data import files_data
-        from skimindex.sequences import list_sequence_files
 
         base = self.output_dir.relative_to(config().processed_data_dir())
         dl = self.download_dir
-        for f in list_sequence_files(dl, mode="absolute", recursive=True):
+        for f, species_subdir in scan_species_dir(dl):
             suffix = "".join(f.suffixes).lstrip(".")
-            rel = f.relative_to(dl)
-            subdir = base / output_subdir_for(rel)
-            yield files_data(f, format=suffix, subdir=subdir)
+            yield files_data(f, format=suffix, subdir=base / species_subdir)
 
     def _genbank_data(self) -> Iterator["Data"]:  # noqa: F821
         from skimindex.config import config

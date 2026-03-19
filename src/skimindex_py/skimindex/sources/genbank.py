@@ -24,7 +24,6 @@ division_dir(release, div) -> Path
     (e.g. release_dir / "fasta" / "bct").
 """
 
-from __future__ import annotations
 
 from pathlib import Path
 
