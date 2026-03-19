@@ -1,16 +1,25 @@
 """
-Config module for skimindex — reads TOML configuration and provides access
-to parsed values, genome section identification, and environment variable export.
+Config module for skimindex — reads TOML configuration and provides typed
+access to all sections, path helpers, and environment variable export.
 
-The configuration file is expected at /config/skimindex.toml by default.
-Environment variables take priority over config file values.
+The configuration file is expected at /config/skimindex.toml by default,
+overridable via SKIMINDEX_CONFIG environment variable.
 
-Section types:
-  - [logging], [local_directories], [genbank]: reserved sections
-  - [decontamination]: pipeline parameters
-  - Genome sections: [name] with either:
-    - 'taxon' key (downloadable via NCBI datasets)
-    - 'taxid' AND 'divisions' keys (filtered from GenBank flat files)
+Section types (identified by TOML prefix):
+  [local_directories], [logging], [processed_data], [indexes], [stamp]
+      → root-level configuration sections
+  [source.X]      → data origin parameters
+  [role.X]        → data usage / pipeline parameters
+  [processing.X]  → pipeline step definitions (atomic or composite)
+  [data.X]        → dataset declarations (require source + role)
+
+Environment variable schema:
+  SKIMINDEX__LOGGING__LEVEL           (root section)
+  SKIMINDEX__SOURCE__NCBI__DIRECTORY  (prefixed section)
+  SKIMINDEX__DATA__HUMAN__TAXON       (prefixed section)
+  SKIMINDEX__ROOT                     (mount root, default "/")
+  SKIMINDEX__REF_TAXA                 (space-separated list)
+  SKIMINDEX__REF_GENOMES              (space-separated list)
 """
 
 import os
@@ -18,183 +27,275 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from skimindex.log import loginfo, openlogfile, setloglevel
+from skimindex.log import openlogfile, setloglevel
 
 
 DEFAULT_CONFIG = Path(os.environ.get("SKIMINDEX_CONFIG", "/config/skimindex.toml"))
 
-# Built-in defaults (priority: env > config file > these)
-DEFAULTS = {
-    ("directories", "genbank"): "/genbank",
-    ("directories", "raw_data"): "/raw_data",
-    ("directories", "processed_data"): "/processed_data",
-    ("genbank", "divisions"): "bct pln",
-    ("decontamination", "kmer_size"): "29",
-    ("decontamination", "frg_size"): "200",
-    ("decontamination", "batches"): "20",
-}
+CONFIGURATION_SECTIONS = frozenset({
+    "local_directories", "logging", "processed_data", "indexes", "stamp"
+})
+SECTION_PREFIXES = frozenset({"source", "role", "processing", "data"})
 
-RESERVED_SECTIONS = {"logging", "local_directories", "genbank", "directories"}
+
+def _env_key(section: str, key: str) -> str:
+    """Build the SKIMINDEX__ env var name for a section + key.
+
+    Examples:
+        _env_key("logging", "level")         → "SKIMINDEX__LOGGING__LEVEL"
+        _env_key("source.ncbi", "directory") → "SKIMINDEX__SOURCE__NCBI__DIRECTORY"
+    """
+    section_part = section.upper().replace(".", "__")
+    return f"SKIMINDEX__{section_part}__{key.upper()}"
 
 
 class Config:
-    """Parse and provide access to skimindex TOML configuration."""
+    """Parse and provide typed access to skimindex TOML configuration."""
 
     def __init__(self, path: Path = DEFAULT_CONFIG):
         self._path = Path(path)
-        self._data: dict[str, dict[str, Any]] = {}
-        self._ref_taxa: list[str] = []
-        self._ref_genomes: list[str] = []
+        self._raw: dict[str, Any] = {}
 
         if self._path.exists():
             self._load()
-            self._identify_sections()
             self._export_env()
             self._apply_logging()
 
+    # ------------------------------------------------------------------
+    # Loading
+    # ------------------------------------------------------------------
+
     def _load(self) -> None:
-        """Load and parse TOML config file."""
         with open(self._path, "rb") as f:
-            self._data = tomllib.load(f)
+            self._raw = tomllib.load(f)
 
-    def _identify_sections(self) -> None:
-        """Identify reference taxa and genomes.
+    # ------------------------------------------------------------------
+    # Typed section accessors
+    # ------------------------------------------------------------------
 
-        ref_taxa: all sections with 'taxon' OR ('taxid' AND 'divisions')
-        ref_genomes: sections with 'taxon' key (downloadable via NCBI datasets)
-        """
-        for section_name, section_content in self._data.items():
-            if section_name in RESERVED_SECTIONS:
-                continue
+    def _prefix_group(self, prefix: str) -> dict[str, dict[str, Any]]:
+        """Return the dict of sub-sections under a given prefix, e.g. 'source'."""
+        val = self._raw.get(prefix, {})
+        if not isinstance(val, dict):
+            return {}
+        return {k: v for k, v in val.items() if isinstance(v, dict)}
 
-            has_taxon = "taxon" in section_content
-            has_taxid = "taxid" in section_content
-            has_divisions = "divisions" in section_content
+    @property
+    def sources(self) -> dict[str, dict[str, Any]]:
+        """All [source.X] sections, keyed by X."""
+        return self._prefix_group("source")
 
-            # ref_taxa: taxon sections OR (taxid+divisions sections)
-            if has_taxon or (has_taxid and has_divisions):
-                self._ref_taxa.append(section_name)
-                # ref_genomes: only taxon-based sections (downloadable)
-                if has_taxon:
-                    self._ref_genomes.append(section_name)
+    @property
+    def roles(self) -> dict[str, dict[str, Any]]:
+        """All [role.X] sections, keyed by X."""
+        return self._prefix_group("role")
+
+    @property
+    def processing(self) -> dict[str, dict[str, Any]]:
+        """All [processing.X] sections, keyed by X."""
+        return self._prefix_group("processing")
+
+    @property
+    def datasets(self) -> dict[str, dict[str, Any]]:
+        """All [data.X] sections, keyed by X."""
+        return self._prefix_group("data")
 
     @property
     def ref_taxa(self) -> list[str]:
-        """Read-only list of all reference taxa (taxon OR taxid+divisions)."""
-        return self._ref_taxa.copy()
+        """Names of all datasets with source 'ncbi' or 'genbank'."""
+        return [
+            name for name, ds in self.datasets.items()
+            if ds.get("source") in ("ncbi", "genbank")
+        ]
 
     @property
     def ref_genomes(self) -> list[str]:
-        """Read-only list of reference genomes (taxon-based, downloadable via NCBI datasets)."""
-        return self._ref_genomes.copy()
+        """Names of all datasets with source 'ncbi' (downloadable via NCBI datasets CLI)."""
+        return [
+            name for name, ds in self.datasets.items()
+            if ds.get("source") == "ncbi"
+        ]
+
+    # ------------------------------------------------------------------
+    # Root-level config section helpers
+    # ------------------------------------------------------------------
+
+    def _config_section(self, name: str) -> dict[str, Any]:
+        val = self._raw.get(name, {})
+        return val if isinstance(val, dict) else {}
+
+    # ------------------------------------------------------------------
+    # Path helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def root(self) -> Path:
+        """Container/runtime root path from SKIMINDEX_ROOT env var (default '/')."""
+        return Path(os.environ.get("SKIMINDEX_ROOT", "/"))
+
+    def _local_dir(self, key: str) -> Path:
+        """Resolve a [local_directories] key to its container mount path (root/<key>)."""
+        return self.root / key
+
+    def source_dir(self, name: str) -> Path:
+        """Return the mount path for a named source (root / sources[name]["directory"])."""
+        directory = self.sources.get(name, {}).get("directory", name)
+        return self._local_dir(directory)
+
+    def processed_data_dir(self) -> Path:
+        """Return the processed data root (root / [processed_data].directory)."""
+        directory = self._config_section("processed_data").get("directory", "processed_data")
+        return self._local_dir(directory)
+
+    def indexes_dir(self) -> Path:
+        """Return the indexes root (root / [indexes].directory)."""
+        directory = self._config_section("indexes").get("directory", "indexes")
+        return self._local_dir(directory)
+
+    def stamp_dir(self) -> Path:
+        """Return the stamp root (root / [stamp].directory)."""
+        directory = self._config_section("stamp").get("directory", "stamp")
+        return self._local_dir(directory)
+
+    def log_file(self) -> Path:
+        """Return the log file path (root / [logging].directory / [logging].file)."""
+        log_section = self._config_section("logging")
+        directory = log_section.get("directory", "log")
+        filename = log_section.get("file", "skimindex.log")
+        return self._local_dir(directory) / filename
+
+    def raw_data_dir(self) -> Path:
+        """Return the internal/raw data root (source_dir('internal'))."""
+        return self.source_dir("internal")
+
+    # ------------------------------------------------------------------
+    # Generic value accessor
+    # ------------------------------------------------------------------
+
+    def get(self, section: str, key: str, default: str = "") -> str:
+        """Get a config value with precedence: env var > TOML > default.
+
+        section may be dotted ("source.ncbi") for prefixed sections.
+
+        Examples:
+            config.get("logging", "level")          → "INFO"
+            config.get("source.ncbi", "directory")  → "genbank"
+            config.get("data.human", "taxon")       → "human"
+        """
+        var_name = _env_key(section, key)
+        if var_name in os.environ:
+            return os.environ[var_name]
+
+        # Navigate nested TOML structure
+        parts = section.split(".")
+        node: Any = self._raw
+        for part in parts:
+            if not isinstance(node, dict):
+                return default
+            node = node.get(part)
+            if node is None:
+                return default
+
+        if not isinstance(node, dict):
+            return default
+        val = node.get(key)
+        return str(val) if val is not None else default
+
+    # ------------------------------------------------------------------
+    # Read-only data property (raw TOML)
+    # ------------------------------------------------------------------
+
+    @property
+    def data(self) -> dict[str, Any]:
+        """Read-only copy of the raw parsed TOML data."""
+        return self._raw.copy()
 
     @property
     def path(self) -> Path:
-        """Read-only config file path."""
         return self._path
 
-    @property
-    def data(self) -> dict[str, dict[str, Any]]:
-        """Read-only config data dictionary."""
-        return self._data.copy()
+    def sections(self) -> list[str]:
+        """Return all top-level section names."""
+        return list(self._raw.keys())
+
+    # ------------------------------------------------------------------
+    # Environment variable export
+    # ------------------------------------------------------------------
 
     def _export_env(self) -> None:
+        """Export all config values as SKIMINDEX__ env vars.
+
+        Pre-existing env vars are never overwritten.
         """
-        Export config as environment variables: SKIMINDEX__{SECTION}__{KEY}=value.
-        Pre-existing environment variables are never overwritten.
-        Also exports SKIMINDEX__REF_TAXA and SKIMINDEX__REF_GENOMES.
-        Called automatically in __init__.
-        """
-        for section, section_content in self._data.items():
-            if section == "local_directories":
-                # Derive container paths: SKIMINDEX__DIRECTORIES__{KEY} = /{key}
+        if "SKIMINDEX_ROOT" not in os.environ:
+            os.environ["SKIMINDEX_ROOT"] = str(self.root)
+
+        for section_name, section_content in self._raw.items():
+            if not isinstance(section_content, dict):
+                continue
+
+            if section_name == "local_directories":
                 for key in section_content:
-                    var_name = f"SKIMINDEX__DIRECTORIES__{key.upper()}"
-                    if var_name not in os.environ:
-                        os.environ[var_name] = f"/{key}"
+                    var = f"SKIMINDEX__LOCAL_DIRECTORIES__{key.upper()}"
+                    if var not in os.environ:
+                        os.environ[var] = f"/{key}"
                 continue
 
-            if section == "directories":
-                # Skip obsolete section
+            if section_name in CONFIGURATION_SECTIONS:
+                for key, value in section_content.items():
+                    var = _env_key(section_name, key)
+                    if var not in os.environ:
+                        os.environ[var] = str(value)
                 continue
 
-            # Export section keys
-            for key, value in section_content.items():
-                var_name = f"SKIMINDEX__{section.upper()}__{key.upper()}"
-                if var_name not in os.environ:
-                    os.environ[var_name] = str(value)
+            if section_name in SECTION_PREFIXES:
+                for sub_name, sub_content in section_content.items():
+                    if not isinstance(sub_content, dict):
+                        continue
+                    for key, value in sub_content.items():
+                        var = _env_key(f"{section_name}.{sub_name}", key)
+                        if var not in os.environ:
+                            os.environ[var] = str(value)
 
-        # Export reference taxa/genomes lists
         if "SKIMINDEX__REF_TAXA" not in os.environ:
-            os.environ["SKIMINDEX__REF_TAXA"] = " ".join(self._ref_taxa)
+            os.environ["SKIMINDEX__REF_TAXA"] = " ".join(self.ref_taxa)
         if "SKIMINDEX__REF_GENOMES" not in os.environ:
-            os.environ["SKIMINDEX__REF_GENOMES"] = " ".join(self._ref_genomes)
+            os.environ["SKIMINDEX__REF_GENOMES"] = " ".join(self.ref_genomes)
+
+    # ------------------------------------------------------------------
+    # Logging
+    # ------------------------------------------------------------------
 
     def _apply_logging(self) -> None:
-        """Apply [logging] section: set log level and open log file."""
-        logging_section = self._data.get("logging", {})
-        if not logging_section:
+        log_section = self._config_section("logging")
+        if not log_section:
             return
 
         level = self.get("logging", "level", "INFO")
         setloglevel(level)
 
-        # Only open a log file if the config file itself specifies one.
-        # Environment variable overrides are still honoured via self.get(),
-        # but we require the key to exist in the TOML so that a stray
-        # SKIMINDEX__LOGGING__FILE env var doesn't silently hijack logging.
-        if "file" not in logging_section:
+        if "file" not in log_section:
             return
 
         def _bool(val: str) -> bool:
             return val.lower() in ("true", "1", "yes")
 
-        logfile = self.get("logging", "file")
+        logfile = str(self.log_file())
         mirror = _bool(self.get("logging", "mirror", "false"))
         everything = _bool(self.get("logging", "everything", "false"))
         openlogfile(logfile, mirror=mirror, everything=everything)
 
-    def get(self, section: str, key: str, default: str = "") -> str:
-        """
-        Get config value (environment variable > config file > defaults).
-        Returns the value as a string, or default if not found.
-
-        Examples:
-          config.get("decontamination", "kmer_size") → "29"
-          config.get("unknown", "key", "fallback") → "fallback"
-        """
-        var_name = f"SKIMINDEX__{section.upper()}__{key.upper()}"
-
-        # Priority: environment > config file > defaults
-        if var_name in os.environ:
-            return os.environ[var_name]
-
-        val = self._data.get(section, {}).get(key)
-        if val is not None:
-            return str(val)
-
-        # Check built-in defaults
-        if (section, key) in DEFAULTS:
-            return DEFAULTS[(section, key)]
-
-        return default
-
-    def sections(self) -> list[str]:
-        """Return list of all section names in the config."""
-        return list(self._data.keys())
+    # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
-        return f"Config(path={self._path}, sections={list(self._data.keys())})"
+        return f"Config(path={self._path}, sections={list(self._raw.keys())})"
 
 
-def raw_data_dir() -> Path:
-    """Return the root raw-data directory from config (directories.raw_data)."""
-    return Path(config().get("directories", "raw_data", "/raw_data"))
+# ======================================================================
+# Module-level singleton
+# ======================================================================
 
-
-def processed_data_dir() -> Path:
-    """Return the root processed-data directory from config (directories.processed_data)."""
-    return Path(config().get("directories", "processed_data", "/processed_data"))
+_CONFIG: Config | None = None
 
 
 def load(path: Path = DEFAULT_CONFIG) -> Config:
@@ -202,59 +303,43 @@ def load(path: Path = DEFAULT_CONFIG) -> Config:
     return Config(path)
 
 
-# ===== Module-level singleton (lazy initialization) =====
-
-_CONFIG: Config | None = None
-
-
 def config() -> Config:
-    """
-    Get the singleton Config instance (lazy initialization, read-only).
-
-    The configuration is loaded on first access and cached for subsequent calls.
-
-    Returns:
-        Config: The read-only configuration singleton
-
-    Example:
-        cfg = config()
-        ref_genomes = cfg.ref_genomes
-    """
+    """Get the module-level singleton Config (lazy-initialized)."""
     global _CONFIG
     if _CONFIG is None:
         _CONFIG = load()
     return _CONFIG
 
 
-# ===== doit configuration task =====
+# ======================================================================
+# Module-level path convenience functions
+# ======================================================================
+
+def root() -> Path:
+    """Return the container root path (SKIMINDEX_ROOT env var, default '/')."""
+    return config().root
 
 
-def task_config():
-    """Validate and display configuration (runs first, dependencies use it).
+def source_dir(name: str) -> Path:
+    """Return the mount path for a named source."""
+    return config().source_dir(name)
 
-    This is a reusable doit task for all pipelines that depend on configuration.
-    Validates and displays the singleton configuration.
 
-    Can be imported and used from other modules:
+def processed_data_dir() -> Path:
+    """Return the processed data root."""
+    return config().processed_data_dir()
 
-        from skimindex.config import task_config
-        # Then reference as a task dependency: "task_dep": ["config"]
-    """
-    def validate_config():
-        cfg = config()
-        loginfo("===== Configuration Loaded =====")
-        loginfo(f"Config path: {cfg.path}")
 
-        ref_taxa = cfg.ref_taxa
-        ref_genomes = cfg.ref_genomes
-        loginfo(f"Reference taxa: {', '.join(ref_taxa) if ref_taxa else '<none>'}")
-        loginfo(f"Reference genomes: {', '.join(ref_genomes) if ref_genomes else '<none>'}")
+def indexes_dir() -> Path:
+    """Return the indexes root."""
+    return config().indexes_dir()
 
-        divisions = cfg.get("genbank", "divisions", "bct pln")
-        loginfo(f"GenBank divisions: {divisions}")
-        return True
 
-    return {
-        "actions": [validate_config],
-        "verbosity": 2,
-    }
+def stamp_dir() -> Path:
+    """Return the stamp root."""
+    return config().stamp_dir()
+
+
+def raw_data_dir() -> Path:
+    """Return the internal/raw data root (source_dir('internal'))."""
+    return config().raw_data_dir()
