@@ -19,7 +19,7 @@ from pathlib import Path
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
-from skimindex.decontamination.sections import genbank_base
+from skimindex.sources import source_dir
 from skimindex.stamp import needs_run, stamp
 from skimindex.unix.compress import pigz_test
 from skimindex.unix.download import curl_download
@@ -34,10 +34,8 @@ TAXOURL = f"https://{FTPNCBI}/pub/taxonomy/taxdump.tar.gz"
 
 def list_divisions() -> str:
     """List available GenBank divisions as CSV from config."""
-    cfg = config()
-    divisions = cfg.get("genbank", "divisions", "bct pln").split()
+    divisions = config().sources.get("genbank", {}).get("divisions", [])
     return ",".join(divisions) if divisions else ""
-
 
 
 @lru_cache(maxsize=1)
@@ -67,7 +65,6 @@ def get_ftp_listing(divisions: list[str]) -> tuple:
         loginfo(f"Downloading FTP listing from {GBURL}")
         output = curl_download(GBURL)()
 
-        # Parse: extract filenames matching the pattern for selected divisions
         div_pattern = "|".join(divisions)
         pattern = re.compile(f"gb({div_pattern})[0-9]+\\.seq\\.gz")
 
@@ -89,27 +86,22 @@ def get_ftp_listing(divisions: list[str]) -> tuple:
 def download_and_process_genbank(release: str, divisions: list[str], dry_run: bool = False) -> bool:
     """Download and convert GenBank files, grouped by division.
 
-    Processes each division separately, downloading and converting files
-    one by one. Uses temporary files for atomicity.
-
     Args:
         release: GenBank release number
         divisions: List of divisions to process
+        dry_run: If True, show what would be done without executing
 
     Returns:
         True on success, False if any files failed.
     """
-    gb_root = genbank_base()
+    gb_root = source_dir("genbank")
 
-    # Get listing (parse and filter by division)
     gb_files = get_ftp_listing(divisions)
     if not gb_files:
         logwarning(f"No GenBank files found for divisions: {', '.join(divisions)}")
         return True
 
-    loginfo(
-        f"Processing {len(gb_files)} GenBank files for divisions: {', '.join(divisions)}"
-    )
+    loginfo(f"Processing {len(gb_files)} GenBank files for divisions: {', '.join(divisions)}")
 
     if not dry_run:
         (gb_root / f"Release_{release}/fasta").mkdir(parents=True, exist_ok=True)
@@ -123,7 +115,6 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
             division_groups[div] = []
         division_groups[div].append(gb_file)
 
-    # Process each division
     errors = 0
     failed_files = []
     total_files = len(gb_files)
@@ -144,9 +135,7 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
                              label=gb_file, action=f"download and convert {gb_file}"):
                 continue
 
-            # Download and convert in one pipe: curl | obiconvert > tmp file, then move to final location
             try:
-                # Temporary file in tmp/ — atomic move on success
                 tmp_file = (
                     gb_root
                     / f"Release_{release}/tmp"
@@ -157,7 +146,6 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
 
                 loginfo(f"    Downloading and converting to FASTA...")
 
-                # Pipe: curl downloads -> obiconvert converts -> redirect to tmp file
                 curl_cmd = curl_download(f"{GBURL}/{gb_file}")
                 convert_cmd = obiconvert(
                     "--batch-size", "1", "-Z", "--fasta-output", "--skip-empty"
@@ -165,24 +153,18 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
 
                 ((curl_cmd | convert_cmd) > str(tmp_file))()
 
-                # Atomic move from tmp to final location
                 tmp_file.rename(fasta_file)
-
                 loginfo(f"    Saved to {fasta_file}")
             except Exception as e:
                 logerror(f"    Failed to download/convert {gb_file}: {e}")
-                # Clean up partial tmp file
                 tmp_file.unlink(missing_ok=True)
                 failed_files.append((gb_file, str(e)))
                 errors += 1
                 continue
 
-            # Mark as processed
             stamp(fasta_file)
 
-    # Clean up tmp directory
-    tmp_dir = gb_root / f"Release_{release}/tmp"
-    shutil.rmtree(tmp_dir, ignore_errors=True)
+    shutil.rmtree(gb_root / f"Release_{release}/tmp", ignore_errors=True)
 
     if errors > 0:
         logwarning(f"===== Summary: {errors} error(s) =====")
@@ -197,12 +179,11 @@ def download_and_process_genbank(release: str, divisions: list[str], dry_run: bo
 
 def download_taxonomy(release: str, dry_run: bool = False) -> bool:
     """Download NCBI taxonomy."""
-    gb_root = genbank_base()
+    gb_root = source_dir("genbank")
     output_dir = gb_root / f"Release_{release}/taxonomy"
     output_file = output_dir / "ncbi_taxonomy.tgz"
 
     if output_file.exists():
-        # Verify gzip integrity
         try:
             pigz_test(str(output_file))()
             loginfo(f"Taxonomy already downloaded: {output_file}")
@@ -231,25 +212,27 @@ def download_taxonomy(release: str, dry_run: bool = False) -> bool:
         return False
 
 
-def process_genbank(divisions: list[str] = None, dry_run: bool = False) -> int:
+def process_genbank(divisions: list[str] | None = None, dry_run: bool = False) -> int:
     """Main entry point: download release, taxonomy, and process GenBank files.
 
     Args:
         divisions: List of GenBank divisions to download (e.g., ['bct', 'pln']).
-                  If None, uses config default.
+                  If None, uses divisions from [source.genbank].divisions in config.
+        dry_run: If True, show what would be done without executing.
 
     Returns:
         0 on success, 1 on failure.
     """
-    # Use provided divisions or fall back to config
     if divisions is None:
-        cfg = config()
-        divisions = cfg.get("genbank", "divisions", "bct pln").split()
+        divisions = config().sources.get("genbank", {}).get("divisions", [])
+
+    if not divisions:
+        logwarning("No GenBank divisions configured in [source.genbank].divisions")
+        return 0
 
     loginfo(f"===== GenBank download pipeline =====")
     loginfo(f"Divisions: {', '.join(divisions)}")
 
-    # Step 1: Get release number
     loginfo(">>> Step 1: Fetching GenBank release number")
     release = get_release_number()
     if release == "unknown":
@@ -257,14 +240,12 @@ def process_genbank(divisions: list[str] = None, dry_run: bool = False) -> int:
         return 1
     loginfo(f"<<< Step 1 OK (Release {release})")
 
-    # Step 2: Download taxonomy
     loginfo(">>> Step 2: Downloading NCBI taxonomy")
     if not download_taxonomy(release, dry_run=dry_run):
         logerror("Step 2 failed")
         return 1
     loginfo("<<< Step 2 OK")
 
-    # Step 3: Download and process GenBank files
     loginfo(f">>> Step 3: Downloading and processing {len(divisions)} division(s)")
     if not download_and_process_genbank(release, divisions, dry_run=dry_run):
         logerror("Step 3 failed")

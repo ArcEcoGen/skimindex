@@ -29,7 +29,7 @@ from skimindex.log import logerror
 
 def genbank_base() -> Path:
     """Return the root GenBank directory from config."""
-    return Path(config().get("directories", "genbank", "/genbank"))
+    return config().source_dir("genbank")
 
 
 def section_rel_dir(section: str) -> str:

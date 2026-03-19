@@ -1,11 +1,12 @@
 """
-Reference genome download processor — pure Python, file-based robustness.
+NCBI reference genome download processor — pure Python, file-based robustness.
 
 Orchestrates NCBI reference genome downloads and processing:
 - Downloads genome assemblies from NCBI by taxon
 - Extracts GBFF files from ZIP archives
 - Compresses per-accession: {scientific_name}-{accession}.gbff.gz
 
+Datasets are driven by [data.X] blocks with source = "ncbi".
 Uses stamp files for robustness: if interrupted, relaunching skips already-processed steps.
 """
 
@@ -17,11 +18,18 @@ from pathlib import Path
 from typing import Any
 
 from skimindex.config import config
+from skimindex.datasets import dataset_config, datasets_for_source
 from skimindex.log import logerror, loginfo, logwarning
-from skimindex.decontamination.sections import genbank_base, section_rel_dir
+from skimindex.sources import dataset_download_dir
 from skimindex.stamp import is_stamped, needs_run, stamp, stamp_gz, unstamp
 from skimindex.unix.compress import pigz, unzip
 from skimindex.unix.ncbi import datasets, datasets_summary_genome
+
+
+def list_datasets() -> str:
+    """List NCBI dataset names as CSV from config."""
+    names = datasets_for_source("ncbi")
+    return ",".join(names) if names else ""
 
 
 def list_assemblies(
@@ -60,12 +68,9 @@ def _cached_list_assemblies(
     assembly_source: str | None,
     assembly_version: str | None,
 ) -> tuple:
-    """Cached wrapper around list_assemblies() to avoid repeated NCBI API calls.
-
-    Returns tuple instead of list for hashability (lru_cache requirement).
-    """
+    """Cached wrapper around list_assemblies() to avoid repeated NCBI API calls."""
     assemblies = list_assemblies(taxon, assembly_level, reference, assembly_source, assembly_version)
-    return tuple(assemblies)  # Convert to tuple for hashability
+    return tuple(assemblies)
 
 
 def list_taxids(
@@ -75,13 +80,9 @@ def list_taxids(
     assembly_source: str | None = None,
     assembly_version: str | None = None,
 ) -> list[int]:
-    """List NCBI taxonomic IDs for assemblies matching the criteria.
-
-    Returns list of tax_id values in order, including duplicates.
-    """
+    """List NCBI taxonomic IDs for assemblies matching the criteria."""
     assemblies = list_assemblies(taxon, assembly_level, reference, assembly_source, assembly_version)
     taxids = []
-
     for assembly in assemblies:
         biosample = assembly.get("assembly_info", {}).get("biosample", {})
         description = biosample.get("description", {})
@@ -89,7 +90,6 @@ def list_taxids(
         tax_id = organism.get("tax_id")
         if tax_id is not None:
             taxids.append(tax_id)
-
     return taxids
 
 
@@ -111,84 +111,70 @@ def _get_genome_size(assembly: dict[str, Any]) -> int:
 def filter_assemblies_by_species(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Filter assemblies to keep only one per species.
 
-    Selection criteria (in order):
-    1. Prefer RefSeq (GCF_) over GenBank (GCA_)
-    2. Prefer larger genomes
+    Selection criteria: prefer RefSeq (GCF_), then larger genome.
     """
-    species_groups = {}
-
+    species_groups: dict[str, list] = {}
     for assembly in assemblies:
-        biosample = assembly.get("assembly_info", {}).get("biosample", {})
-        description = biosample.get("description", {})
-        organism = description.get("organism", {})
-        organism_name = organism.get("organism_name", "")
+        name = _get_organism_name_from_report(assembly)
+        if name:
+            species_groups.setdefault(name, []).append(assembly)
 
-        if organism_name:
-            if organism_name not in species_groups:
-                species_groups[organism_name] = []
-            species_groups[organism_name].append(assembly)
-
-    # Select best assembly per species
-    selected = []
-    for species, assemblies_list in species_groups.items():
-        # Sort by: accession type (GCF first), then by genome size (descending)
-        best = sorted(
-            assemblies_list,
-            key=lambda a: (
-                _get_accession_type(a.get("accession", "")),
-                -_get_genome_size(a),
-            ),
-        )[0]
-        selected.append(best)
-
-    return selected
+    return [
+        sorted(lst, key=lambda a: (_get_accession_type(a.get("accession", "")), -_get_genome_size(a)))[0]
+        for lst in species_groups.values()
+    ]
 
 
 def filter_assemblies_by_genus(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Filter assemblies to keep only one per genus.
 
-    Selection criteria (in order):
-    1. Prefer RefSeq (GCF_) over GenBank (GCA_)
-    2. Prefer larger genomes
+    Selection criteria: prefer RefSeq (GCF_), then larger genome.
     """
-    genus_groups = {}
-
+    genus_groups: dict[str, list] = {}
     for assembly in assemblies:
-        biosample = assembly.get("assembly_info", {}).get("biosample", {})
-        description = biosample.get("description", {})
-        organism = description.get("organism", {})
-        organism_name = organism.get("organism_name", "")
+        name = _get_organism_name_from_report(assembly)
+        if name:
+            genus = name.split()[0]
+            genus_groups.setdefault(genus, []).append(assembly)
 
-        if organism_name:
-            genus = organism_name.split()[0]
-            if genus not in genus_groups:
-                genus_groups[genus] = []
-            genus_groups[genus].append(assembly)
-
-    # Select best assembly per genus
-    selected = []
-    for genus, assemblies_list in genus_groups.items():
-        # Sort by: accession type (GCF first), then by genome size (descending)
-        best = sorted(
-            assemblies_list,
-            key=lambda a: (
-                _get_accession_type(a.get("accession", "")),
-                -_get_genome_size(a),
-            ),
-        )[0]
-        selected.append(best)
-
-    return selected
-
-
-def _is_hybrid(organism_name: str) -> bool:
-    """Return True if the organism name denotes a hybrid (contains ' x ')."""
-    return bool(re.search(r'\bx\b', organism_name, re.IGNORECASE))
+    return [
+        sorted(lst, key=lambda a: (_get_accession_type(a.get("accession", "")), -_get_genome_size(a)))[0]
+        for lst in genus_groups.values()
+    ]
 
 
 def filter_assemblies_no_hybrids(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Remove hybrid organisms (names containing ' x ') from the assembly list."""
-    return [a for a in assemblies if not _is_hybrid(_get_organism_name_from_report(a))]
+    return [
+        a for a in assemblies
+        if not re.search(r'\bx\b', _get_organism_name_from_report(a), re.IGNORECASE)
+    ]
+
+
+def query_assemblies(
+    taxon: str,
+    assembly_level: str | None = None,
+    reference: bool = False,
+    assembly_source: str | None = None,
+    assembly_version: str | None = None,
+    one_per: str | None = None,
+) -> int:
+    """List assemblies for a taxon, apply filters, print summary.
+
+    Returns exit code 0 (always succeeds as a query operation).
+    """
+    assemblies = list_assemblies(taxon, assembly_level, reference, assembly_source, assembly_version)
+    if one_per == "species":
+        assemblies = filter_assemblies_by_species(assemblies)
+    elif one_per == "genus":
+        assemblies = filter_assemblies_by_genus(assemblies)
+    print(f"Found {len(assemblies)} assemblies")
+    for asm in assemblies:
+        accession = asm.get("accession", "N/A")
+        organism = _get_organism_name_from_report(asm)
+        size = asm.get("assembly_stats", {}).get("total_sequence_length", "0")
+        print(f"  {accession} - {organism} ({size} bp)")
+    return 0
 
 
 def _taxon_key(organism_name: str, one_per: str) -> str:
@@ -216,74 +202,8 @@ def _covered_taxa(output_dir: Path, one_per: str) -> set:
     return covered
 
 
-def list_sections() -> str:
-    """List available reference genome sections as CSV from config."""
-    cfg = config()
-    sections = cfg.ref_genomes
-    return ",".join(sections) if sections else ""
-
-
-def _load_section_config(section: str) -> dict[str, Any]:
-    """Load parameters for a reference genome section from config."""
-    try:
-        cfg = config()
-        section_data = cfg.data.get(section, {})
-
-        # Get taxon (required)
-        taxon = section_data.get("taxon")
-        if not taxon:
-            logerror(f"Section [{section}]: 'taxon' is not defined in config.")
-            return {}
-
-        # Get output directory
-        rel_dir = section_rel_dir(section)
-        output_dir = genbank_base() / rel_dir
-
-        # Get optional filters
-        reference = str(section_data.get("reference", "false")).lower() == "true"
-        one_per = section_data.get("one_per", "").lower()  # "species", "genus", or empty
-
-        return {
-            "taxon": taxon,
-            "output_dir": output_dir,
-            "reference": reference,
-            "assembly_source": section_data.get("assembly_source"),
-            "assembly_level": section_data.get("assembly_level"),
-            "assembly_version": section_data.get("assembly_version"),
-            "one_per": one_per,
-        }
-    except Exception as e:
-        logerror(f"Error loading section [{section}]: {e}")
-        return {}
-
-
-def _format_dataset_flags(
-    reference: bool,
-    assembly_source: str | None,
-    assembly_level: str | None,
-    assembly_version: str | None,
-) -> str:
-    """Format datasets CLI flags for logging."""
-    flags = []
-    if reference:
-        flags.append("--reference")
-    if assembly_source:
-        flags.append(f"--assembly-source {assembly_source}")
-    if assembly_level:
-        flags.append(f"--assembly-level {assembly_level}")
-    if assembly_version:
-        flags.append(f"--assembly-version {assembly_version}")
-    return " ".join(flags) if flags else "<none>"
-
-
 def _get_organism_name_from_report(assembly: dict[str, Any]) -> str:
-    """Extract organism name from a datasets summary report dict.
-
-    Tries multiple paths in order of preference:
-      1. organism.organism_name  (top-level, present for all assemblies)
-      2. assembly_info.biosample.description.organism.organism_name (older path)
-    Falls back to accession if neither is found.
-    """
+    """Extract organism name from a datasets summary report dict."""
     name = assembly.get("organism", {}).get("organism_name", "")
     if not name:
         biosample = assembly.get("assembly_info", {}).get("biosample", {})
@@ -291,12 +211,18 @@ def _get_organism_name_from_report(assembly: dict[str, Any]) -> str:
     return name or assembly.get("accession", "unknown")
 
 
+def _safe_name(organism: str) -> str:
+    """Convert organism name to safe filename."""
+    safe = re.sub(r"[^a-zA-Z0-9._-]", "_", organism)
+    safe = re.sub(r"_+", "_", safe)
+    return safe.strip("_")
+
+
 def _download_accession(accession: str, zip_file: Path, stamp_key: Path) -> bool:
     """Download a single accession ZIP. Skip if stamp exists."""
     if is_stamped(stamp_key):
         loginfo(f"    [{accession}] Already downloaded (stamp exists)")
         return True
-
     try:
         loginfo(f"    [{accession}] Downloading...")
         zip_file.parent.mkdir(parents=True, exist_ok=True)
@@ -317,51 +243,35 @@ def _download_accession(accession: str, zip_file: Path, stamp_key: Path) -> bool
 def _extract_accession(
     accession: str, zip_file: Path, work_dir: Path, stamp_key: Path, dl_stamp_key: Path
 ) -> bool:
-    """Extract a single accession ZIP. Skip if stamp exists.
-
-    On failure, removes ZIP and dl_stamp to force re-download on retry.
-    """
+    """Extract a single accession ZIP. On failure, removes ZIP and dl_stamp to force re-download."""
     if is_stamped(stamp_key):
         loginfo(f"    [{accession}] Already extracted")
         return True
-
     if not zip_file.exists():
         logerror(f"    [{accession}] ZIP not found: {zip_file}")
         return False
-
     try:
         loginfo(f"    [{accession}] Extracting...")
         work_dir.mkdir(parents=True, exist_ok=True)
         unzip("-o", "-d", str(work_dir), str(zip_file))()
         stamp(stamp_key)
-        # Suppress ZIP after extraction
         zip_file.unlink(missing_ok=True)
         loginfo(f"    [{accession}] Extraction complete")
         return True
     except Exception as e:
         logerror(f"    [{accession}] Extract failed: {e}")
-        # Clean up corrupted ZIP and dl_stamp to force re-download on retry
         zip_file.unlink(missing_ok=True)
         unstamp(dl_stamp_key)
         return False
 
 
 def _compress_accession(
-    accession: str,
-    organism_name: str,
-    work_dir: Path,
-    output_path: Path,
-    out_file: Path,
+    accession: str, organism_name: str, work_dir: Path, output_path: Path, out_file: Path
 ) -> bool:
-    """Compress GBFF files for one accession and stamp the output gz file.
-
-    Uses stamp_gz to verify integrity before stamping.
-    Skip if the output is already stamped.
-    """
+    """Compress GBFF files for one accession and stamp the output gz file."""
     if is_stamped(out_file):
         loginfo(f"    [{accession}] Already compressed")
         return True
-
     if out_file.exists():
         loginfo(f"    [{accession}] Output exists, verifying integrity...")
         if stamp_gz(out_file):
@@ -369,7 +279,6 @@ def _compress_accession(
         logwarning(f"    [{accession}] Integrity check failed, re-compressing...")
         out_file.unlink(missing_ok=True)
 
-    # Find GBFF files in work_dir/ncbi_dataset/data/{accession}/
     dataset_dir = work_dir / "ncbi_dataset" / "data" / accession
     if not dataset_dir.exists():
         logerror(f"    [{accession}] Dataset dir not found: {dataset_dir}")
@@ -387,65 +296,77 @@ def _compress_accession(
     return ok
 
 
-def _safe_name(organism: str) -> str:
-    """Convert organism name to safe filename."""
-    safe = re.sub(r"[^a-zA-Z0-9._-]", "_", organism)
-    safe = re.sub(r"_+", "_", safe)
-    safe = safe.strip("_")
-    return safe
-
-
 def _consolidate_accession(accession_dir: Path, organism: str, out_file: Path) -> bool:
     """Consolidate and compress GBFF files for an accession."""
     try:
-        # Find all .gbff files
         gbff_files = list(accession_dir.glob("**/*.gbff"))
-
         if not gbff_files:
             logerror(f"No .gbff files found in {accession_dir}")
             return False
 
-        # If only one file, compress it directly
         if len(gbff_files) == 1:
             gbff_file = gbff_files[0]
             pigz("-f", "-k", str(gbff_file))()
             Path(str(gbff_file) + ".gz").rename(out_file)
             return True
 
-        # Multiple files: concatenate then compress
         temp_gbff = accession_dir / "consolidated.gbff"
         try:
             with open(temp_gbff, "wb") as out_f:
                 for gbff_file in sorted(gbff_files):
                     with open(gbff_file, "rb") as in_f:
                         out_f.write(in_f.read())
-
             pigz("-f", "-k", str(temp_gbff))()
             Path(str(temp_gbff) + ".gz").rename(out_file)
             return True
         finally:
             temp_gbff.unlink(missing_ok=True)
-
     except Exception as e:
         logerror(f"Error consolidating {accession_dir}: {e}")
         return False
 
 
-def process_refgenome_section(
-    section: str,
+def _load_dataset_config(dataset_name: str) -> dict[str, Any]:
+    """Load download parameters for an NCBI dataset from config."""
+    try:
+        ds = dataset_config(dataset_name)
+        taxon = ds.get("taxon")
+        if not taxon:
+            logerror(f"Dataset [{dataset_name}]: 'taxon' is not defined in config.")
+            return {}
+
+        output_dir = dataset_download_dir(dataset_name)
+        reference = str(ds.get("reference", "false")).lower() == "true"
+        one_per = ds.get("one_per", "").lower()
+
+        return {
+            "taxon": taxon,
+            "output_dir": output_dir,
+            "reference": reference,
+            "assembly_source": ds.get("assembly_source"),
+            "assembly_level": ds.get("assembly_level"),
+            "assembly_version": ds.get("assembly_version"),
+            "one_per": one_per,
+        }
+    except Exception as e:
+        logerror(f"Error loading dataset [{dataset_name}]: {e}")
+        return {}
+
+
+def process_ncbi_dataset(
+    dataset_name: str,
     one_per: str | None = None,
     dry_run: bool = False,
 ) -> bool:
-    """Download and process a single reference genome section, accession by accession.
+    """Download and process a single NCBI dataset, accession by accession.
 
     Returns True on success, False if any step failed.
     """
-    loginfo(f"===== Processing reference genome section: {section} =====")
+    loginfo(f"===== Processing NCBI dataset: {dataset_name} =====")
 
-    # Load section config
-    config_vals = _load_section_config(section)
+    config_vals = _load_dataset_config(dataset_name)
     if not config_vals:
-        logerror(f"Section [{section}] configuration not found")
+        logerror(f"Dataset [{dataset_name}] configuration not found")
         return False
 
     taxon = config_vals["taxon"]
@@ -454,44 +375,34 @@ def process_refgenome_section(
     assembly_source = config_vals.get("assembly_source")
     assembly_level = config_vals.get("assembly_level")
     assembly_version = config_vals.get("assembly_version")
-    # CLI arguments override TOML config
     one_per = one_per if one_per is not None else config_vals.get("one_per", "")
 
     work_base = output_dir / ".work"
     if not dry_run:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Log configuration
-    loginfo(f"[{section}] Taxon: {taxon}")
-    loginfo(f"[{section}] Output: {output_dir}")
-    dataset_flags = _format_dataset_flags(reference, assembly_source, assembly_level, assembly_version)
-    if dataset_flags != "<none>":
-        loginfo(f"[{section}] Datasets flags: {dataset_flags}")
+    loginfo(f"[{dataset_name}] Taxon: {taxon}")
+    loginfo(f"[{dataset_name}] Output: {output_dir}")
 
-    # Fetch assemblies (cached in memory to avoid repeated NCBI calls)
     assemblies = list(_cached_list_assemblies(taxon, assembly_level, reference, assembly_source, assembly_version))
-
     if not assemblies:
-        logwarning(f"[{section}] No assemblies found for taxon '{taxon}'")
+        logwarning(f"[{dataset_name}] No assemblies found for taxon '{taxon}'")
         return True
 
-    # Apply optional filtering
     if one_per == "species":
         assemblies = filter_assemblies_by_species(assemblies)
-        loginfo(f"[{section}] Filtered to {len(assemblies)} assemblies (one per species)")
+        loginfo(f"[{dataset_name}] Filtered to {len(assemblies)} assemblies (one per species)")
     elif one_per == "genus":
         assemblies = filter_assemblies_by_genus(assemblies)
-        loginfo(f"[{section}] Filtered to {len(assemblies)} assemblies (one per genus)")
+        loginfo(f"[{dataset_name}] Filtered to {len(assemblies)} assemblies (one per genus)")
     else:
-        loginfo(f"[{section}] Processing {len(assemblies)} assemblies")
+        loginfo(f"[{dataset_name}] Processing {len(assemblies)} assemblies")
 
-    # Remove hybrids
     before = len(assemblies)
     assemblies = filter_assemblies_no_hybrids(assemblies)
     if len(assemblies) < before:
-        loginfo(f"[{section}] Removed {before - len(assemblies)} hybrid(s), {len(assemblies)} remaining")
+        loginfo(f"[{dataset_name}] Removed {before - len(assemblies)} hybrid(s), {len(assemblies)} remaining")
 
-    # Skip taxa already present on disk (genus/species coverage check)
     if one_per in ("genus", "species") and output_dir.exists():
         covered = _covered_taxa(output_dir, one_per)
         if covered:
@@ -500,19 +411,18 @@ def process_refgenome_section(
                           if _taxon_key(_get_organism_name_from_report(a), one_per) not in covered]
             skipped = before - len(assemblies)
             if skipped:
-                loginfo(f"[{section}] {skipped} {one_per}(s) already on disk, {len(assemblies)} new to download")
+                loginfo(f"[{dataset_name}] {skipped} {one_per}(s) already on disk, {len(assemblies)} new")
 
-    # Build accession → organism_name map
-    accession_map = {}
-    for asm in assemblies:
-        accession = asm.get("accession")
-        if accession:
-            accession_map[accession] = _get_organism_name_from_report(asm)
+    accession_map = {
+        asm["accession"]: _get_organism_name_from_report(asm)
+        for asm in assemblies
+        if asm.get("accession")
+    }
 
     total = len(accession_map)
     max_retries = 3
+    errors = 0
 
-    # Process each accession with automatic retry on failures
     for attempt in range(1, max_retries + 1):
         errors = 0
         failed_accessions = []
@@ -520,85 +430,79 @@ def process_refgenome_section(
         for i, (accession, organism_name) in enumerate(accession_map.items(), 1):
             work_dir = work_base / accession
             zip_file = work_dir / "download.zip"
-
             dl_stamp = work_base / accession / "download"
             ext_stamp = work_base / accession / "extract"
-
             safe_name_str = _safe_name(organism_name)
             final_output = output_dir / f"{safe_name_str}-{accession}.gbff.gz"
+
             if not needs_run(final_output, dry_run=dry_run,
                              label=accession, action=f"download {accession}"):
                 continue
 
-            loginfo(f"[{section}] [{i}/{total}] {accession} — {organism_name}")
+            loginfo(f"[{dataset_name}] [{i}/{total}] {accession} — {organism_name}")
 
-            # Download → Extract → Compress pipeline
             if not _download_accession(accession, zip_file, dl_stamp):
                 errors += 1
                 failed_accessions.append(accession)
                 continue
-
             if not _extract_accession(accession, zip_file, work_dir, ext_stamp, dl_stamp):
                 errors += 1
                 failed_accessions.append(accession)
                 continue
-
             if not _compress_accession(accession, organism_name, work_dir, output_dir, final_output):
                 errors += 1
                 failed_accessions.append(accession)
 
-        # If no errors, we're done
         if errors == 0:
             break
-
-        # Log retry attempt
         if attempt < max_retries:
-            logwarning(f"[{section}] Attempt {attempt}/{max_retries}: {errors} accession(s) failed, retrying...")
+            logwarning(f"[{dataset_name}] Attempt {attempt}/{max_retries}: {errors} failed, retrying...")
         else:
-            logerror(f"[{section}] Attempt {attempt}/{max_retries}: {errors} accession(s) still failing after {max_retries} attempts")
+            logerror(f"[{dataset_name}] {errors} accession(s) still failing after {max_retries} attempts")
 
-    # Cleanup empty work directory
     shutil.rmtree(work_base, ignore_errors=True)
 
     if errors:
-        logerror(f"[{section}] {errors}/{total} accession(s) failed — {', '.join(failed_accessions[:5])}" +
-                 ("..." if len(failed_accessions) > 5 else ""))
+        logerror(f"[{dataset_name}] {errors}/{total} accession(s) failed")
         return False
 
-    loginfo(f"[{section}] ✓ All {total} accessions processed successfully")
+    loginfo(f"[{dataset_name}] ✓ All {total} accessions processed successfully")
     return True
 
 
-def process_refgenome(sections: list[str] = None, dry_run: bool = False) -> int:
-    """Main entry point: process reference genome sections.
+def process_ncbi(
+    dataset_names: list[str] | None = None,
+    one_per: str | None = None,
+    dry_run: bool = False,
+) -> int:
+    """Main entry point: process NCBI reference genome datasets.
 
     Args:
-        sections: List of section names to process.
-                 If None, uses all configured sections from config.
+        dataset_names: Dataset names to process. If None, uses all datasets
+                       with source="ncbi" from config.
+        one_per: Override one_per setting ("species", "genus", or None).
+        dry_run: If True, show what would be done without executing.
 
     Returns:
-        0 on success, 1 if any section failed.
+        0 on success, 1 if any dataset failed.
     """
-    # Use provided sections or get from config
-    if sections is None:
-        cfg = config()
-        sections = cfg.ref_genomes
+    if dataset_names is None:
+        dataset_names = datasets_for_source("ncbi")
 
-    if not sections:
-        logwarning("No reference genome sections configured")
+    if not dataset_names:
+        logwarning("No NCBI datasets configured (no [data.X] with source = \"ncbi\")")
         return 0
 
-    loginfo(f"Processing {len(sections)} reference genome section(s)")
+    loginfo(f"Processing {len(dataset_names)} NCBI dataset(s)")
 
-    # Process each section
     errors = 0
-    for section in sections:
-        if not process_refgenome_section(section, dry_run=dry_run):
+    for name in dataset_names:
+        if not process_ncbi_dataset(name, one_per=one_per, dry_run=dry_run):
             errors += 1
 
     if errors > 0:
-        logerror(f"===== {errors} section(s) failed =====")
+        logerror(f"===== {errors} dataset(s) failed =====")
         return 1
 
-    loginfo("===== All reference genomes processed successfully =====")
+    loginfo("===== All NCBI datasets processed successfully =====")
     return 0

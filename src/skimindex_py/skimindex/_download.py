@@ -1,165 +1,166 @@
 """
 Download GenBank and reference genome data.
 
-Three entry points:
-  download-genbank   Download GenBank flat-file divisions.
-  download-refgenome Download reference genome assemblies from NCBI.
-  download           Download everything (GenBank + all reference genomes).
+Usage:
+  download                       Download everything (GenBank + all NCBI datasets)
+  download genbank [options]     Download GenBank flat-file divisions only
+  download ncbi    [options]     Download NCBI reference genome assemblies only
+
+Run 'download genbank --help' or 'download ncbi --help' for subcommand options.
 """
 
+import argparse
 import sys
 
 from skimindex.cli import SkimCommand
-from skimindex.download.genbank import list_divisions, process_genbank
-from skimindex.download.refgenome import (
-    filter_assemblies_by_genus,
-    filter_assemblies_by_species,
-    list_assemblies,
-    list_sections,
-    process_refgenome,
-    process_refgenome_section,
+from skimindex.sources.download.genbank import list_divisions, process_genbank
+from skimindex.sources.download.ncbi import (
+    list_datasets,
+    process_ncbi,
+    process_ncbi_dataset,
+    query_assemblies,
+)
+from skimindex.sources.download.status import (
+    download_status,
+    genbank_status,
+    ncbi_status,
+    print_status,
 )
 
 
 # ---------------------------------------------------------------------------
-# download-genbank
+# genbank subcommand
 # ---------------------------------------------------------------------------
 
-genbank_cmd = SkimCommand(
-    name="download-genbank",
+_genbank_cmd = SkimCommand(
+    name="download genbank",
     description="Download GenBank flat-file divisions",
     list_fn=list_divisions,
     examples=[
         "%(prog)s",
         "%(prog)s --list",
+        "%(prog)s --status",
         "%(prog)s --section pln",
+        "%(prog)s --dry-run",
     ],
 )
+_genbank_cmd.add_argument("--status", action="store_true",
+    help="Show download status for GenBank (no download)")
 
-# Note: --section from SkimCommand maps to a single division (e.g. "pln").
-# Without --section, all configured divisions are downloaded.
 
-@genbank_cmd.handler
+@_genbank_cmd.handler
 def _(sections, args, dry_run):
+    if args.status:
+        print_status(download_status())
+        return 0
     return process_genbank(sections, dry_run=dry_run)
 
 
-main_genbank = genbank_cmd.main
-
-
 # ---------------------------------------------------------------------------
-# download-refgenome
+# ncbi subcommand
 # ---------------------------------------------------------------------------
 
-refgenome_cmd = SkimCommand(
-    name="download-refgenome",
-    description="Download reference genome assemblies from NCBI",
-    list_fn=list_sections,
+_ncbi_cmd = SkimCommand(
+    name="download ncbi",
+    description="Download NCBI reference genome assemblies",
+    list_fn=list_datasets,
     examples=[
         "%(prog)s",
         "%(prog)s --list",
+        "%(prog)s --status",
         "%(prog)s --section human",
         "%(prog)s --taxon Spermatophyta --one-per species",
-        "%(prog)s --taxon Spermatophyta --one-per genus",
+        "%(prog)s --dry-run",
     ],
 )
 
-refgenome_cmd.add_argument(
+_ncbi_cmd.add_argument(
     "--taxon",
     metavar="TAXON",
     help="Query assemblies for a taxon and display results (no download)",
 )
-refgenome_cmd.add_argument(
+_ncbi_cmd.add_argument(
     "--one-per",
     choices=["species", "genus"],
     metavar="species|genus",
-    help="Keep only one assembly per species or genus (prefer RefSeq, then largest genome)",
+    help="Keep only one assembly per species or genus",
 )
-refgenome_cmd.add_argument(
-    "--assembly-level",
-    metavar="LEVEL",
-    help="Filter by assembly level (e.g. 'complete')",
-)
-refgenome_cmd.add_argument(
-    "--assembly-source",
-    metavar="SOURCE",
-    help="Filter by assembly source",
-)
-refgenome_cmd.add_argument(
-    "--assembly-version",
-    metavar="VERSION",
-    help="Filter by assembly version",
-)
-refgenome_cmd.add_argument(
-    "--reference",
-    action="store_true",
-    help="Filter to reference assemblies only",
-)
+_ncbi_cmd.add_argument("--assembly-level", metavar="LEVEL",
+    help="Filter by assembly level (e.g. 'complete')")
+_ncbi_cmd.add_argument("--assembly-source", metavar="SOURCE",
+    help="Filter by assembly source")
+_ncbi_cmd.add_argument("--assembly-version", metavar="VERSION",
+    help="Filter by assembly version")
+_ncbi_cmd.add_argument("--reference", action="store_true",
+    help="Filter to reference assemblies only")
+_ncbi_cmd.add_argument("--status", action="store_true",
+    help="Show download status for NCBI datasets (no download)")
 
 
-@refgenome_cmd.handler
+@_ncbi_cmd.handler
 def _(sections, args, dry_run):
-    # Query mode: display filtered assembly list without downloading.
+    if args.status:
+        print_status(download_status())
+        return 0
+    one_per = getattr(args, "one_per", None)
     if args.taxon:
-        assemblies = list_assemblies(
+        return query_assemblies(
             args.taxon,
             assembly_level=args.assembly_level,
             reference=args.reference,
             assembly_source=args.assembly_source,
             assembly_version=args.assembly_version,
+            one_per=one_per,
         )
-        one_per = getattr(args, "one_per", None)
-        if one_per == "species":
-            assemblies = filter_assemblies_by_species(assemblies)
-        elif one_per == "genus":
-            assemblies = filter_assemblies_by_genus(assemblies)
-        print(f"Found {len(assemblies)} assemblies")
-        for asm in assemblies:
-            accession = asm.get("accession", "N/A")
-            organism = (
-                asm.get("assembly_info", {})
-                .get("biosample", {})
-                .get("description", {})
-                .get("organism", {})
-                .get("organism_name", "N/A")
-            )
-            size = asm.get("assembly_stats", {}).get("total_sequence_length", "0")
-            print(f"  {accession} - {organism} ({size} bp)")
-        return 0
-
-    # Download a single section.
     if sections:
-        one_per = getattr(args, "one_per", None)
-        return 0 if process_refgenome_section(sections[0], one_per, dry_run=dry_run) else 1
-
-    # Download all configured sections.
-    return process_refgenome(dry_run=dry_run)
-
-
-main_refgenome = refgenome_cmd.main
+        return 0 if process_ncbi_dataset(sections[0], one_per=one_per, dry_run=dry_run) else 1
+    return process_ncbi(one_per=one_per, dry_run=dry_run)
 
 
 # ---------------------------------------------------------------------------
-# download — download everything (GenBank + all reference genomes)
+# download — top-level entry point
 # ---------------------------------------------------------------------------
+
+_SUBCOMMANDS = {
+    "genbank": _genbank_cmd.main,
+    "ncbi":    _ncbi_cmd.main,
+}
+
 
 def main(argv: list | None = None) -> int:
-    """Download everything: GenBank divisions then all reference genome sections."""
-    import argparse
+    """Download everything, or a specific source via subcommand."""
+    if argv is None:
+        argv = sys.argv[1:]
+
+    # Route to subcommand if the first argument names one
+    if argv and argv[0] in _SUBCOMMANDS:
+        return _SUBCOMMANDS[argv[0]](argv[1:])
+
+    # No subcommand: download everything (or show global status)
     parser = argparse.ArgumentParser(
         prog="download",
-        description="Download everything (GenBank + all reference genomes)",
+        description="Download all configured data sources.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Subcommands:\n"
+            "  download genbank   Download GenBank flat-file divisions\n"
+            "  download ncbi      Download NCBI reference genome assemblies\n\n"
+            "Run 'download <subcommand> --help' for subcommand-specific options."
+        ),
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be downloaded without executing anything",
-    )
+    parser.add_argument("--dry-run", action="store_true",
+        help="Show what would be downloaded without executing anything")
+    parser.add_argument("--status", action="store_true",
+        help="Show download status for all sources (no download)")
     args = parser.parse_args(argv)
+
+    if args.status:
+        print_status(download_status())
+        return 0
 
     if process_genbank(dry_run=args.dry_run) != 0:
         return 1
-    return process_refgenome(dry_run=args.dry_run)
+    return process_ncbi(dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
