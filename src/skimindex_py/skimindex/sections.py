@@ -24,7 +24,7 @@ latest_release(genbank_root) -> Path | None
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from skimindex.config import config
 from skimindex.log import logerror
@@ -50,7 +50,7 @@ def section_rel_dir(section: str) -> str:
     return section_data.get("directory", section.lower())
 
 
-def section_dirs(section: str) -> Optional[Dict[str, Any]]:
+def section_dirs(section: str) -> dict[str, Any] | None:
     """Load input/output directories for *section* from config.
 
     Returns a dict with:
@@ -78,7 +78,7 @@ def section_dirs(section: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def latest_release(genbank_root: Path) -> Optional[Path]:
+def latest_release(genbank_root: Path) -> Path | None:
     """Find the most recent Release_* directory under *genbank_root*.
 
     Returns the Path to the latest release directory, or None if none found.

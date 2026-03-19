@@ -25,11 +25,11 @@ Example:
                "--input-file", "data.json") & FG
 """
 
-from skimindex.unix.base import local
+from skimindex.unix.base import LoggedBoundCommand, local
 
 
 # Main NCBI tools — flexible API
-def datasets(*args):
+def datasets(*args) -> LoggedBoundCommand:
     """Execute a datasets command.
 
     Common subcommands:
@@ -46,7 +46,7 @@ def datasets(*args):
     return local["datasets"][*args]
 
 
-def dataformat(*args):
+def dataformat(*args) -> LoggedBoundCommand:
     """Execute a dataformat command.
 
     Common subcommands:
@@ -66,59 +66,59 @@ def dataformat(*args):
 
 
 # datasets download shortcuts — convenient API
-def datasets_download(*args):
+def datasets_download(*args) -> LoggedBoundCommand:
     """Download datasets from NCBI."""
     return datasets("download", *args)
 
 
-def datasets_download_genome(*args):
+def datasets_download_genome(*args) -> LoggedBoundCommand:
     """Download genome sequences (datasets download genome)."""
     return datasets_download("genome", *args)
 
 
-def datasets_download_gene(*args):
+def datasets_download_gene(*args) -> LoggedBoundCommand:
     """Download gene sequences (datasets download gene)."""
     return datasets_download("gene", *args)
 
 
-def datasets_download_protein(*args):
+def datasets_download_protein(*args) -> LoggedBoundCommand:
     """Download protein sequences (datasets download protein)."""
     return datasets_download("protein", *args)
 
 
 # datasets summary shortcuts — convenient API
-def datasets_summary(*args):
+def datasets_summary(*args) -> LoggedBoundCommand:
     """Get summary information about datasets without downloading."""
     return datasets("summary", *args)
 
 
-def datasets_summary_genome(*args):
+def datasets_summary_genome(*args) -> LoggedBoundCommand:
     """Get summary of genome datasets."""
     return datasets_summary("genome", *args)
 
 
-def datasets_summary_gene(*args):
+def datasets_summary_gene(*args) -> LoggedBoundCommand:
     """Get summary of gene datasets."""
     return datasets_summary("gene", *args)
 
 
-def datasets_summary_protein(*args):
+def datasets_summary_protein(*args) -> LoggedBoundCommand:
     """Get summary of protein datasets."""
     return datasets_summary("protein", *args)
 
 
 # dataformat shortcuts — convenient API
-def dataformat_convert(*args):
+def dataformat_convert(*args) -> LoggedBoundCommand:
     """Convert between dataset formats."""
     return dataformat("convert", *args)
 
 
-def dataformat_fasta(*args):
+def dataformat_fasta(*args) -> LoggedBoundCommand:
     """Extract or convert to FASTA format."""
     return dataformat("fasta", *args)
 
 
-def dataformat_tsv(*args):
+def dataformat_tsv(*args) -> LoggedBoundCommand:
     """Extract or convert to TSV format."""
     return dataformat("tsv", *args)
 

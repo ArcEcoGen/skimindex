@@ -61,7 +61,7 @@ Using run_sections in the backing module `foo.py`:
 """
 
 import argparse
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 from skimindex.log import logerror, loginfo
 
@@ -72,7 +72,7 @@ from skimindex.log import logerror, loginfo
 
 def run_sections(
     name: str,
-    sections: List[str],
+    sections: list[str],
     fn: Callable[[str], bool],
     dry_run: bool = False,
 ) -> int:
@@ -136,10 +136,10 @@ class SkimCommand:
         name: str,
         description: str,
         list_fn: Callable[[], str],
-        examples: Optional[List[str]] = None,
+        examples: list[str] | None = None,
     ):
         self._list_fn = list_fn
-        self._handler: Optional[Callable] = None
+        self._handler: Callable | None = None
 
         epilog = ""
         if examples:
@@ -195,7 +195,7 @@ class SkimCommand:
         self._handler = fn
         return fn
 
-    def main(self, argv: Optional[List[str]] = None) -> int:
+    def main(self, argv: list[str] | None = None) -> int:
         """Parse *argv* and dispatch to the registered handler.
 
         Compatible with pyproject.toml entry points:

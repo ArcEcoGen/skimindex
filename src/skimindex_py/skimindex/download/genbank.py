@@ -16,7 +16,6 @@ import re
 import shutil
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
@@ -54,7 +53,7 @@ def get_release_number() -> str:
         return "unknown"
 
 
-def get_ftp_listing(divisions: List[str]) -> tuple:
+def get_ftp_listing(divisions: list[str]) -> tuple:
     """Download and parse FTP listing to get GenBank filenames.
 
     Args:
@@ -87,7 +86,7 @@ def get_ftp_listing(divisions: List[str]) -> tuple:
         return ()
 
 
-def download_and_process_genbank(release: str, divisions: List[str], dry_run: bool = False) -> bool:
+def download_and_process_genbank(release: str, divisions: list[str], dry_run: bool = False) -> bool:
     """Download and convert GenBank files, grouped by division.
 
     Processes each division separately, downloading and converting files
@@ -117,7 +116,7 @@ def download_and_process_genbank(release: str, divisions: List[str], dry_run: bo
         (gb_root / f"Release_{release}/tmp").mkdir(parents=True, exist_ok=True)
 
     # Group files by division
-    division_groups: Dict[str, List[str]] = {}
+    division_groups: dict[str, list[str]] = {}
     for gb_file in gb_files:
         div = re.match(r"^gb(...).*$", gb_file).group(1)
         if div not in division_groups:
@@ -232,7 +231,7 @@ def download_taxonomy(release: str, dry_run: bool = False) -> bool:
         return False
 
 
-def process_genbank(divisions: List[str] = None, dry_run: bool = False) -> int:
+def process_genbank(divisions: list[str] = None, dry_run: bool = False) -> int:
     """Main entry point: download release, taxonomy, and process GenBank files.
 
     Args:

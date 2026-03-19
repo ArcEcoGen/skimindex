@@ -23,11 +23,11 @@ Example:
     pigz("-p", "4", "-9", "file.txt") & FG
 """
 
-from skimindex.unix.base import local
+from skimindex.unix.base import LoggedBoundCommand, local
 
 
 # pigz (parallel gzip) — flexible API
-def pigz(*args):
+def pigz(*args) -> LoggedBoundCommand:
     """Execute a pigz command (parallel gzip compression).
 
     Common options:
@@ -47,23 +47,23 @@ def pigz(*args):
     return local["pigz"][*args]
 
 
-def pigz_compress(*args):
+def pigz_compress(*args) -> LoggedBoundCommand:
     """Compress file(s) with parallel gzip."""
     return pigz(*args)
 
 
-def pigz_decompress(*args):
+def pigz_decompress(*args) -> LoggedBoundCommand:
     """Decompress file(s) with parallel gzip."""
     return pigz("-d", *args)
 
 
-def pigz_test(*args):
+def pigz_test(*args) -> LoggedBoundCommand:
     """Test integrity of gzipped file(s)."""
     return pigz("-t", *args)
 
 
 # unzip — flexible API
-def unzip(*args):
+def unzip(*args) -> LoggedBoundCommand:
     """Execute an unzip command.
 
     Common subcommands/options:
@@ -84,12 +84,12 @@ def unzip(*args):
     return local["unzip"][*args]
 
 
-def unzip_list(*args):
+def unzip_list(*args) -> LoggedBoundCommand:
     """List contents of archive."""
     return unzip("-l", *args)
 
 
-def unzip_extract(*args):
+def unzip_extract(*args) -> LoggedBoundCommand:
     """Extract archive (unzip -d DIR archive.zip)."""
     return unzip("-d", *args)
 

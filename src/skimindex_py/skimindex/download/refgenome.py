@@ -14,7 +14,7 @@ import json
 import re
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
@@ -26,11 +26,11 @@ from skimindex.unix.ncbi import datasets, datasets_summary_genome
 
 def list_assemblies(
     taxon: str,
-    assembly_level: Optional[str] = None,
+    assembly_level: str | None = None,
     reference: bool = False,
-    assembly_source: Optional[str] = None,
-    assembly_version: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    assembly_source: str | None = None,
+    assembly_version: str | None = None,
+) -> list[dict[str, Any]]:
     """List genome assemblies for a taxon using NCBI datasets summary.
 
     Runs: datasets summary genome taxon <taxon> [flags]
@@ -55,10 +55,10 @@ def list_assemblies(
 @functools.lru_cache(maxsize=None)
 def _cached_list_assemblies(
     taxon: str,
-    assembly_level: Optional[str],
+    assembly_level: str | None,
     reference: bool,
-    assembly_source: Optional[str],
-    assembly_version: Optional[str],
+    assembly_source: str | None,
+    assembly_version: str | None,
 ) -> tuple:
     """Cached wrapper around list_assemblies() to avoid repeated NCBI API calls.
 
@@ -70,11 +70,11 @@ def _cached_list_assemblies(
 
 def list_taxids(
     taxon: str,
-    assembly_level: Optional[str] = None,
+    assembly_level: str | None = None,
     reference: bool = False,
-    assembly_source: Optional[str] = None,
-    assembly_version: Optional[str] = None,
-) -> List[int]:
+    assembly_source: str | None = None,
+    assembly_version: str | None = None,
+) -> list[int]:
     """List NCBI taxonomic IDs for assemblies matching the criteria.
 
     Returns list of tax_id values in order, including duplicates.
@@ -98,7 +98,7 @@ def _get_accession_type(accession: str) -> int:
     return 0 if accession.startswith("GCF_") else 1
 
 
-def _get_genome_size(assembly: Dict[str, Any]) -> int:
+def _get_genome_size(assembly: dict[str, Any]) -> int:
     """Extract total sequence length from assembly stats."""
     stats = assembly.get("assembly_stats", {})
     total_length = stats.get("total_sequence_length", "0")
@@ -108,7 +108,7 @@ def _get_genome_size(assembly: Dict[str, Any]) -> int:
         return 0
 
 
-def filter_assemblies_by_species(assemblies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def filter_assemblies_by_species(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Filter assemblies to keep only one per species.
 
     Selection criteria (in order):
@@ -144,7 +144,7 @@ def filter_assemblies_by_species(assemblies: List[Dict[str, Any]]) -> List[Dict[
     return selected
 
 
-def filter_assemblies_by_genus(assemblies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def filter_assemblies_by_genus(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Filter assemblies to keep only one per genus.
 
     Selection criteria (in order):
@@ -186,7 +186,7 @@ def _is_hybrid(organism_name: str) -> bool:
     return bool(re.search(r'\bx\b', organism_name, re.IGNORECASE))
 
 
-def filter_assemblies_no_hybrids(assemblies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def filter_assemblies_no_hybrids(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Remove hybrid organisms (names containing ' x ') from the assembly list."""
     return [a for a in assemblies if not _is_hybrid(_get_organism_name_from_report(a))]
 
@@ -223,7 +223,7 @@ def list_sections() -> str:
     return ",".join(sections) if sections else ""
 
 
-def _load_section_config(section: str) -> Dict[str, Any]:
+def _load_section_config(section: str) -> dict[str, Any]:
     """Load parameters for a reference genome section from config."""
     try:
         cfg = config()
@@ -259,9 +259,9 @@ def _load_section_config(section: str) -> Dict[str, Any]:
 
 def _format_dataset_flags(
     reference: bool,
-    assembly_source: Optional[str],
-    assembly_level: Optional[str],
-    assembly_version: Optional[str],
+    assembly_source: str | None,
+    assembly_level: str | None,
+    assembly_version: str | None,
 ) -> str:
     """Format datasets CLI flags for logging."""
     flags = []
@@ -276,7 +276,7 @@ def _format_dataset_flags(
     return " ".join(flags) if flags else "<none>"
 
 
-def _get_organism_name_from_report(assembly: Dict[str, Any]) -> str:
+def _get_organism_name_from_report(assembly: dict[str, Any]) -> str:
     """Extract organism name from a datasets summary report dict.
 
     Tries multiple paths in order of preference:
@@ -433,7 +433,7 @@ def _consolidate_accession(accession_dir: Path, organism: str, out_file: Path) -
 
 def process_refgenome_section(
     section: str,
-    one_per: Optional[str] = None,
+    one_per: str | None = None,
     dry_run: bool = False,
 ) -> bool:
     """Download and process a single reference genome section, accession by accession.
@@ -569,7 +569,7 @@ def process_refgenome_section(
     return True
 
 
-def process_refgenome(sections: List[str] = None, dry_run: bool = False) -> int:
+def process_refgenome(sections: list[str] = None, dry_run: bool = False) -> int:
     """Main entry point: process reference genome sections.
 
     Args:

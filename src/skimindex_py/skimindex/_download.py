@@ -8,7 +8,6 @@ Three entry points:
 """
 
 import sys
-from typing import Optional
 
 from skimindex.cli import SkimCommand
 from skimindex.download.genbank import list_divisions, process_genbank
@@ -144,7 +143,7 @@ main_refgenome = refgenome_cmd.main
 # download — download everything (GenBank + all reference genomes)
 # ---------------------------------------------------------------------------
 
-def main(argv: Optional[list] = None) -> int:
+def main(argv: list | None = None) -> int:
     """Download everything: GenBank divisions then all reference genome sections."""
     import argparse
     parser = argparse.ArgumentParser(

@@ -4,10 +4,10 @@ Download utilities using curl via plumbum.
 Provides Pythonic interface to curl for HTTP/HTTPS operations.
 """
 
-from skimindex.unix.base import local
+from skimindex.unix.base import LoggedBoundCommand, local
 
 
-def curl(*args):
+def curl(*args) -> LoggedBoundCommand:
     """
     Execute curl command with given arguments.
 
@@ -22,7 +22,7 @@ def curl(*args):
     return local["curl"][*args]
 
 
-def curl_download(url: str, *extra_args):
+def curl_download(url: str, *extra_args) -> LoggedBoundCommand:
     """
     Download from URL with sensible defaults for robustness.
 

@@ -28,7 +28,6 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
 # Log level constants (matching bash levels)
@@ -48,7 +47,7 @@ _LOG_RED = '\033[1;31m'       # ERROR
 _LOG_DIM = '\033[2m'          # timestamp/host dimmed
 
 # Global state
-_logfile: Optional[str] = None
+_logfile: str | None = None
 _mirror_to_stderr = False
 _logeverything = False
 _original_stderr = None  # Save original stderr fd for restoration

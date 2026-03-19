@@ -43,9 +43,8 @@ needs_run(path, *sources, dry_run, label, action) -> bool
 import os
 import shutil
 from pathlib import Path
-from typing import Optional, Union
 
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -246,7 +245,7 @@ def stamp_gz(path: PathLike) -> bool:
 def needs_run(
     path: PathLike,
     *sources: PathLike,
-    target: Optional[PathLike] = None,
+    target: PathLike | None = None,
     dry_run: bool = False,
     label: str = "",
     action: str = "process",

@@ -16,7 +16,7 @@ Section types:
 import os
 import tomllib
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from skimindex.log import loginfo, openlogfile, setloglevel
 
@@ -41,9 +41,9 @@ class Config:
 
     def __init__(self, path: Path = DEFAULT_CONFIG):
         self._path = Path(path)
-        self._data: Dict[str, Dict[str, Any]] = {}
-        self._ref_taxa: List[str] = []
-        self._ref_genomes: List[str] = []
+        self._data: dict[str, dict[str, Any]] = {}
+        self._ref_taxa: list[str] = []
+        self._ref_genomes: list[str] = []
 
         if self._path.exists():
             self._load()
@@ -78,12 +78,12 @@ class Config:
                     self._ref_genomes.append(section_name)
 
     @property
-    def ref_taxa(self) -> List[str]:
+    def ref_taxa(self) -> list[str]:
         """Read-only list of all reference taxa (taxon OR taxid+divisions)."""
         return self._ref_taxa.copy()
 
     @property
-    def ref_genomes(self) -> List[str]:
+    def ref_genomes(self) -> list[str]:
         """Read-only list of reference genomes (taxon-based, downloadable via NCBI datasets)."""
         return self._ref_genomes.copy()
 
@@ -93,7 +93,7 @@ class Config:
         return self._path
 
     @property
-    def data(self) -> Dict[str, Dict[str, Any]]:
+    def data(self) -> dict[str, dict[str, Any]]:
         """Read-only config data dictionary."""
         return self._data.copy()
 
@@ -178,7 +178,7 @@ class Config:
 
         return default
 
-    def sections(self) -> List[str]:
+    def sections(self) -> list[str]:
         """Return list of all section names in the config."""
         return list(self._data.keys())
 
@@ -193,7 +193,7 @@ def load(path: Path = DEFAULT_CONFIG) -> Config:
 
 # ===== Module-level singleton (lazy initialization) =====
 
-_CONFIG: Optional[Config] = None
+_CONFIG: Config | None = None
 
 
 def config() -> Config:

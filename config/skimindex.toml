@@ -81,6 +81,6 @@ frg_size         = 200            # reference sequences are splitted in small fr
 batches          = 20             # After splitting references sequences are divided in
                                   # this given number of batches
 
-[genome_indexing]
+[genomes]
 kmer_size        = 31
-genome_directory = genomes_15x
+directory        = genomes_15x

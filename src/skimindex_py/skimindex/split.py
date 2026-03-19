@@ -22,7 +22,7 @@ Output structure:
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from skimindex.config import config
 from skimindex.log import logerror, loginfo, logwarning
@@ -34,7 +34,7 @@ from skimindex.unix.obitools import obiconvert, obidistribute, obigrep, obiscrip
 SPLITSEQS_LUA = "/app/obiluascripts/splitseqs.lua"
 
 
-def _extract_genome_info_from_filename(filename: str) -> Optional[tuple]:
+def _extract_genome_info_from_filename(filename: str) -> tuple | None:
     """Extract genome name and accession from filename.
 
     Expected pattern: {name}-{ACCESSION}.{ext}
@@ -53,7 +53,7 @@ def _extract_genome_info_from_filename(filename: str) -> Optional[tuple]:
     return None
 
 
-def _extract_accession_from_filename(filename: str) -> Optional[str]:
+def _extract_accession_from_filename(filename: str) -> str | None:
     """Extract accession (GCF_/GCA_) from genome filename.
 
     Expected pattern: {name}-{ACCESSION}.{ext}
@@ -74,10 +74,10 @@ def list_sections() -> str:
 
 
 def _load_split_params(
-    frg_size_opt: Optional[int] = None,
-    overlap_opt: Optional[int] = None,
-    batches_opt: Optional[int] = None,
-) -> Dict[str, int]:
+    frg_size_opt: int | None = None,
+    overlap_opt: int | None = None,
+    batches_opt: int | None = None,
+) -> dict[str, int]:
     """Load decontamination parameters from config with CLI overrides.
 
     Args:
@@ -164,7 +164,7 @@ def _run_split_pipeline(
         return False
 
 
-def split_taxon_section(section: str, params: Dict[str, int], dry_run: bool = False) -> bool:
+def split_taxon_section(section: str, params: dict[str, int], dry_run: bool = False) -> bool:
     """Split a taxon section (pre-downloaded FASTA/GBFF files).
 
     Processes each genome separately with its own parts subdirectory.
@@ -237,7 +237,7 @@ def split_taxon_section(section: str, params: Dict[str, int], dry_run: bool = Fa
     return errors == 0
 
 
-def split_division_section(section: str, params: Dict[str, int], dry_run: bool = False) -> bool:
+def split_division_section(section: str, params: dict[str, int], dry_run: bool = False) -> bool:
     """Split a GenBank division section (filter by taxid from flat files).
 
     Processes each division separately with its own fragments subdirectory.
@@ -325,7 +325,7 @@ def split_division_section(section: str, params: Dict[str, int], dry_run: bool =
     return errors == 0
 
 
-def split_section(section: str, params: Dict[str, int], dry_run: bool = False) -> bool:
+def split_section(section: str, params: dict[str, int], dry_run: bool = False) -> bool:
     """Split a section (dispatch to taxon or division handler).
 
     Args:
@@ -345,10 +345,10 @@ def split_section(section: str, params: Dict[str, int], dry_run: bool = False) -
 
 
 def process_split(
-    sections: List[str] = None,
-    frg_size: Optional[int] = None,
-    overlap: Optional[int] = None,
-    batches: Optional[int] = None,
+    sections: list[str] | None = None,
+    frg_size: int | None = None,
+    overlap: int | None = None,
+    batches: int | None = None,
     dry_run: bool = False,
 ) -> int:
     """Main entry point: split genome sections into fragments.
