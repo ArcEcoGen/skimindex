@@ -47,11 +47,27 @@ def _run_pipeline(processing_name: str, sections: list[str] | None, dry_run: boo
     errors = 0
     for ds in datasets:
         loginfo(f">>> {ds.name}")
-        for data in ds.to_data():
-            result = pipeline(data, dry_run=dry_run)
-            if result is None:
-                logerror(f"  Pipeline failed for {ds.name} ({data.subdir})")
-                errors += 1
+        count = 0
+        try:
+            for data in ds.to_data():
+                count += 1
+                try:
+                    result = pipeline(data, dry_run=dry_run)
+                    if result is None:
+                        logerror(f"  Pipeline failed for {ds.name} ({data.subdir})")
+                        errors += 1
+                except Exception as e:
+                    import traceback
+                    logerror(f"  Pipeline exception for {ds.name} ({data.subdir}): {e}")
+                    logerror(traceback.format_exc())
+                    errors += 1
+        except Exception as e:
+            import traceback
+            logerror(f"  to_data() exception for {ds.name}: {e}")
+            logerror(traceback.format_exc())
+            errors += 1
+        if count == 0:
+            logwarning(f"  No input data found for {ds.name} (download_dir={ds.download_dir})")
         loginfo(f"<<< {ds.name} done")
 
     if errors:

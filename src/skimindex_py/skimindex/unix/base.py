@@ -14,7 +14,7 @@ import os
 import subprocess
 import threading
 from plumbum import local as _plumbum_local
-from skimindex.log import loginfo, logwarning
+from skimindex.log import logdebug, loginfo, logwarning
 
 
 class LoggedBoundCommand:
@@ -32,6 +32,7 @@ class LoggedBoundCommand:
 
     def __call__(self, *args, **kwargs):
         """Execute command with stderr captured and sent to logs."""
+        logdebug(f"RUN {self._cmd}")
         if hasattr(self._cmd, 'srccmd'):
             return self._run_pipeline(*args, **kwargs)
 
