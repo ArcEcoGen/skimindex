@@ -107,6 +107,7 @@ steps = [
 # Atomic: count k-mers in prepared decontamination fragments.
 [processing.count_kmers_decontam]
 type      = "kmercount"
+role      = "decontamination"
 input     = "prepare_decontam"   # reads from parts/ produced by prepare_decontam
 directory = "kmercount"
 kmer_size = 29
