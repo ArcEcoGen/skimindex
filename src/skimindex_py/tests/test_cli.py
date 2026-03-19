@@ -17,7 +17,7 @@ def _make_cmd(list_items="a,b,c"):
         name="test",
         description="Test command",
         list_fn=lambda: list_items,
-        examples=["%(prog)s --section foo"],
+        examples=["%(prog)s --dataset foo"],
     )
     cmd.add_argument("--extra", type=int, default=0, help="Extra param")
 
@@ -53,19 +53,36 @@ class TestSkimCommandList:
 
 
 # ---------------------------------------------------------------------------
-# SkimCommand — --section
+# SkimCommand — --dataset (default section_arg)
 # ---------------------------------------------------------------------------
 
 class TestSkimCommandSection:
     def test_section_passed_as_list(self):
         cmd, calls = _make_cmd()
-        cmd.main(["--section", "human"])
+        cmd.main(["--dataset", "human"])
         assert calls[0]["sections"] == ["human"]
 
     def test_no_section_passes_none(self):
         cmd, calls = _make_cmd()
         cmd.main([])
         assert calls[0]["sections"] is None
+
+    def test_custom_section_arg(self):
+        calls = []
+        cmd = SkimCommand(
+            name="test2",
+            description="Test",
+            list_fn=lambda: "pln,bct",
+            section_arg="division",
+            section_metavar="DIV",
+            section_help="A division",
+        )
+        @cmd.handler
+        def _(sections, args, dry_run):
+            calls.append(sections)
+            return 0
+        cmd.main(["--division", "pln"])
+        assert calls[0] == ["pln"]
 
 
 # ---------------------------------------------------------------------------
@@ -170,32 +187,3 @@ class TestRunSections:
         assert run_sections("x", [], lambda s: True) == 0
 
 
-# ---------------------------------------------------------------------------
-# Integration — _split.main uses SkimCommand correctly
-# ---------------------------------------------------------------------------
-
-class TestSplitIntegration:
-    def test_list_returns_0(self, capsys):
-        from unittest.mock import patch
-        from skimindex import _split
-        # list_fn is stored by reference in cmd; patch via the object directly.
-        with patch.object(_split.cmd, "_list_fn", return_value="human,fungi"):
-            rc = _split.main(["--list"])
-        assert rc == 0
-        assert "human" in capsys.readouterr().out
-
-    def test_dry_run_forwarded(self):
-        from unittest.mock import patch
-        from skimindex import _split
-        # The handler looks up process_split in the _split module's globals.
-        with patch("skimindex._split.process_split", return_value=0) as mock_ps:
-            _split.main(["--dry-run"])
-        mock_ps.assert_called_once()
-        assert mock_ps.call_args.kwargs.get("dry_run") is True
-
-    def test_section_forwarded(self):
-        from unittest.mock import patch
-        from skimindex import _split
-        with patch("skimindex._split.process_split", return_value=0) as mock_ps:
-            _split.main(["--section", "human"])
-        assert mock_ps.call_args.kwargs.get("sections") == ["human"]

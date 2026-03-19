@@ -71,19 +71,72 @@ steps = [
 
 ## Persistence
 
-Whether a step's output is saved to disk depends on how it is referenced:
+Whether a step's output is saved to disk depends on whether it declares a
+`directory` key. The **runner** (not the atomic bricks) enforces these rules.
 
-| Context | `directory` present? | Output |
+### Who persists what
+
+| Context | `directory` present? | Result |
 |---------|----------------------|--------|
-| Top-level `[processing.X]` referenced by `run` | must be present | saved to `directory` |
+| Top-level `[processing.X]` referenced by `run` | must be present | saved |
 | Named reference inside `steps` | yes | saved to its `directory` |
-| Named reference inside `steps` | no | temporary |
+| Named reference inside `steps` | no | temporary (cleaned up after pipeline) |
 | Inline table `{type=...}` inside `steps` | n/a | always temporary |
 
-Temporary outputs are piped directly between steps where possible. When
-intermediate files are unavoidable (e.g. between processes that cannot be
-piped), they are written to a `tmp/` directory and deleted once the downstream
-step completes.
+Only the **composite output directory** carries a stamp. Intermediate steps
+saved to their own `directory` are persisted but not stamped — they will not
+trigger a short-circuit on re-run.
+
+### How the runner persists each OutputKind
+
+#### STREAM output with `directory`, **non-terminal** step
+
+The runner injects `tee` into the pipe so the byte stream is simultaneously
+written to disk and forwarded to the next step:
+
+```
+input_cmd | tee(out_file) | next_step
+```
+
+The output file is `step_dir / output_filename` (declared by the type).
+
+#### STREAM output with `directory`, **terminal** step (last in composite)
+
+The runner redirects stdout to the output file and executes the pipeline:
+
+```python
+(input_cmd > str(out_file))()
+```
+
+Execution happens here; the next Data object is `files_data([out_file])`.
+
+#### DIRECTORY or FILE output with `directory`
+
+The runner passes `step_dir` as the output directory to the atomic brick:
+
+```python
+fn(data, step_dir, dry_run=dry_run)
+```
+
+The brick creates the directory, writes its files, and returns a `Data` object.
+
+#### Without `directory` (temporary)
+
+- **STREAM**: the step is chained without executing (no intermediate file).
+- **DIRECTORY / FILE**: the runner creates a temporary directory via
+  `tempfile.mkdtemp()`, passes it to the brick, and removes it in a
+  `try/finally` block after the pipeline completes.
+
+### Stamp management
+
+```
+needs_run(composite_output_dir, *sources)  →  skip if already stamped
+remove_if_not_stamped(composite_output_dir)  →  clean partial results
+… all steps execute …
+stamp(composite_output_dir)  →  mark success
+```
+
+Stamp files live under the `[stamp]` directory configured in `skimindex.toml`.
 
 ---
 
@@ -210,6 +263,82 @@ steps inside a composite.
 
 ---
 
+## Dataset binding and input chaining
+
+### `role` — which datasets a processing operates on
+
+A processing section can declare the role of datasets it operates on via the
+optional `role` key. When a pipeline is executed without an explicit dataset
+list, the runner uses `role` to discover the relevant datasets automatically.
+
+```toml
+[processing.prepare_decontam]
+role      = "decontamination"  # operates on all datasets with role="decontamination"
+directory = "parts"
+steps = [...]
+```
+
+This makes the processing section self-describing: it knows its own dataset
+scope without any hardcoding in the calling code.
+
+### `input` — where input data comes from
+
+A processing section can declare where its input data comes from via the
+optional `input` key:
+
+| `input` present? | Source of input data |
+|------------------|----------------------|
+| absent | raw dataset files (`dataset.to_data()`) |
+| `input = "X"` | output directory of `[processing.X]` for the same dataset |
+
+```toml
+[processing.prepare_decontam]
+role      = "decontamination"
+directory = "parts"
+steps = [
+  {type = "split",         size = 200, overlap = 28},
+  {type = "filter_n_only"},
+  {type = "distribute",    batches = 20},
+]
+# no input → reads raw downloaded files
+
+[processing.count_kmers_decontam]
+type      = "kmercount"
+input     = "prepare_decontam"   # reads from parts/ produced by prepare_decontam
+directory = "kmercount"
+kmer_size = 29
+```
+
+These two sections implicitly define a chain:
+
+```
+dataset.to_data()
+    → prepare_decontam   (role="decontamination") → parts/
+    → count_kmers_decontam                        → kmercount/
+```
+
+Each section can be run independently: `decontam prepare` starts from raw files,
+`decontam count` starts from `parts/` without re-running `prepare_decontam`.
+
+### Input resolution rules
+
+The rule is recursive and uniform:
+
+**Standalone execution** (referenced by `run` or called directly):
+- no `input` → `dataset.to_data()` (raw source files)
+- `input = "X"` → `directory_data(output_dir_of_X / for_this_dataset)`
+
+**As a step inside a composite**:
+- the step's own `input` key is **silently ignored**
+- first step → receives the composite's resolved input (same rules as standalone)
+- subsequent steps → receive the output of the previous step
+
+The composite resolves its own `input` first, then propagates the result through
+its steps in order. A step's `input` is only meaningful when that section is
+executed as a top-level pipeline.
+
+---
+
 ## Validation rules
 
 1. A `[processing.X]` section must have exactly one of `type` or `steps`.
@@ -220,3 +349,5 @@ steps inside a composite.
 6. A STREAM/FILE atomic with `directory` must have a declared `output_filename` in its type.
 7. Composite sections (`steps`) are **not** registered in the `@processing_type` registry.
    They are structural constructs executed by the pipeline runner, not named operations.
+8. If `input` is present, it must reference an existing `[processing.X]` section that has a `directory`.
+9. If `role` is present, it must be a valid role name declared in a `[role.X]` section.

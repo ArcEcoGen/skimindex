@@ -9,6 +9,9 @@ Species-organised layouts (by_species=true)
 -------------------------------------------
 Level 0 — flat file, single accession per species:
     {Species_name}--{accession}.{ext}[.gz]
+    processed_data subdir: {Species_name}/{accession}
+
+No-accession layout (accession unknown, any source):
     processed_data subdir: {Species_name}/default
 
 Level 1 — species subdirectory, one file per accession:
@@ -125,7 +128,6 @@ def parse_genome_path(path: Path | str) -> tuple[str, str, str, bool]:
     Level 0 — flat filename with '--' separator:
         Homo_sapiens--GCF_000001405.40.gbff.gz
         → ("Homo_sapiens", "GCF_000001405.40", "gbff", True)
-        Note: processed_data output uses accession="default" (see output_subdir_for).
 
     Level 1 — species subdirectory, one file per accession:
         Homo_sapiens/GCF_000001405.40.gbff.gz
@@ -191,12 +193,12 @@ def genome_filename(
 def genome_subdir(species: str, accession: str) -> Path:
     """Build the canonical processed_data relative path: Species_name/accession.
 
-    For level-0 sources, pass accession="default" (the source had a single flat
-    file; the output accession directory is conventionally named "default").
+    When no accession is available, pass accession="default" as a conventional
+    placeholder for a single individual of unknown or untracked accession.
 
     Examples:
         genome_subdir("Homo_sapiens", "GCF_000001405.40") → Path("Homo_sapiens/GCF_000001405.40")
-        genome_subdir("Homo_sapiens", "default")           → Path("Homo_sapiens/default")
+        genome_subdir("Betula_nana", "default")            → Path("Betula_nana/default")
     """
     return Path(species) / accession
 
@@ -204,23 +206,18 @@ def genome_subdir(species: str, accession: str) -> Path:
 def output_subdir_for(path: Path | str) -> Path:
     """Return the processed_data relative subdir for a species-organised source path.
 
-    Combines parse_genome_path and genome_subdir.  Level-0 sources yield
-    accession="default" as the output directory name.
+    Combines parse_genome_path and genome_subdir.  The accession is always
+    extracted from the path, including for level-0 flat files.
 
     Examples:
         output_subdir_for(Path("Homo_sapiens--GCF_000001405.40.gbff.gz"))
-            → Path("Homo_sapiens/default")
+            → Path("Homo_sapiens/GCF_000001405.40")
         output_subdir_for(Path("Homo_sapiens/GCF_000001405.40.gbff.gz"))
             → Path("Homo_sapiens/GCF_000001405.40")
         output_subdir_for(Path("Homo_sapiens/GCF_000001405.40/seq.gbff.gz"))
             → Path("Homo_sapiens/GCF_000001405.40")
     """
-    path = Path(path)
-    depth = len(path.parts) - 1
-    species, accession, _, _ = parse_genome_path(path)
-    # Level 0 flat file → output accession directory is "default"
-    if depth == 0:
-        accession = "default"
+    species, accession, _, _ = parse_genome_path(Path(path))
     return genome_subdir(species, accession)
 
 

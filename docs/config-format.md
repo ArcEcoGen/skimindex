@@ -123,6 +123,9 @@ One section per data origin. Each source section has a `directory` key
 referencing a `[local_directories]` entry, which gives the root mount point
 where raw data for that source are stored.
 
+For a conceptual explanation of how sources, datasets, and roles interact at
+runtime, see [Data Model](data.md).
+
 ### `[source.ncbi]`
 
 Data downloaded via the NCBI Datasets CLI.

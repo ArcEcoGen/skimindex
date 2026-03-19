@@ -14,6 +14,13 @@ via a single TOML file.
   `config/skimindex.toml`: configuration sections, source sections, role
   sections, processing sections, and data sections
 
+- [Data Model](data.md) — runtime concepts: sources (ncbi, genbank, internal),
+  datasets (`Dataset`, `to_data()`), and roles — how they bind together and
+  drive the pipeline
+
+- [Processing Model](processing.md) — how processing sections work: atomic vs
+  composite, Data abstraction, input chaining, output resolution
+
 ## Quick Start
 
 1. Copy `config/skimindex.toml` and edit it for your datasets.

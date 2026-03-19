@@ -295,6 +295,39 @@ def _validate_processing_sections(cfg: "Config") -> list[ConfigError]:
                 f"'directory'; a runnable processing section must save its results"
             ))
 
+        # C19 — role (if present) must be a valid declared role
+        if "role" in proc:
+            role_val = proc["role"]
+            if not isinstance(role_val, str):
+                errors.append(ConfigError(sec, "role", "must be a string (role name)"))
+            elif role_val not in VALID_ROLES:
+                errors.append(ConfigError(
+                    sec, "role",
+                    f"'{role_val}' is not valid; must be one of {sorted(VALID_ROLES)}"
+                ))
+            elif role_val not in cfg.roles:
+                errors.append(ConfigError(
+                    sec, "role",
+                    f"[role.{role_val}] section is not declared in the config"
+                ))
+
+        # C18 — input (if present) must reference a processing section with directory
+        if "input" in proc:
+            input_ref = proc["input"]
+            if not isinstance(input_ref, str):
+                errors.append(ConfigError(sec, "input", "must be a string (processing section name)"))
+            elif input_ref not in all_proc:
+                errors.append(ConfigError(
+                    sec, "input",
+                    f"references processing section \"{input_ref}\" which is not declared"
+                ))
+            elif "directory" not in all_proc[input_ref]:
+                errors.append(ConfigError(
+                    sec, "input",
+                    f"processing section \"{input_ref}\" has no 'directory'; "
+                    f"an input source must save its results"
+                ))
+
     return errors
 
 

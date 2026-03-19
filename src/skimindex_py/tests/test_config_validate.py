@@ -296,6 +296,62 @@ run = "atomic_no_dir"
         errors = validate(_cfg(toml, tmp_path))
         assert _has_error(errors, "processing.atomic_no_dir", "directory")
 
+    def test_C18_input_must_reference_existing_processing(self, tmp_path):
+        toml = BASE + b'\n[processing.bad]\ntype = "split"\ninput = "nonexistent"\n'
+        errors = validate(_cfg(toml, tmp_path))
+        assert _has_error(errors, "processing.bad", "input")
+
+    def test_C18_input_must_be_string(self, tmp_path):
+        toml = BASE + b'\n[processing.bad]\ntype = "split"\ninput = 42\n'
+        errors = validate(_cfg(toml, tmp_path))
+        assert _has_error(errors, "processing.bad", "input")
+
+    def test_C18_input_target_must_have_directory(self, tmp_path):
+        toml = BASE + b"""
+[processing.no_dir]
+type = "split"
+
+[processing.bad]
+type = "split"
+input = "no_dir"
+"""
+        errors = validate(_cfg(toml, tmp_path))
+        assert _has_error(errors, "processing.bad", "input")
+
+    def test_C18_valid_input_reference(self, tmp_path):
+        toml = BASE + b"""
+[processing.source_proc]
+type = "split"
+directory = "parts"
+
+[processing.consumer]
+type = "split"
+input = "source_proc"
+directory = "kmercount"
+"""
+        errors = validate(_cfg(toml, tmp_path))
+        assert not _has_error(errors, "processing.consumer", "input")
+
+    def test_C19_role_must_be_valid(self, tmp_path):
+        toml = BASE + b'\n[processing.bad]\ntype = "split"\nrole = "unknown_role"\n'
+        errors = validate(_cfg(toml, tmp_path))
+        assert _has_error(errors, "processing.bad", "role")
+
+    def test_C19_role_must_be_declared(self, tmp_path):
+        toml = BASE + b'\n[processing.bad]\ntype = "split"\nrole = "genomes"\n'
+        errors = validate(_cfg(toml, tmp_path))
+        assert _has_error(errors, "processing.bad", "role")
+
+    def test_C19_valid_role(self, tmp_path):
+        toml = BASE + b'\n[processing.ok]\ntype = "split"\nrole = "decontamination"\n'
+        errors = validate(_cfg(toml, tmp_path))
+        assert not _has_error(errors, "processing.ok", "role")
+
+    def test_C19_role_must_be_string(self, tmp_path):
+        toml = BASE + b'\n[processing.bad]\ntype = "split"\nrole = 42\n'
+        errors = validate(_cfg(toml, tmp_path))
+        assert _has_error(errors, "processing.bad", "role")
+
 
 # ===========================================================================
 # D. directory → [local_directories]

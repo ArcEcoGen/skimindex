@@ -18,8 +18,8 @@
 #   init                     Initialise a new project directory and download the default config.
 #   update                   Pull the latest container image from the registry (or refresh the SIF for apptainer).
 #   shell                    Start an interactive shell inside the container.
+#   decontam                 Prepare decontamination filter data.
 #   download                 Download GenBank and reference genome data.
-#   split                    Split reference genomes into fragments for decontamination index building.
 #   validate                 Validate the skimindex configuration file.
 #
 # shell options:
@@ -524,11 +524,11 @@ if [[ "$RUNTIME" == "none" ]]; then
 fi
 
 case "$SUBCMD" in
+    decontam)
+        _ski_run_exec decontam "$@"
+        ;;
     download)
         _ski_run_exec download "$@"
-        ;;
-    split)
-        _ski_run_exec split "$@"
         ;;
     validate)
         _ski_run_exec validate "$@"

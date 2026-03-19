@@ -207,6 +207,7 @@ from skimindex.processing.split import split, SPLITSEQS_LUA      # noqa: F401, E
 from skimindex.processing.filter_taxid import filter_taxid       # noqa: F401, E402
 from skimindex.processing.filter_n_only import filter_n_only     # noqa: F401, E402
 from skimindex.processing.distribute import distribute           # noqa: F401, E402
+from skimindex.processing.kmercount import kmercount             # noqa: F401, E402
 
 __all__ = [
     "OutputKind", "ProcessingType",
@@ -218,6 +219,7 @@ __all__ = [
     "filter_taxid",
     "filter_n_only",
     "distribute",
+    "kmercount",
 ]
 
 
@@ -239,22 +241,66 @@ def _resolve_output_dir(processing_name: str, terminal_pt: ProcessingType, data:
     return root / proc_dir
 
 
+def _resolve_input(proc_params: dict, input_data: Data) -> Data:
+    """Resolve the actual input Data for a processing section.
+
+    If 'input' key is present in proc_params, the input is read from the
+    output directory of the referenced processing section.  The subdir from
+    input_data is preserved so that output path resolution still works.
+
+    If 'input' is absent, input_data is returned unchanged.
+    """
+    input_ref = proc_params.get("input")
+    if input_ref is None:
+        return input_data
+
+    from skimindex.config import config
+    cfg = config()
+    ref_params = cfg.processing.get(input_ref, {})
+    ref_dir = ref_params.get("directory", input_ref)
+    root = cfg.processed_data_dir()
+
+    if input_data.subdir is not None:
+        path = root / input_data.subdir / ref_dir
+    else:
+        path = root / ref_dir
+
+    return directory_data(path, subdir=input_data.subdir)
+
+
+def _step_output_dir(step_params: dict, is_indexer: bool, data: Data) -> Path | None:
+    """Return the output directory for a step, or None if no 'directory' declared."""
+    step_dir = step_params.get("directory")
+    if not step_dir:
+        return None
+    from skimindex.config import config
+    cfg = config()
+    root = cfg.indexes_dir() if is_indexer else cfg.processed_data_dir()
+    return (root / data.subdir / step_dir) if data.subdir is not None else (root / step_dir)
+
+
 def make_pipeline(processing_name: str) -> Callable:
     """Build a runnable callable from a composite [processing.X] TOML block.
 
-    Steps are chained via the uniform Data → Data interface:
-    - STREAM steps transform Data and pass it to the next step (no execution yet)
-    - The terminal step (DIRECTORY/FILE) executes the pipeline and returns Data
+    Persistence rules (enforced by the runner, not the atomic bricks):
+    - STREAM step with directory, non-terminal: tee to file, pipe continues
+    - STREAM step with directory, terminal: redirect stdout to file
+    - DIRECTORY/FILE step: output_dir passed to brick (step_dir or tmpdir)
+    - No directory: STREAM chains without executing; DIRECTORY uses tmpdir (cleaned up)
 
-    The output directory is resolved from data.subdir at runtime:
-        {root} / {data.subdir} / {processing.directory}
+    Stamp rules:
+    - needs_run / stamp on the composite output_dir only
+    - Intermediate steps with directory are persisted but not stamped
 
     Returns a callable: run(input_data: Data, dry_run=False) -> Data
-
-    Raises:
-        ValueError: Not a composite, not runnable, or invalid step definition.
     """
+    import shutil
+    import tempfile
+
+    from plumbum import local as _local
+
     from skimindex.config import config  # local import to avoid circular dependency
+    from skimindex.stamp import needs_run, remove_if_not_stamped, stamp
 
     cfg = config()
     params = cfg.processing.get(processing_name, {})
@@ -269,33 +315,67 @@ def make_pipeline(processing_name: str) -> Callable:
             f"[processing.{processing_name}] composite has no 'directory' — not runnable"
         )
 
-    # Resolve each step into (ProcessingType, callable)
-    resolved: list[tuple[ProcessingType, Callable]] = []
+    # Resolve each step into (step_params, ProcessingType, callable)
+    resolved: list[tuple[dict, ProcessingType, Callable]] = []
     for step in steps_cfg:
         if isinstance(step, str):
             ref_params = cfg.processing.get(step, {})
             if not ref_params:
                 raise ValueError(f"[processing.{step}] not found (referenced in {processing_name})")
             pt, fn = _make_atomic(ref_params)
+            resolved.append((ref_params, pt, fn))
         elif isinstance(step, dict):
             pt, fn = _make_atomic(step)
+            resolved.append((step, pt, fn))
         else:
             raise ValueError(f"Invalid step in [processing.{processing_name}]: {step!r}")
-        resolved.append((pt, fn))
 
-    # The terminal step determines is_indexer
-    terminal_pt = resolved[-1][0]
+    terminal_pt = resolved[-1][1]
 
     def run(input_data: Data, dry_run: bool = False) -> Data:
-        """Execute the composite pipeline via Data → Data chaining."""
-        output_dir = _resolve_output_dir(processing_name, terminal_pt, input_data)
-        data = input_data
-        for pt, fn in resolved:
-            if pt.output_kind == OutputKind.STREAM:
-                data = fn(data)
-            else:
-                data = fn(data, output_dir, dry_run=dry_run)  # terminal — executes
-        return data
+        """Execute the composite pipeline with persistence and stamp management."""
+        data = _resolve_input(params, input_data)
+        composite_output_dir = _resolve_output_dir(processing_name, terminal_pt, data)
+
+        sources = data.paths or ([data.path] if data.path else [])
+        if not needs_run(composite_output_dir, *sources, dry_run=dry_run,
+                         label=processing_name, action=f"run {processing_name}"):
+            return directory_data(composite_output_dir, subdir=data.subdir)
+        remove_if_not_stamped(composite_output_dir)
+
+        tmpdirs: list[Path] = []
+        try:
+            n = len(resolved)
+            for i, (step_params, pt, fn) in enumerate(resolved):
+                is_last = (i == n - 1)
+                step_dir = _step_output_dir(step_params, terminal_pt.is_indexer, data)
+
+                if pt.output_kind == OutputKind.STREAM:
+                    if step_dir:
+                        step_dir.mkdir(parents=True, exist_ok=True)
+                        out_file = step_dir / pt.output_filename
+                        if is_last:
+                            (data.command > str(out_file))()
+                            data = files_data([out_file], format=data.format, subdir=data.subdir)
+                        else:
+                            tee = _local["tee"][str(out_file)]
+                            data = stream_data(data.command | tee, format=data.format, subdir=data.subdir)
+                    else:
+                        data = fn(data)
+                else:
+                    if step_dir:
+                        effective_dir = step_dir
+                    else:
+                        tmpdir = Path(tempfile.mkdtemp())
+                        tmpdirs.append(tmpdir)
+                        effective_dir = tmpdir
+                    data = fn(data, effective_dir, dry_run=dry_run)
+
+            stamp(composite_output_dir)
+            return data
+        finally:
+            for t in tmpdirs:
+                shutil.rmtree(t, ignore_errors=True)
 
     return run
 
@@ -307,10 +387,13 @@ def build(processing_name: str) -> Callable:
     - 'steps' key → make_pipeline()
     - 'type'  key → atomic build (must be runnable)
 
+    The returned callable handles needs_run / stamp automatically.
+
     Raises:
         ValueError: Section not found, not runnable, or missing type/steps.
     """
     from skimindex.config import config  # local import to avoid circular dependency
+    from skimindex.stamp import needs_run, remove_if_not_stamped, stamp
 
     params = config().processing.get(processing_name, {})
     if not params:
@@ -329,4 +412,19 @@ def build(processing_name: str) -> Callable:
             f"[processing.{processing_name}] (type={type_name!r}) is not runnable: "
             f"no effective output directory"
         )
-    return pt.build(params)
+    fn = pt.build(params)
+
+    def run(input_data: Data, dry_run: bool = False) -> Data:
+        """Execute the atomic step with needs_run / stamp management."""
+        data = _resolve_input(params, input_data)
+        output_dir = _resolve_output_dir(processing_name, pt, data)
+        sources = data.paths or ([data.path] if data.path else [])
+        if not needs_run(output_dir, *sources, dry_run=dry_run,
+                         label=processing_name, action=f"run {processing_name}"):
+            return directory_data(output_dir, subdir=data.subdir)
+        remove_if_not_stamped(output_dir)
+        result = fn(data, output_dir, dry_run=dry_run)
+        stamp(output_dir)
+        return result
+
+    return run

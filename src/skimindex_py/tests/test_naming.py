@@ -219,14 +219,14 @@ class TestParseGenomePathLevel2:
 class TestOutputSubdirFor:
     """processed_data relative subdir from any source level.
 
-    Level 0 → Species_name/default
+    Level 0 → Species_name/accession
     Level 1 → Species_name/accession
     Level 2 → Species_name/accession
     """
 
-    def test_level0_uses_default(self):
+    def test_level0_uses_accession(self):
         p = Path("Homo_sapiens--GCF_000001405.40.gbff.gz")
-        assert output_subdir_for(p) == Path("Homo_sapiens/default")
+        assert output_subdir_for(p) == Path("Homo_sapiens/GCF_000001405.40")
 
     def test_level1_uses_accession(self):
         p = Path("Homo_sapiens/GCF_000001405.40.gbff.gz")
