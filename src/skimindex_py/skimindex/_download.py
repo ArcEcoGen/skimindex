@@ -25,6 +25,8 @@ from skimindex.sources.download.status import (
     genbank_status,
     ncbi_status,
     print_status,
+    print_genbank_status,
+    print_ncbi_status,
 )
 
 
@@ -51,7 +53,7 @@ _genbank_cmd.add_argument("--status", action="store_true",
 @_genbank_cmd.handler
 def _(sections, args, dry_run):
     if args.status:
-        print_status(download_status())
+        print_genbank_status()
         return 0
     return process_genbank(sections, dry_run=dry_run)
 
@@ -100,7 +102,7 @@ _ncbi_cmd.add_argument("--status", action="store_true",
 @_ncbi_cmd.handler
 def _(sections, args, dry_run):
     if args.status:
-        print_status(download_status())
+        print_ncbi_status()
         return 0
     one_per = getattr(args, "one_per", None)
     if args.taxon:

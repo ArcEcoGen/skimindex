@@ -163,12 +163,7 @@ def _ok(flag: bool) -> str:
     return "✓" if flag else "✗"
 
 
-def print_status(status: DownloadStatus | None = None) -> None:
-    """Print a human-readable download status report to stdout."""
-    if status is None:
-        status = download_status()
-
-    gb = status.genbank
+def _print_genbank_section(gb: GenBankStatus) -> None:
     print("=== GenBank ===")
     if gb.current_release:
         print(f"  Release : {gb.current_release}")
@@ -183,16 +178,46 @@ def print_status(status: DownloadStatus | None = None) -> None:
     else:
         print("  Divisions: none configured")
 
-    print()
+
+def _print_ncbi_section(ncbi: list[DatasetStatus]) -> None:
     print("=== NCBI datasets ===")
-    if status.ncbi:
-        for ds in status.ncbi:
+    if ncbi:
+        for ds in ncbi:
             bar = f"{ds.files_stamped}/{ds.files_present}"
             label = _ok(ds.complete) if ds.started else "-"
             print(f"  {label} {ds.name:<20} {bar} assemblies  ({ds.output_dir})")
     else:
         print("  No NCBI datasets configured.")
 
+
+def print_genbank_status(status: GenBankStatus | None = None) -> None:
+    """Print GenBank-only download status."""
+    if status is None:
+        status = genbank_status()
+    _print_genbank_section(status)
+    print()
+    overall = "complete" if status.complete else "incomplete"
+    print(f"Overall: {overall}")
+
+
+def print_ncbi_status(statuses: list[DatasetStatus] | None = None) -> None:
+    """Print NCBI-only download status."""
+    if statuses is None:
+        statuses = ncbi_status()
+    _print_ncbi_section(statuses)
+    print()
+    overall = "complete" if all(d.complete for d in statuses) else "incomplete"
+    print(f"Overall: {overall}")
+
+
+def print_status(status: DownloadStatus | None = None) -> None:
+    """Print a human-readable download status report to stdout."""
+    if status is None:
+        status = download_status()
+
+    _print_genbank_section(status.genbank)
+    print()
+    _print_ncbi_section(status.ncbi)
     print()
     overall = "complete" if status.complete else "incomplete"
     print(f"Overall: {overall}")

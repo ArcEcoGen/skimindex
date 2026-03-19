@@ -33,11 +33,14 @@ def source_dir(source: str) -> Path:
 def dataset_download_dir(dataset_name: str) -> Path:
     """Download output directory for a named dataset.
 
-    Resolves: source_dir(dataset.source) / dataset_name
+    Resolves: source_dir(dataset.source) / dataset.directory
+    where dataset.directory defaults to dataset_name if not set.
 
     Example:
-        dataset_download_dir("human") → Path("/data/genbank/human")
+        dataset_download_dir("human")       → Path("/data/genbank/human")
+        dataset_download_dir("betula_nana") → Path("/data/raw_data/Betula_nana")
     """
     ds = dataset_config(dataset_name)
     source = ds.get("source", "ncbi")
-    return source_dir(source) / dataset_name
+    directory = ds.get("directory", dataset_name)
+    return source_dir(source) / directory

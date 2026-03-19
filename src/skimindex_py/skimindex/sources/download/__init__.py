@@ -24,6 +24,8 @@ from skimindex.sources.download.status import (
     ncbi_status,
     ncbi_dataset_status,
     print_status,
+    print_genbank_status,
+    print_ncbi_status,
     DownloadStatus,
     GenBankStatus,
     DatasetStatus,
