@@ -19,7 +19,8 @@ def distribute(params: dict) -> Callable[[Data, Path, bool], Data]:
     batches = int(params.get("batches", 20))
 
     def run(input_data: Data, output_dir: Path, dry_run: bool = False) -> Data:
-        assert input_data.kind == DataKind.STREAM
+        if input_data.kind != DataKind.STREAM:
+            raise ValueError(f"distribute expects STREAM input, got {input_data.kind.name}")
         output_dir.mkdir(parents=True, exist_ok=True)
         dist = obidistribute(
             "-Z", "-n", str(batches),

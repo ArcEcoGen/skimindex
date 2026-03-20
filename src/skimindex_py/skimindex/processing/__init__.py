@@ -198,11 +198,19 @@ def _make_atomic(params: dict[str, Any]) -> tuple[ProcessingType, Callable]:
     return pt, pt.build(params)
 
 
+# ---------------------------------------------------------------------------
+# Public re-exports
+# ---------------------------------------------------------------------------
+# Data abstractions used throughout the pipeline
 from skimindex.processing.data import (  # noqa: F401, E402
     Data, DataKind,
     stream_data, files_data, directory_data,
     to_stream_command,
 )
+
+# Processing type registrations — importing these modules triggers @processing_type,
+# which registers each type in _REGISTRY so that get_processing_type() and build()
+# can find them by name.
 from skimindex.processing.split import split, SPLITSEQS_LUA      # noqa: F401, E402
 from skimindex.processing.filter_taxid import filter_taxid       # noqa: F401, E402
 from skimindex.processing.filter_n_only import filter_n_only     # noqa: F401, E402
@@ -213,7 +221,7 @@ __all__ = [
     "OutputKind", "ProcessingType",
     "register", "get_processing_type", "registered_types",
     "processing_type",
-    "make_pipeline", "build",
+    "build",
     "Data", "DataKind", "stream_data", "files_data", "directory_data", "to_stream_command",
     "split", "SPLITSEQS_LUA",
     "filter_taxid",

@@ -15,6 +15,7 @@ import json
 import re
 import shutil
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from skimindex.config import config
@@ -108,21 +109,33 @@ def _get_genome_size(assembly: dict[str, Any]) -> int:
         return 0
 
 
+def _filter_assemblies_by_rank(
+    assemblies: list[dict[str, Any]],
+    key_fn: "Callable[[str], str]",
+) -> list[dict[str, Any]]:
+    """Keep one assembly per taxonomic rank group.
+
+    Groups are formed by applying *key_fn* to the organism name.
+    Selection criteria within each group: prefer RefSeq (GCF_), then larger genome.
+    """
+    groups: dict[str, list] = {}
+    for assembly in assemblies:
+        name = _get_organism_name_from_report(assembly)
+        if name:
+            groups.setdefault(key_fn(name), []).append(assembly)
+
+    return [
+        sorted(lst, key=lambda a: (_get_accession_type(a.get("accession", "")), -_get_genome_size(a)))[0]
+        for lst in groups.values()
+    ]
+
+
 def filter_assemblies_by_species(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Filter assemblies to keep only one per species.
 
     Selection criteria: prefer RefSeq (GCF_), then larger genome.
     """
-    species_groups: dict[str, list] = {}
-    for assembly in assemblies:
-        name = _get_organism_name_from_report(assembly)
-        if name:
-            species_groups.setdefault(name, []).append(assembly)
-
-    return [
-        sorted(lst, key=lambda a: (_get_accession_type(a.get("accession", "")), -_get_genome_size(a)))[0]
-        for lst in species_groups.values()
-    ]
+    return _filter_assemblies_by_rank(assemblies, lambda name: name)
 
 
 def filter_assemblies_by_genus(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -130,17 +143,7 @@ def filter_assemblies_by_genus(assemblies: list[dict[str, Any]]) -> list[dict[st
 
     Selection criteria: prefer RefSeq (GCF_), then larger genome.
     """
-    genus_groups: dict[str, list] = {}
-    for assembly in assemblies:
-        name = _get_organism_name_from_report(assembly)
-        if name:
-            genus = name.split()[0]
-            genus_groups.setdefault(genus, []).append(assembly)
-
-    return [
-        sorted(lst, key=lambda a: (_get_accession_type(a.get("accession", "")), -_get_genome_size(a)))[0]
-        for lst in genus_groups.values()
-    ]
+    return _filter_assemblies_by_rank(assemblies, lambda name: name.split()[0])
 
 
 def filter_assemblies_no_hybrids(assemblies: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -336,7 +339,7 @@ def _load_dataset_config(dataset_name: str) -> dict[str, Any]:
             return {}
 
         output_dir = dataset_download_dir(dataset_name)
-        reference = str(ds.get("reference", "false")).lower() == "true"
+        reference = bool(ds.get("reference", False))
         one_per = ds.get("one_per", "").lower()
 
         return {

@@ -48,6 +48,8 @@ def _resolve_directory(directory: PathLike) -> Path:
     d = Path(directory).resolve()
     if not d.exists():
         raise FileNotFoundError(f"Directory not found: {d}")
+    if not d.is_dir():
+        raise NotADirectoryError(f"Not a directory: {d}")
     return d
 
 

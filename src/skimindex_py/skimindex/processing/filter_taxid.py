@@ -16,6 +16,8 @@ from skimindex.unix.obitools import obigrep
 @processing_type(output_kind=OutputKind.STREAM, output_filename="filtered.fasta")
 def filter_taxid(params: dict) -> Callable[[Data], Data]:
     """Filter sequences by taxonomic ID using NCBI taxonomy."""
+    if "taxid" not in params:
+        raise ValueError("filter_taxid requires a 'taxid' parameter")
     taxid = str(params["taxid"])
 
     def _taxonomy() -> str:

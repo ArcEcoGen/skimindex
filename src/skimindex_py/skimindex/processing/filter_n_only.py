@@ -16,7 +16,8 @@ from skimindex.unix.obitools import obigrep
 def filter_n_only(params: dict) -> Callable[[Data], Data]:
     """Remove sequences composed only of N bases."""
     def run(input_data: Data) -> Data:
-        assert input_data.kind == DataKind.STREAM
+        if input_data.kind != DataKind.STREAM:
+            raise ValueError(f"filter_n_only expects STREAM input, got {input_data.kind.name}")
         return stream_data(
             input_data.command | obigrep("-v", "-s", "^[n]+$"),
             format="fasta",
