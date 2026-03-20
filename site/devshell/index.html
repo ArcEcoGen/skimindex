@@ -80,14 +80,6 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#stamp-functions">Stamp functions</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#advanced-development-shipping-a-command-inside-the-image">Advanced development — shipping a command inside the image</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#adding-a-built-in-subcommand">Adding a built-in subcommand</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#how-the-build-system-works">How the build system works</a>
-    </li>
-        </ul>
-    </li>
     </ul>
                 </li>
               </ul>
@@ -335,7 +327,8 @@ if ski_needs_run &quot;$OUTPUT_DIR&quot; &quot;$INPUT_FILE&quot; \
 fi
 </code></pre>
 <hr />
-<h2 id="advanced-development-shipping-a-command-inside-the-image">Advanced development — shipping a command inside the image</h2>
+<h1 id="advanced-development">Advanced development</h1>
+<h2 id="shipping-a-command-inside-the-image">shipping a command inside the image</h2>
 <p>In normal use, scripts live in <code>usercmd/</code> and never require a rebuild.
 The steps below are only needed when you want to <strong>ship a command inside the
 container image</strong> itself — for example to distribute it to users who do not

@@ -1,3 +1,5 @@
+CLAUDE.md
+
 **/.DS_Store
 **/__pycache__
 **/*.egg-info
@@ -20,7 +22,6 @@
 **/*.sif
 
 .venv
-
 genbank
 !genbank/Makefile
 

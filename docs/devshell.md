@@ -210,7 +210,9 @@ fi
 
 ---
 
-## Advanced development — shipping a command inside the image
+# Advanced development 
+
+## shipping a command inside the image
 
 In normal use, scripts live in `usercmd/` and never require a rebuild.
 The steps below are only needed when you want to **ship a command inside the
