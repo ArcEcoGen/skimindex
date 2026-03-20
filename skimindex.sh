@@ -43,40 +43,34 @@ set -euo pipefail
 # =============================================================================
 # Inlined utility functions
 # =============================================================================
+# ============================================================
+# __skimindex_log.sh
+# Logging facilities for skimindex bash scripts.
+#
+# Provides:
+#   logdebug / loginfo / logwarning / logerror <MESSAGE>
+#   setloglevel <LEVEL>          (DEBUG | INFO | WARNING | ERROR)
+#   openlogfile <PATH> [MIRROR] [EVERYTHING]
+#   closelogfile
+#
+# All logging goes through file descriptor 3 (default: stderr).
+# VT100 colours are applied on terminals; stripped when writing to files.
+# Default level: INFO.
+#
+# Source this file — do NOT execute it directly.
+# ============================================================
 
-# Logging facilities for bash
-# ===========================
-#
-# Provides the following functions:
-#
-#  openlogfile <FILENAME> [STDERR]
-#    Redirects all logging to the file specified by FILENAME.
-#    If the file already exists, new logs are appended at the end.
-#    Pass STDERR as second argument to also mirror output to stderr.
-#
-#  closelogfile
-#    Closes the current logfile and redirects logging back to stderr.
-#
-#  logdebug <MESSAGE>
-#    Writes message as a debug level log to the current log destination.
-#
-#  loginfo <MESSAGE>
-#    Writes message as an info level log to the current log destination.
-#
-#  logwarning <MESSAGE>
-#    Writes message as a warning level log to the current log destination.
-#
-#  logerror <MESSAGE>
-#    Writes message as an error level log to the current log destination.
-#
-#  setloglevel <LEVEL>
-#    Sets the current logging level (DEBUG, INFO, WARNING or ERROR).
-#    Only messages at or above this level are recorded.
-#
-# All logging goes through file descriptor 3.
-# By default fd 3 is redirected to stderr.
-# Colors (VT100) are applied automatically when fd 3 is a terminal.
-# Default logging level: INFO.
+
+# Guard against multiple inclusion
+[[ -n "${_SKIMINDEX_LOG_LOADED:-}" ]] && return 0
+
+# Require __skimindex.sh as entry point (_skimindex_sh_dir must be set)
+if [[ -z "${_skimindex_sh_dir:-}" ]]; then
+    echo "ERROR: source __skimindex.sh instead of __skimindex_log.sh directly." >&2
+    return 1
+fi
+
+_SKIMINDEX_LOG_LOADED=1
 
 LOG_DEBUG_LEVEL=1
 LOG_INFO_LEVEL=2
@@ -87,10 +81,7 @@ LOG_LEVEL=$LOG_INFO_LEVEL
 
 exec 3>&2
 
-# ---------- VT100 color codes (always defined as constants) ----------
-# Colors are always embedded in log messages; openlogfile strips them via sed
-# when writing to a file, so the file stays clean while the screen keeps colors.
-
+# ---------- VT100 colour codes ----------
 _LOG_RESET=$'\033[0m'
 _LOG_CYAN=$'\033[0;36m'    # DEBUG
 _LOG_GREEN=$'\033[0;32m'   # INFO
@@ -148,27 +139,17 @@ function setloglevel() {
 function openlogfile() {
     local logpath="$1"
     local mirror="${2:-false}"      # "true" → tee logs to screen + file
-    local everything="${3:-false}"  # "true" → also redirect fd 2 (all stderr) through fd 3
-    # Test write access before redirecting fd 3 (avoids set -e crash).
-    # Use touch rather than >> to avoid bash printing a redirection error
-    # to stderr even when the failure is handled.
+    local everything="${3:-false}"  # "true" → also redirect fd 2 through fd 3
     if ! touch "$logpath" 2>/dev/null; then
         logwarning "cannot open log file: $logpath — logging to stderr only."
         return 0
     fi
     if [[ "$mirror" == "true" ]]; then
-        # fd 3 → tee:
-        #   - to screen via fd 2 (colors intact)
-        #   - to file via sed (VT100 codes stripped)
         exec 3> >(tee >(sed 's/\x1b\[[0-9;]*m//g' >> "$logpath") >&2)
     else
-        # fd 3 → file only (VT100 codes stripped)
         exec 3> >(sed 's/\x1b\[[0-9;]*m//g' >> "$logpath")
     fi
     if [[ "$everything" == "true" ]]; then
-        # fd 2 → fd 3: all stderr (bash errors, command output) also captured
-        # NOTE: tee's >&2 is evaluated at fork time (before this exec),
-        # so it keeps pointing to the original screen fd — no loop.
         exec 2>&3
         LOGEVERYTHING=1
     fi
@@ -177,13 +158,12 @@ function openlogfile() {
 
 function closelogfile() {
     if [[ -n "${LOGFILE:-}" ]]; then
-        # Restore fd 2 only if it was redirected (everything=true)
         if [[ -n "${LOGEVERYTHING:-}" ]]; then
             exec 2>/dev/tty 2>/dev/null || exec 2>&1
             unset LOGEVERYTHING
         fi
-        exec 3>&-   # close log fd
-        exec 3>&2   # restore fd 3 to stderr
+        exec 3>&-
+        exec 3>&2
         LOGFILE=""
     fi
 }
@@ -472,8 +452,27 @@ _ski_init() {
 # =============================================================================
 # Subcommand dispatch
 # =============================================================================
-if [[ $# -eq 0 ]]; then
+_ski_help() {
     sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
+    # Append user-defined subcommands from /usercmd/ if any exist
+    if [[ -d /usercmd ]] && compgen -G "/usercmd/*.sh" >/dev/null 2>&1; then
+        echo "# user subcommands (from usercmd/):"
+        for _f in /usercmd/*.sh; do
+            _name="$(basename "$_f" .sh)"
+            # Extract first non-empty, non-separator comment line after the filename comment
+            _desc="$(awk '
+                NR==1 { next }
+                /^# *[-=]{4,}/ { next }
+                /^#/ { sub(/^# */, ""); print; exit }
+            ' "$_f")"
+            printf "#   %-20s %s\n" "$_name" "${_desc:-(no description)}"
+        done
+        echo "#"
+    fi
+}
+
+if [[ $# -eq 0 ]]; then
+    _ski_help
     exit 0
 fi
 
@@ -481,7 +480,7 @@ SUBCMD="$1"; shift
 
 case "$SUBCMD" in
     -h|--help)
-        sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
+        _ski_help
         exit 0
         ;;
     init)
@@ -534,8 +533,15 @@ case "$SUBCMD" in
         _ski_run_exec validate "$@"
         ;;
     *)
-        logerror "Unknown subcommand '$SUBCMD'."
-        logerror "Run '$(basename "$0") --help' for usage."
-        exit 1
+        # Dynamic lookup in /usercmd (bind-mounted from project usercmd/ dir).
+        # Scripts placed there are available without rebuilding the image.
+        if [[ -f "/usercmd/${SUBCMD}.sh" ]]; then
+            export SKIMINDEX_SCRIPTS_DIR=/app/scripts
+            bash "/usercmd/${SUBCMD}.sh" "$@"
+        else
+            logerror "Unknown subcommand '$SUBCMD'."
+            logerror "Run '$(basename "$0") --help' for usage."
+            exit 1
+        fi
         ;;
 esac

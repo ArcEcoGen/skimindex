@@ -23,6 +23,7 @@ Environment variable schema:
 """
 
 import os
+import shlex
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -58,14 +59,17 @@ def _env_key(section: str, key: str) -> str:
 class Config:
     """Parse and provide typed access to skimindex TOML configuration."""
 
-    def __init__(self, path: Path = DEFAULT_CONFIG):
+    def __init__(self, path: Path = DEFAULT_CONFIG, *, apply_logging: bool = True,
+                 export_env: bool = True):
         self._path = Path(path)
         self._raw: dict[str, Any] = {}
 
         if self._path.exists():
             self._load()
-            self._export_env()
-            self._apply_logging()
+            if export_env:
+                self._export_env()
+            if apply_logging:
+                self._apply_logging()
 
     # ------------------------------------------------------------------
     # Loading
@@ -233,13 +237,30 @@ class Config:
     # Environment variable export
     # ------------------------------------------------------------------
 
-    def _export_env(self) -> None:
-        """Export all config values as SKIMINDEX__ env vars.
+    @staticmethod
+    def _serialize_value(value: Any) -> str:
+        """Serialize a TOML value to a shell-safe string.
 
-        Pre-existing env vars are never overwritten.
+        - list  → space-separated items (e.g. ``["bct", "pln"]`` → ``"bct pln"``)
+        - bool  → ``"true"`` / ``"false"`` (lowercase, TOML/shell convention)
+        - other → ``str(value)``
         """
-        if "SKIMINDEX_ROOT" not in os.environ:
-            os.environ["SKIMINDEX_ROOT"] = str(self.root)
+        if isinstance(value, list):
+            return " ".join(str(v) for v in value)
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        return str(value)
+
+    def env_vars(self) -> dict[str, str]:
+        """Return all SKIMINDEX__ environment variables as a plain dict.
+
+        Does not touch ``os.environ`` — suitable for inspection or shell export.
+        Derived variables (REF_TAXA, REF_GENOMES) are included.
+        """
+        sv = self._serialize_value
+        out: dict[str, str] = {}
+
+        out["SKIMINDEX_ROOT"] = str(self.root)
 
         for section_name, section_content in self._raw.items():
             if not isinstance(section_content, dict):
@@ -247,16 +268,12 @@ class Config:
 
             if section_name == "local_directories":
                 for key in section_content:
-                    var = f"SKIMINDEX__LOCAL_DIRECTORIES__{key.upper()}"
-                    if var not in os.environ:
-                        os.environ[var] = f"/{key}"
+                    out[f"SKIMINDEX__LOCAL_DIRECTORIES__{key.upper()}"] = f"/{key}"
                 continue
 
             if section_name in CONFIGURATION_SECTIONS:
                 for key, value in section_content.items():
-                    var = _env_key(section_name, key)
-                    if var not in os.environ:
-                        os.environ[var] = str(value)
+                    out[_env_key(section_name, key)] = sv(value)
                 continue
 
             if section_name in SECTION_PREFIXES:
@@ -264,14 +281,39 @@ class Config:
                     if not isinstance(sub_content, dict):
                         continue
                     for key, value in sub_content.items():
-                        var = _env_key(f"{section_name}.{sub_name}", key)
-                        if var not in os.environ:
-                            os.environ[var] = str(value)
+                        if isinstance(value, (dict, list)) and any(
+                            isinstance(v, dict) for v in (value if isinstance(value, list) else [])
+                        ):
+                            continue  # skip steps arrays (list of inline tables)
+                        out[_env_key(f"{section_name}.{sub_name}", key)] = sv(value)
 
-        if "SKIMINDEX__REF_TAXA" not in os.environ:
-            os.environ["SKIMINDEX__REF_TAXA"] = " ".join(self.ref_taxa)
-        if "SKIMINDEX__REF_GENOMES" not in os.environ:
-            os.environ["SKIMINDEX__REF_GENOMES"] = " ".join(self.ref_genomes)
+        out["SKIMINDEX__REF_TAXA"]    = " ".join(self.ref_taxa)
+        out["SKIMINDEX__REF_GENOMES"] = " ".join(self.ref_genomes)
+        return out
+
+    def dump_env(self) -> str:
+        """Return a shell snippet that exports all SKIMINDEX__ variables.
+
+        Variables already present in ``os.environ`` are skipped (pre-existing
+        environment takes priority).  The output is safe to pass to
+        ``eval`` in bash::
+
+            eval "$(python3 -m skimindex.config)"
+        """
+        lines = []
+        for var, value in self.env_vars().items():
+            if var not in os.environ:
+                lines.append(f"export {var}={shlex.quote(value)}")
+        return "\n".join(lines)
+
+    def _export_env(self) -> None:
+        """Export all config values as SKIMINDEX__ env vars.
+
+        Pre-existing env vars are never overwritten.
+        """
+        for var, value in self.env_vars().items():
+            if var not in os.environ:
+                os.environ[var] = value
 
     # ------------------------------------------------------------------
     # Logging

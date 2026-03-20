@@ -127,7 +127,7 @@ all: build-obitools-multiplatform push skimindex-script docs
 skimindex-script: $(SKIMINDEX_SH)
 
 $(SKIMINDEX_SH): $(SKIMINDEX_SH_IN) $(BUILD_USER_SCRIPT) \
-                 $(PROJECT_ROOT)/scripts/__utils_functions.sh \
+                 $(PROJECT_ROOT)/scripts/__skimindex_log.sh \
                  $(wildcard $(PROJECT_ROOT)/scripts/*.sh) \
                  $(PROJECT_ROOT)/src/skimindex_py/pyproject.toml \
                  $(wildcard $(PROJECT_ROOT)/src/skimindex_py/skimindex/_*.py)

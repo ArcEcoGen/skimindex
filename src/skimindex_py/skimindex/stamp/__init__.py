@@ -44,6 +44,8 @@ import os
 import shutil
 from pathlib import Path
 
+from skimindex.bashwrapper import bash_export
+
 type PathLike = str | Path
 
 # ---------------------------------------------------------------------------
@@ -91,6 +93,7 @@ def _max_mtime(path: Path) -> float:
 # Public API
 # ---------------------------------------------------------------------------
 
+@bash_export
 def stamp(path: PathLike) -> bool:
     """Mark *path* as successfully processed.
 
@@ -112,6 +115,7 @@ def stamp(path: PathLike) -> bool:
         return False
 
 
+@bash_export
 def is_stamped(path: PathLike) -> bool:
     """Return True if *path* has a stamp file (has been successfully processed).
 
@@ -124,6 +128,7 @@ def is_stamped(path: PathLike) -> bool:
     return _stamp_path(path).exists()
 
 
+@bash_export
 def remove_if_not_stamped(path: PathLike) -> bool:
     """Delete *path* if it has no valid stamp.
 
@@ -149,6 +154,7 @@ def remove_if_not_stamped(path: PathLike) -> bool:
     return True
 
 
+@bash_export
 def newer_than_stamp(path: PathLike, path_stamped: PathLike) -> bool:
     """Return True if *path* is newer than the stamp of *path_stamped*.
 
@@ -185,6 +191,7 @@ def newer_than_stamp(path: PathLike, path_stamped: PathLike) -> bool:
         return False
 
 
+@bash_export
 def unstamp_if_newer(path: PathLike, *sources: PathLike) -> bool:
     """Remove the stamp for *path* if any of *sources* is newer than it.
 
@@ -207,6 +214,7 @@ def unstamp_if_newer(path: PathLike, *sources: PathLike) -> bool:
     return False
 
 
+@bash_export
 def unstamp(path: PathLike) -> bool:
     """Remove the stamp for *path*, forcing re-processing on the next run.
 
@@ -224,6 +232,7 @@ def unstamp(path: PathLike) -> bool:
         return False
 
 
+@bash_export
 def stamp_gz(path: PathLike) -> bool:
     """Verify gzip integrity of *path* with pigz -t, then stamp it.
 
@@ -242,6 +251,7 @@ def stamp_gz(path: PathLike) -> bool:
         return False
 
 
+@bash_export
 def needs_run(
     path: PathLike,
     *sources: PathLike,

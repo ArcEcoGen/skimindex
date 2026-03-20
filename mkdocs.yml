@@ -6,8 +6,10 @@ nav:
   - Home: index.md
   - Directory Structure: directory-structure.md
   - Configuration Format: config-format.md
+  - Environment Variables: environment-variables.md
   - Data Model: data.md
   - Processing Model: processing.md
+  - Writing Shell Commands: devshell.md
 
 theme:
   name: readthedocs

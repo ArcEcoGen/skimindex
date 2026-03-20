@@ -30,6 +30,7 @@ processed_data = "processed_data"
 config         = "config"
 log            = "log"
 stamp          = "stamp"
+usercmd        = "usercmd"        # optional user-defined sub-commands (mounted at /usercmd)
 
 # Logging configuration.
 [logging]

@@ -38,7 +38,7 @@ set -euo pipefail
 # =============================================================================
 # Inlined utility functions
 # =============================================================================
-# @@INLINE: scripts/__utils_functions.sh@@
+# @@INLINE: scripts/__skimindex_log.sh@@
 
 # =============================================================================
 # Image identity  (substituted at build time by docker/build_user_script.sh)
@@ -324,8 +324,27 @@ _ski_init() {
 # =============================================================================
 # Subcommand dispatch
 # =============================================================================
-if [[ $# -eq 0 ]]; then
+_ski_help() {
     sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
+    # Append user-defined subcommands from /usercmd/ if any exist
+    if [[ -d /usercmd ]] && compgen -G "/usercmd/*.sh" >/dev/null 2>&1; then
+        echo "# user subcommands (from usercmd/):"
+        for _f in /usercmd/*.sh; do
+            _name="$(basename "$_f" .sh)"
+            # Extract first non-empty, non-separator comment line after the filename comment
+            _desc="$(awk '
+                NR==1 { next }
+                /^# *[-=]{4,}/ { next }
+                /^#/ { sub(/^# */, ""); print; exit }
+            ' "$_f")"
+            printf "#   %-20s %s\n" "$_name" "${_desc:-(no description)}"
+        done
+        echo "#"
+    fi
+}
+
+if [[ $# -eq 0 ]]; then
+    _ski_help
     exit 0
 fi
 
@@ -333,7 +352,7 @@ SUBCMD="$1"; shift
 
 case "$SUBCMD" in
     -h|--help)
-        sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' "$0"
+        _ski_help
         exit 0
         ;;
     init)
@@ -378,8 +397,15 @@ fi
 case "$SUBCMD" in
 # @@SUBCOMMANDS@@
     *)
-        logerror "Unknown subcommand '$SUBCMD'."
-        logerror "Run '$(basename "$0") --help' for usage."
-        exit 1
+        # Dynamic lookup in /usercmd (bind-mounted from project usercmd/ dir).
+        # Scripts placed there are available without rebuilding the image.
+        if [[ -f "/usercmd/${SUBCMD}.sh" ]]; then
+            export SKIMINDEX_SCRIPTS_DIR=/app/scripts
+            bash "/usercmd/${SUBCMD}.sh" "$@"
+        else
+            logerror "Unknown subcommand '$SUBCMD'."
+            logerror "Run '$(basename "$0") --help' for usage."
+            exit 1
+        fi
         ;;
 esac
