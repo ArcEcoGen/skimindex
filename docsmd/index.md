@@ -1,9 +1,5 @@
 # skimindex Documentation
 
-skimindex is a pipeline for building k-mer decontamination indices from public
-and internal sequence databases. It runs inside a container and is configured
-via a single TOML file.
-
 ## Contents
 
 - [Directory Structure](directory-structure.md) — layout of runtime data directories
