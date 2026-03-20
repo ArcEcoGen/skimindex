@@ -52,6 +52,7 @@ processed_data = "processed_data"
 config         = "config"
 log            = "log"
 stamp          = "stamp"
+usercmd        = "usercmd"   # optional user-defined sub-commands (mounted at /usercmd)
 ```
 
 ### `[logging]`
@@ -209,15 +210,16 @@ run       = "prepare_decontam"
 
 Parameters for the complete reference genomes role.
 
-| Key        | Type   | Description                                                          |
-|------------|--------|----------------------------------------------------------------------|
-| `directory`| string | Subdirectory name within processed data tree                         |
-| `run`      | string | Name of a `[processing.X]` section to execute (must have `directory`)|
+| Key        | Type    | Description                                                          |
+|------------|---------|----------------------------------------------------------------------|
+| `directory`| string  | Subdirectory name within processed data tree                         |
+| `kmer_size`| integer | K-mer size used when indexing genomes                                |
+| `run`      | string  | Name of a `[processing.X]` section to execute (optional)            |
 
 ```toml
 [role.genomes]
 directory = "genomes_15x"
-run       = "prepare_genomes"
+kmer_size = 31
 ```
 
 ### `[role.genome_skims]`
@@ -227,12 +229,11 @@ Parameters for the low-coverage skim-sequenced genomes role.
 | Key        | Type   | Description                                                          |
 |------------|--------|----------------------------------------------------------------------|
 | `directory`| string | Subdirectory name within processed data tree                         |
-| `run`      | string | Name of a `[processing.X]` section to execute (must have `directory`)|
+| `run`      | string | Name of a `[processing.X]` section to execute (optional)            |
 
 ```toml
 [role.genome_skims]
 directory = "skims"
-run       = "prepare_skims"
 ```
 
 ---

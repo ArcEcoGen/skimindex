@@ -8,32 +8,32 @@ the container image**.
 
 ## Quick start
 
-1. Create `usercmd/` in your project root (done automatically by `skimindex init`):
+**Step 1.** Create `usercmd/` in your project root (done automatically by `skimindex init`):
 
-    ```bash
-    mkdir -p usercmd
-    ```
+```bash
+mkdir -p usercmd
+```
 
-2. Write a script there:
+**Step 2.** Write a script there, e.g. `usercmd/hello.sh`:
 
-    ```bash
-    #!/usr/bin/env bash
-    # ============================================================
-    # hello.sh
-    # Say hello — one-line description shown in skimindex --help.
-    # ============================================================
-    set -euo pipefail
+```bash
+#!/usr/bin/env bash
+# ============================================================
+# hello.sh
+# Say hello — one-line description shown in skimindex --help.
+# ============================================================
+set -euo pipefail
 
-    source "${SKIMINDEX_SCRIPTS_DIR}/__skimindex.sh"   # logging + config + stamping
+source "${SKIMINDEX_SCRIPTS_DIR}/__skimindex.sh"   # logging + config + stamping
 
-    loginfo "Hello, skimindex!"
-    ```
+loginfo "Hello, skimindex!"
+```
 
-3. Invoke it immediately — no rebuild needed:
+**Step 3.** Invoke it immediately — no rebuild needed:
 
-    ```bash
-    skimindex hello
-    ```
+```bash
+skimindex hello
+```
 
 The first non-empty, non-separator comment line after the filename becomes the
 description shown in `skimindex --help` under the *user subcommands* section.
@@ -219,28 +219,28 @@ have access to the project directory.
 
 ### Adding a built-in subcommand
 
-1. Place the script in `scripts/` (no `_` prefix).  Use `$SCRIPT_DIR` to
-   locate the library instead of `SKIMINDEX_SCRIPTS_DIR`:
+**Step 1.** Place the script in `scripts/` (no `_` prefix).  Use `$SCRIPT_DIR` to
+locate the library instead of `SKIMINDEX_SCRIPTS_DIR`:
 
-    ```bash
-    #!/usr/bin/env bash
-    # ============================================================
-    # hello.sh
-    # Say hello — built-in version.
-    # ============================================================
-    set -euo pipefail
+```bash
+#!/usr/bin/env bash
+# ============================================================
+# hello.sh
+# Say hello — built-in version.
+# ============================================================
+set -euo pipefail
 
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    source "${SCRIPT_DIR}/__skimindex.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/__skimindex.sh"
 
-    loginfo "Hello from inside the image!"
-    ```
+loginfo "Hello from inside the image!"
+```
 
-2. Rebuild the image **and** regenerate `skimindex.sh`:
+**Step 2.** Rebuild the image **and** regenerate `skimindex.sh`:
 
-    ```bash
-    make -C docker
-    ```
+```bash
+make -C docker
+```
 
 The script now appears as a built-in in `skimindex --help` and is available
 even without a `usercmd/` directory.

@@ -69,6 +69,7 @@ container).
 | `SKIMINDEX__LOCAL_DIRECTORIES__CONFIG` | `/config` |
 | `SKIMINDEX__LOCAL_DIRECTORIES__LOG` | `/log` |
 | `SKIMINDEX__LOCAL_DIRECTORIES__STAMP` | `/stamp` |
+| `SKIMINDEX__LOCAL_DIRECTORIES__USERCMD` | `/usercmd` |
 
 ### `[logging]`
 
