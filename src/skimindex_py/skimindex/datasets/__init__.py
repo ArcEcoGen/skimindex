@@ -15,7 +15,8 @@ Usage
 
 
 from pathlib import Path
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 from skimindex.config import config
 

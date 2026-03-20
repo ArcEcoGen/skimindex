@@ -50,7 +50,8 @@ Usage
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ Output kind: STREAM (chainable via Data → Data interface).
 """
 
 import os
-from typing import Callable
+from collections.abc import Callable
 
 from skimindex.processing import OutputKind, processing_type
 from skimindex.processing.data import Data, stream_data, to_stream_command

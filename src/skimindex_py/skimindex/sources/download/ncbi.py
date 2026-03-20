@@ -111,7 +111,7 @@ def _get_genome_size(assembly: dict[str, Any]) -> int:
 
 def _filter_assemblies_by_rank(
     assemblies: list[dict[str, Any]],
-    key_fn: "Callable[[str], str]",
+    key_fn: Callable[[str], str],
 ) -> list[dict[str, Any]]:
     """Keep one assembly per taxonomic rank group.
 

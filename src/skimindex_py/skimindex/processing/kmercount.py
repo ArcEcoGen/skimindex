@@ -13,7 +13,7 @@ ntcard writes one file per k value: <prefix>_k<K>.hist
 """
 
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from skimindex.processing import OutputKind, processing_type
 from skimindex.processing.data import Data, DataKind, directory_data

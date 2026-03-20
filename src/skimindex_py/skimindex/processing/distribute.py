@@ -6,7 +6,7 @@ Output kind: DIRECTORY.
 """
 
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from skimindex.processing import OutputKind, processing_type
 from skimindex.processing.data import Data, DataKind, directory_data

@@ -5,7 +5,7 @@ Removes sequences composed entirely of N bases via obigrep.
 Output kind: STREAM (chainable).
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 from skimindex.processing import OutputKind, processing_type
 from skimindex.processing.data import Data, DataKind, stream_data
