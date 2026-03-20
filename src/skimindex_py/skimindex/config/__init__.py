@@ -72,8 +72,12 @@ class Config:
     # ------------------------------------------------------------------
 
     def _load(self) -> None:
-        with open(self._path, "rb") as f:
-            self._raw = tomllib.load(f)
+        try:
+            with open(self._path, "rb") as f:
+                self._raw = tomllib.load(f)
+        except Exception as e:
+            e.add_note(f"Config file: {self._path}")
+            raise
 
     # ------------------------------------------------------------------
     # Typed section accessors
@@ -218,6 +222,7 @@ class Config:
 
     @property
     def path(self) -> Path:
+        """Absolute path to the TOML configuration file."""
         return self._path
 
     def sections(self) -> list[str]:

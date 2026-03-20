@@ -36,7 +36,7 @@ class DataKind(Enum):
     DIRECTORY = auto()  # a directory of files (single Path)
 
 
-@dataclass
+@dataclass(slots=True)
 class Data:
     """Data flowing between processing steps.
 

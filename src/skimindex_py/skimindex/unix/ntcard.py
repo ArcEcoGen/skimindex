@@ -20,15 +20,22 @@ from skimindex.unix.base import LoggedBoundCommand, local
 
 
 def ntcard(*args) -> LoggedBoundCommand:
-    """Estimate k-mer coverage histogram.
+    """Build an ntCard command to estimate the k-mer coverage histogram.
 
-    Options:
+    Passes all arguments directly to the ``ntcard`` executable.
+    Call the returned command to execute it.
+
+    Common options:
       -t, --threads=N      parallel threads [1]
       -k, --kmer=N         k-mer length
       -g, --gap=N          gap seed length [0]
       -c, --cov=N          maximum coverage in output [1000]
       -p, --pref=STRING    prefix for output file name(s)
       -o, --output=STRING  single output file name
+
+    Returns:
+        A :class:`LoggedBoundCommand` ready to execute (call with ``()``
+        or pipe with ``|``).
     """
     return local["ntcard"][args]
 

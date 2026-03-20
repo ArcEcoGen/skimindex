@@ -96,7 +96,14 @@ def unzip_extract(*args) -> LoggedBoundCommand:
 
 # Helper function to get help for any tool
 def help(tool_name: str) -> str:
-    """Get help text for a compression tool."""
+    """Return the ``--help`` output for a compression tool.
+
+    Args:
+        tool_name: Executable name, e.g. ``"pigz"`` or ``"unzip"``.
+
+    Returns:
+        Help text string, or an error message if the tool is not found.
+    """
     try:
         cmd = local[tool_name]
         return cmd["--help"]()

@@ -130,7 +130,18 @@ def dataformat_gff3(*args):
 
 # Helper function to get help for any tool
 def help(tool_name: str) -> str:
-    """Get help text for an NCBI tool."""
+    """Return the ``--help`` output for an NCBI CLI tool.
+
+    Supports multi-word subcommands by splitting on spaces, e.g.
+    ``"datasets download"`` invokes ``datasets download --help``.
+
+    Args:
+        tool_name: Tool name or space-separated subcommand path,
+                   e.g. ``"datasets"`` or ``"dataformat convert"``.
+
+    Returns:
+        Help text string, or an error message if the tool is not found.
+    """
     try:
         parts = tool_name.split()
         cmd = local[parts[0]]

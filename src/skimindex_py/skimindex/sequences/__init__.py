@@ -33,14 +33,12 @@ from pathlib import Path
 from collections.abc import Callable, Iterator
 from typing import Literal
 
-DataType = Literal["raw", "processed"]
-
-PathLike = str | Path
+type DataType = Literal["raw", "processed"]
+type PathLike = str | Path
+type PathMode = Literal["relative", "absolute", "prefixed"]
 
 # Base extensions (without .gz) — both compressed and uncompressed variants are found.
 SEQUENCE_EXTENSIONS: tuple = (".fasta", ".gbff", ".fa", ".fastq")
-
-PathMode = Literal["relative", "absolute", "prefixed"]
 
 
 def _resolve_directory(directory: PathLike) -> Path:

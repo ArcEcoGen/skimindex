@@ -68,7 +68,7 @@ class OutputKind(Enum):
 # ProcessingType
 # ---------------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class ProcessingType:
     """Metadata and builder for a registered processing operation type."""
 
@@ -157,6 +157,8 @@ def processing_type(
         needs_tmpdir:     True if the type needs a temporary working directory.
         output_filename:  Filename used when a STREAM/FILE output is persisted.
                           None = type cannot be persisted (must stay temporary).
+        is_indexer:       True if this type writes to the indexes tree rather
+                          than the processed_data tree.
 
     Example::
 
@@ -195,7 +197,11 @@ def _make_atomic(params: dict[str, Any]) -> tuple[ProcessingType, Callable]:
     type_name = params.get("type")
     if not type_name:
         raise ValueError("Atomic processing params missing 'type' key")
-    pt = get_processing_type(type_name)
+    try:
+        pt = get_processing_type(type_name)
+    except KeyError as e:
+        e.add_note(f"Check [processing.*] sections in your skimindex.toml")
+        raise
     return pt, pt.build(params)
 
 

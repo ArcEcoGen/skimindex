@@ -44,7 +44,7 @@ import os
 import shutil
 from pathlib import Path
 
-PathLike = str | Path
+type PathLike = str | Path
 
 # ---------------------------------------------------------------------------
 # Configuration

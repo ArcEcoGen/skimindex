@@ -24,10 +24,17 @@ VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR"})
 
 @dataclass(frozen=True)
 class ConfigError:
-    """A single config validation error."""
-    section: str   # e.g. "data.fungi", "processing.prepare_decontam"
-    key: str       # e.g. "divisions", "run"
-    message: str   # human-readable explanation
+    """A single config validation error with location and description.
+
+    Attributes:
+        section: TOML section path, e.g. ``"data.fungi"`` or
+                 ``"processing.prepare_decontam"``.
+        key:     Key within the section, e.g. ``"divisions"`` or ``"run"``.
+        message: Human-readable description of the violation.
+    """
+    section: str
+    key: str
+    message: str
 
 
 class ConfigValidationError(Exception):

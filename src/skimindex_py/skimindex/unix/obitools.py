@@ -209,7 +209,15 @@ def obireffamidx(*args) -> LoggedBoundCommand:
 
 # Helper function to get help for any tool
 def help(tool_name: str) -> str:
-    """Get help text for a tool."""
+    """Return the ``--help`` output for an OBITools4 tool.
+
+    Args:
+        tool_name: OBITools4 executable name, e.g. ``"obigrep"`` or
+                   ``"obiconvert"``.
+
+    Returns:
+        Help text string, or an error message if the tool is not found.
+    """
     try:
         cmd = local[tool_name]
         return cmd["--help"]()

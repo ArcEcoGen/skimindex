@@ -68,6 +68,12 @@ class Dataset:
         return dataset_output_dir(self.name)
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Return a raw config value for this dataset, without type conversion.
+
+        Args:
+            key:     Config key to look up (e.g. ``"taxon"``, ``"divisions"``).
+            default: Value to return if the key is absent (default: ``None``).
+        """
         return self._cfg.get(key, default)
 
     # ------------------------------------------------------------------
