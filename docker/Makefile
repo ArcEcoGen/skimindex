@@ -229,7 +229,7 @@ docs-stop:
 		rm -f $(DOCS_PID); \
 	fi
 
-## docs-build         : Build the static HTML documentation into site/
+## docs-build         : Build the static HTML documentation into docs/
 docs-build: $(VENV_PYTHON)
 	$(VENV)/bin/mkdocs build --config-file $(PROJECT_ROOT)/mkdocs.yml
 
@@ -237,7 +237,7 @@ docs-build: $(VENV_PYTHON)
 clean: clean-builder clean-venv docs-stop
 	docker rmi --force $(FULL_IMAGE) 2>/dev/null || true
 	rm -f $(OCI_ARCHIVE) $(DOCKERFILE)
-	rm -rf $(PROJECT_ROOT)/site
+	rm -rf $(PROJECT_ROOT)/docs
 
 ## clean-venv         : Remove the development virtual environment
 clean-venv:

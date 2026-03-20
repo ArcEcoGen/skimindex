@@ -1,6 +1,6 @@
 site_name: skimindex
-docs_dir: docs
-site_dir: site
+docs_dir: docsmd
+site_dir: docs
 
 nav:
   - Home: index.md
