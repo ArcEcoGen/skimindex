@@ -16,11 +16,19 @@ Convenience constructors
   files_data(paths, format=None)             → FILES  Data  (Path or list[Path])
   directory_data(path)                       → DIRECTORY Data
 
-Adapter
--------
+Adapters
+--------
   to_stream_command(data)
-      Converts any Data into a plumbum source command.
+      Converts any Data into a plumbum source command via obiconvert.
       This is the only place where the plumbum layer is visible.
+
+  pipe_through(data, cmd)
+      Connect any Data kind to an arbitrary command:
+      - STREAM    : data.command | cmd
+      - FILES     : cmd(*paths)
+      - DIRECTORY : cmd(dir_path)
+      Use this instead of to_stream_command() when the target command
+      already accepts file/directory arguments (e.g. most OBITools).
 """
 
 
@@ -132,3 +140,41 @@ def to_stream_command(data: Data) -> Any:
         return obiconvert(str(data.path))
 
     raise ValueError(f"Cannot convert {data.kind!r} to a stream command")
+
+
+def pipe_through(data: Data, cmd: Any) -> Any:
+    """Connect any Data kind to a command that accepts files or piped input.
+
+    - STREAM    : ``data.command | cmd``  (pipe into the command)
+    - FILES     : ``cmd(*paths)``         (pass all file paths as arguments)
+    - DIRECTORY : ``cmd(dir_path)``       (pass the directory as argument)
+
+    Use this adapter when the target command already accepts file/directory
+    arguments directly (most OBITools commands do), avoiding the overhead
+    and format constraints of an intermediate ``obiconvert`` step.
+
+    Args:
+        data: Input data in any form.
+        cmd:  A plumbum BoundCommand whose bound arguments will be augmented
+              with the file paths, or whose stdin will receive the pipe.
+
+    Returns:
+        A plumbum command or pipe, ready to execute or chain further.
+
+    Raises:
+        ValueError: if data.kind is not recognised or FILES has no paths.
+    """
+    if data.kind == DataKind.STREAM:
+        return data.command | cmd
+
+    if data.kind == DataKind.FILES:
+        if not data.paths:
+            raise ValueError("FILES Data has no paths")
+        return cmd[*[str(p) for p in data.paths]]
+
+    if data.kind == DataKind.DIRECTORY:
+        if not data.path:
+            raise ValueError("DIRECTORY Data has no path")
+        return cmd[str(data.path)]
+
+    raise ValueError(f"Cannot pipe {data.kind!r} through a command")

@@ -212,7 +212,7 @@ def _make_atomic(params: dict[str, Any]) -> tuple[ProcessingType, Callable]:
 from skimindex.processing.data import (  # noqa: F401, E402
     Data, DataKind,
     stream_data, files_data, directory_data,
-    to_stream_command,
+    to_stream_command, pipe_through,
 )
 
 # Processing type registrations — importing these modules triggers @processing_type,
@@ -223,18 +223,22 @@ from skimindex.processing.filter_taxid import filter_taxid       # noqa: F401, E
 from skimindex.processing.filter_n_only import filter_n_only     # noqa: F401, E402
 from skimindex.processing.distribute import distribute           # noqa: F401, E402
 from skimindex.processing.kmercount import kmercount             # noqa: F401, E402
+from skimindex.processing.compress import compress               # noqa: F401, E402
+from skimindex.processing.uncompress import uncompress           # noqa: F401, E402
 
 __all__ = [
     "OutputKind", "ProcessingType",
     "register", "get_processing_type", "registered_types",
     "processing_type",
     "build",
-    "Data", "DataKind", "stream_data", "files_data", "directory_data", "to_stream_command",
+    "Data", "DataKind", "stream_data", "files_data", "directory_data", "to_stream_command", "pipe_through",
     "split", "SPLITSEQS_LUA",
     "filter_taxid",
     "filter_n_only",
     "distribute",
     "kmercount",
+    "compress",
+    "uncompress",
 ]
 
 

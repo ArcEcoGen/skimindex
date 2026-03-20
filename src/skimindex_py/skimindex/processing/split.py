@@ -18,9 +18,20 @@ SPLITSEQS_LUA = "/app/obiluascripts/splitseqs.lua"
 
 @processing_type(output_kind=OutputKind.STREAM, output_filename="fragmented.fasta")
 def split(params: dict) -> Callable[[Data], Data]:
-    """Split reference sequences into overlapping fragments."""
+    """Split reference sequences into overlapping fragments.
+
+    Parameters (from TOML config):
+        size:     Fragment size in bases, default 200.
+        overlap:  Overlap between consecutive fragments, default 28.
+        compress: Compress output with gzip (obiscript -Z), default false.
+    """
     frg_size = int(params.get("size", 200))
     overlap  = int(params.get("overlap", 28))
+    compress = bool(params.get("compress", False))
+
+    script_args = [SPLITSEQS_LUA]
+    if compress:
+        script_args.append("-Z")
 
     def run(input_data: Data) -> Data:
         cmd = to_stream_command(input_data)
@@ -29,7 +40,8 @@ def split(params: dict) -> Callable[[Data], Data]:
         try:
             os.environ["FRAGMENT_SIZE"] = str(frg_size)
             os.environ["OVERLAP"]       = str(overlap)
-            return stream_data(cmd | obiscript(SPLITSEQS_LUA), format="fasta")
+            fmt = "fasta.gz" if compress else "fasta"
+            return stream_data(cmd | obiscript(*script_args), format=fmt, subdir=input_data.subdir)
         finally:
             for key, old in [("FRAGMENT_SIZE", old_frag), ("OVERLAP", old_over)]:
                 if old is None:
