@@ -68,29 +68,29 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#source-sections">Source Sections</a>
         <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#ncbi">[ncbi]</a>
+    <li class="toctree-l3"><a class="reference internal" href="#sourcencbi">[source.ncbi]</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#genbank">[genbank]</a>
+    <li class="toctree-l3"><a class="reference internal" href="#sourcegenbank">[source.genbank]</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#internal">[internal]</a>
+    <li class="toctree-l3"><a class="reference internal" href="#sourceinternal">[source.internal]</a>
     </li>
         </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#role-sections">Role Sections</a>
         <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#decontamination">[decontamination]</a>
+    <li class="toctree-l3"><a class="reference internal" href="#roledecontamination">[role.decontamination]</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#genomes">[genomes]</a>
+    <li class="toctree-l3"><a class="reference internal" href="#rolegenomes">[role.genomes]</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#genome_skims">[genome_skims]</a>
+    <li class="toctree-l3"><a class="reference internal" href="#rolegenome_skims">[role.genome_skims]</a>
     </li>
         </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#processing-sections">Processing Sections</a>
         <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#split">[split]</a>
+    <li class="toctree-l3"><a class="reference internal" href="#atomic-form">Atomic form</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#kmercount">[kmercount]</a>
+    <li class="toctree-l3"><a class="reference internal" href="#composite-form">Composite form</a>
     </li>
         </ul>
     </li>
@@ -131,6 +131,22 @@
     </ul>
                 </li>
               </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../environment-variables/">Environment Variables</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../data/">Data Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../processing/">Processing Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../devshell/">Writing Shell Commands</a>
+                </li>
+              </ul>
       </div>
     </div>
     </nav>
@@ -157,7 +173,45 @@
                 <h1 id="skimindex-configuration-file-format">skimindex Configuration File Format</h1>
 <h2 id="overview">Overview</h2>
 <p>The skimindex configuration file (<code>config/skimindex.toml</code>) uses TOML format.
-Sections fall into five categories:</p>
+Sections fall into five categories, identified by a <strong>TOML table prefix</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Category</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(none — root level)</em></td>
+<td><strong>Configuration</strong></td>
+<td><code>[local_directories]</code>, <code>[logging]</code></td>
+</tr>
+<tr>
+<td><code>source.</code></td>
+<td><strong>Source</strong></td>
+<td><code>[source.ncbi]</code>, <code>[source.genbank]</code></td>
+</tr>
+<tr>
+<td><code>role.</code></td>
+<td><strong>Role</strong></td>
+<td><code>[role.decontamination]</code>, <code>[role.genomes]</code></td>
+</tr>
+<tr>
+<td><code>processing.</code></td>
+<td><strong>Processing</strong></td>
+<td><code>[processing.split]</code>, <code>[processing.kmercount]</code></td>
+</tr>
+<tr>
+<td><code>data.</code></td>
+<td><strong>Data</strong></td>
+<td><code>[data.human]</code>, <code>[data.plants]</code></td>
+</tr>
+</tbody>
+</table>
+<p>The prefix makes the section type self-describing and removes the need for
+any hardcoded list of reserved names.</p>
 <ul>
 <li><strong>Configuration sections</strong> — infrastructure settings (paths, logging, pipeline storage locations)</li>
 <li><strong>Source sections</strong> — one per data origin, defines where raw data are stored</li>
@@ -166,11 +220,9 @@ Sections fall into five categories:</p>
 <li><strong>Data sections</strong> — describe a dataset, require both <code>source</code> and <code>role</code> keys</li>
 </ul>
 <p>The pipeline flow is: raw data live under their <strong>source</strong> directory → processed
-outputs go to <strong><code>[processed_data]</code></strong> → k-mer indexes go to **`[indexes]``.</p>
+outputs go to <strong><code>[processed_data]</code></strong> → k-mer indexes go to <strong><code>[indexes]</code></strong>.</p>
 <p>The resulting directory layout is described in
 <a href="../directory-structure/">Directory Structure</a>.</p>
-<p>Reserved section names (configuration, sources, roles) must <strong>not</strong> contain
-<code>source</code> or <code>role</code> keys. Data sections must contain both.</p>
 <hr />
 <h2 id="configuration-sections">Configuration Sections</h2>
 <h3 id="local_directories"><code>[local_directories]</code></h3>
@@ -189,6 +241,7 @@ processed_data = &quot;processed_data&quot;
 config         = &quot;config&quot;
 log            = &quot;log&quot;
 stamp          = &quot;stamp&quot;
+usercmd        = &quot;usercmd&quot;   # optional user-defined sub-commands (mounted at /usercmd)
 </code></pre>
 <h3 id="logging"><code>[logging]</code></h3>
 <p>Log level, output file, and mirroring behaviour.</p>
@@ -304,7 +357,9 @@ directory = &quot;stamp&quot;               # references [local_directories] key
 <p>One section per data origin. Each source section has a <code>directory</code> key
 referencing a <code>[local_directories]</code> entry, which gives the root mount point
 where raw data for that source are stored.</p>
-<h3 id="ncbi"><code>[ncbi]</code></h3>
+<p>For a conceptual explanation of how sources, datasets, and roles interact at
+runtime, see <a href="../data/">Data Model</a>.</p>
+<h3 id="sourcencbi"><code>[source.ncbi]</code></h3>
 <p>Data downloaded via the NCBI Datasets CLI.</p>
 <table>
 <thead>
@@ -322,10 +377,10 @@ where raw data for that source are stored.</p>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-toml">[ncbi]
+<pre><code class="language-toml">[source.ncbi]
 directory = &quot;genbank&quot;             # references [local_directories] key → ${SKIMINDEX_ROOT}/genbank/
 </code></pre>
-<h3 id="genbank"><code>[genbank]</code></h3>
+<h3 id="sourcegenbank"><code>[source.genbank]</code></h3>
 <p>Data to download from GenBank (FTP/HTTPS site) as flat-files.</p>
 <table>
 <thead>
@@ -348,11 +403,11 @@ directory = &quot;genbank&quot;             # references [local_directories] key
 </tr>
 </tbody>
 </table>
-<pre><code class="language-toml">[genbank]
+<pre><code class="language-toml">[source.genbank]
 directory = &quot;genbank&quot;             # references [local_directories] key → ${SKIMINDEX_ROOT}/genbank/
 divisions = [&quot;bct&quot;, &quot;pln&quot;]
 </code></pre>
-<h3 id="internal"><code>[internal]</code></h3>
+<h3 id="sourceinternal"><code>[source.internal]</code></h3>
 <p>Internal sequencing data produced in-house.</p>
 <table>
 <thead>
@@ -370,7 +425,7 @@ divisions = [&quot;bct&quot;, &quot;pln&quot;]
 </tr>
 </tbody>
 </table>
-<pre><code class="language-toml">[internal]
+<pre><code class="language-toml">[source.internal]
 directory = &quot;raw_data&quot;            # references [local_directories] key → ${SKIMINDEX_ROOT}/raw_data/
 </code></pre>
 <hr />
@@ -388,15 +443,15 @@ component for processed and indexed data, giving the full layout:</p>
 <tbody>
 <tr>
 <td>Raw</td>
-<td><code>${SKIMINDEX_ROOT}/&lt;[source].directory&gt;/&lt;data.directory&gt;/</code></td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[source.X].directory&gt;/&lt;data.directory&gt;/</code></td>
 </tr>
 <tr>
 <td>Processed</td>
-<td><code>${SKIMINDEX_ROOT}/&lt;[processed_data].directory&gt;/&lt;[role].directory&gt;/&lt;data.directory&gt;/&lt;species&gt;/&lt;accession&gt;/&lt;[processing].directory&gt;/</code></td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[processed_data].directory&gt;/&lt;[role.X].directory&gt;/&lt;data.directory&gt;/&lt;species&gt;/&lt;accession&gt;/&lt;[processing.X].directory&gt;/</code></td>
 </tr>
 <tr>
 <td>Indexes</td>
-<td><code>${SKIMINDEX_ROOT}/&lt;[indexes].directory&gt;/&lt;[role].directory&gt;/…</code>  (to be specified)</td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[indexes].directory&gt;/&lt;[role.X].directory&gt;/…</code>  (to be specified)</td>
 </tr>
 </tbody>
 </table>
@@ -411,19 +466,19 @@ component for processed and indexed data, giving the full layout:</p>
 <tbody>
 <tr>
 <td>Raw</td>
-<td><code>${SKIMINDEX_ROOT}/&lt;[source].directory&gt;/&lt;data.directory&gt;/</code></td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[source.X].directory&gt;/&lt;data.directory&gt;/</code></td>
 </tr>
 <tr>
 <td>Processed</td>
-<td><code>${SKIMINDEX_ROOT}/&lt;[processed_data].directory&gt;/&lt;[role].directory&gt;/&lt;data.directory&gt;/&lt;[processing].directory&gt;/</code></td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[processed_data].directory&gt;/&lt;[role.X].directory&gt;/&lt;data.directory&gt;/&lt;[processing.X].directory&gt;/</code></td>
 </tr>
 <tr>
 <td>Indexes</td>
-<td><code>${SKIMINDEX_ROOT}/&lt;[indexes].directory&gt;/&lt;[role].directory&gt;/…</code>  (to be specified)</td>
+<td><code>${SKIMINDEX_ROOT}/&lt;[indexes].directory&gt;/&lt;[role.X].directory&gt;/…</code>  (to be specified)</td>
 </tr>
 </tbody>
 </table>
-<h3 id="decontamination"><code>[decontamination]</code></h3>
+<h3 id="roledecontamination"><code>[role.decontamination]</code></h3>
 <p>Parameters for the decontamination filter role.</p>
 <table>
 <thead>
@@ -437,32 +492,20 @@ component for processed and indexed data, giving the full layout:</p>
 <tr>
 <td><code>directory</code></td>
 <td>string</td>
-<td>Subdirectory name within source and processed data mounts</td>
+<td>Subdirectory name within processed data tree</td>
 </tr>
 <tr>
-<td><code>kmer_size</code></td>
-<td>integer</td>
-<td>K-mer size used to build decontamination indices</td>
-</tr>
-<tr>
-<td><code>frg_size</code></td>
-<td>integer</td>
-<td>Fragment size (bp) when splitting reference sequences</td>
-</tr>
-<tr>
-<td><code>batches</code></td>
-<td>integer</td>
-<td>Number of batches for split reference sequences</td>
+<td><code>run</code></td>
+<td>string</td>
+<td>Name of a <code>[processing.X]</code> section to execute (must have <code>directory</code>)</td>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-toml">[decontamination]
+<pre><code class="language-toml">[role.decontamination]
 directory = &quot;decontamination&quot;
-kmer_size = 29
-frg_size  = 200
-batches   = 20
+run       = &quot;prepare_decontam&quot;
 </code></pre>
-<h3 id="genomes"><code>[genomes]</code></h3>
+<h3 id="rolegenomes"><code>[role.genomes]</code></h3>
 <p>Parameters for the complete reference genomes role.</p>
 <table>
 <thead>
@@ -476,20 +519,25 @@ batches   = 20
 <tr>
 <td><code>directory</code></td>
 <td>string</td>
-<td>Subdirectory name within source and processed data mounts</td>
+<td>Subdirectory name within processed data tree</td>
 </tr>
 <tr>
 <td><code>kmer_size</code></td>
 <td>integer</td>
-<td>K-mer size used for genome analyses</td>
+<td>K-mer size used when indexing genomes</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td>string</td>
+<td>Name of a <code>[processing.X]</code> section to execute (optional)</td>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-toml">[genomes]
+<pre><code class="language-toml">[role.genomes]
 directory = &quot;genomes_15x&quot;
 kmer_size = 31
 </code></pre>
-<h3 id="genome_skims"><code>[genome_skims]</code></h3>
+<h3 id="rolegenome_skims"><code>[role.genome_skims]</code></h3>
 <p>Parameters for the low-coverage skim-sequenced genomes role.</p>
 <table>
 <thead>
@@ -503,63 +551,102 @@ kmer_size = 31
 <tr>
 <td><code>directory</code></td>
 <td>string</td>
-<td>Subdirectory name within source and processed data mounts</td>
+<td>Subdirectory name within processed data tree</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td>string</td>
+<td>Name of a <code>[processing.X]</code> section to execute (optional)</td>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-toml">[genome_skims]
+<pre><code class="language-toml">[role.genome_skims]
 directory = &quot;skims&quot;
 </code></pre>
 <hr />
 <h2 id="processing-sections">Processing Sections</h2>
-<p>One section per pipeline processing step. Each processing section has a
-<code>directory</code> key giving the subdirectory name used inside the processed data
-tree. The section name defaults as the <code>directory</code> value if absent.</p>
-<h3 id="split"><code>[split]</code></h3>
-<p>Splitting reference sequences into overlapping fragments.</p>
+<p>Processing sections (<code>[processing.X]</code>) describe how data are transformed.
+Each section is either <strong>atomic</strong> (single operation) or <strong>composite</strong> (ordered
+sequence of steps). See <a href="../processing/">Processing Model</a> for the full
+specification including persistence rules and worked examples.</p>
+<h3 id="atomic-form">Atomic form</h3>
+<p>Has <code>type</code> (required) — maps to a registered <code>@processing</code> Python function.</p>
 <table>
 <thead>
 <tr>
 <th>Key</th>
 <th>Type</th>
+<th>Required</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td><code>type</code></td>
+<td>string</td>
+<td>yes</td>
+<td>Registered processing function name</td>
+</tr>
+<tr>
 <td><code>directory</code></td>
 <td>string</td>
-<td>Subdirectory name for split fragment outputs</td>
+<td>no</td>
+<td>Output subdirectory. Absent → output is temporary</td>
+</tr>
+<tr>
+<td><em>(others)</em></td>
+<td>any</td>
+<td>no</td>
+<td>Operation-specific parameters</td>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-toml">[split]
+<pre><code class="language-toml">[processing.split_decontam]
+type      = &quot;split&quot;
 directory = &quot;split&quot;
+size      = 200
+overlap   = 28
 </code></pre>
-<h3 id="kmercount"><code>[kmercount]</code></h3>
-<p>Counting k-mers in split fragments to build decontamination indices.</p>
+<h3 id="composite-form">Composite form</h3>
+<p>Has <code>steps</code> (required) — ordered list of named references (strings) or inline
+atomics (inline tables <code>{type=...}</code>).</p>
 <table>
 <thead>
 <tr>
 <th>Key</th>
 <th>Type</th>
+<th>Required</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td><code>steps</code></td>
+<td>array</td>
+<td>yes</td>
+<td>Ordered steps: strings (named refs) or inline tables <code>{type=...}</code></td>
+</tr>
+<tr>
 <td><code>directory</code></td>
 <td>string</td>
-<td>Subdirectory name for k-mer count outputs</td>
+<td>yes*</td>
+<td>Output subdirectory. *Required when referenced by a <code>run</code> key</td>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-toml">[kmercount]
-directory = &quot;kmercount&quot;
+<pre><code class="language-toml">[processing.prepare_decontam]
+directory = &quot;prepared&quot;
+steps = [
+  &quot;split_decontam&quot;,               # named reference — saved if it has directory
+  {type = &quot;remove_n_only&quot;},       # inline — always temporary
+  &quot;count_kmers_decontam&quot;,         # named reference — saved if it has directory
+]
 </code></pre>
 <hr />
 <h2 id="data-sections">Data Sections</h2>
-<p>Every data section <strong>must</strong> contain both <code>source</code> and <code>role</code>.</p>
+<p>Every data section <strong>must</strong> contain both <code>source</code> and <code>role</code>.
+Data sections use the <code>[data.&lt;name&gt;]</code> prefix where <code>&lt;name&gt;</code> is a free
+identifier chosen by the user.</p>
 <h3 id="classification-keys">Classification Keys</h3>
 <table>
 <thead>
@@ -622,6 +709,11 @@ directory = &quot;kmercount&quot;
 <td>boolean</td>
 <td>Whether data is organised per species/accession (default: <code>true</code>). Set to <code>false</code> for bulk sources such as GenBank flat-files where sequences are not separated by species. Controls the layout of processed data paths (see <a href="#role-sections">Role Sections</a> and <a href="../directory-structure/#processed_data-processed-data">processed_data</a>).</td>
 </tr>
+<tr>
+<td><code>run</code></td>
+<td>string</td>
+<td>Override the role's <code>run</code> with a different <code>[processing.X]</code> for this dataset (optional).</td>
+</tr>
 </tbody>
 </table>
 <h3 id="source-specific-keys">Source-specific Keys</h3>
@@ -668,24 +760,45 @@ directory = &quot;kmercount&quot;
 </tbody>
 </table>
 <h4 id="source-genbank"><code>source = "genbank"</code></h4>
+<p>Data sections with <code>source = "genbank"</code> are <strong>not</strong> backed by per-species raw
+files. They are derived from the monolithic GenBank flat-file release by
+applying one or two successive filters:</p>
+<ol>
+<li><strong>Division filter</strong> (<code>divisions</code>, required) — selects flat-files belonging
+   to one or more GenBank divisions from the latest downloaded release.</li>
+<li><strong>Taxonomic filter</strong> (<code>taxid</code>, optional) — if present, only sequences whose
+   taxonomy falls under the given NCBI taxon ID are retained.</li>
+</ol>
+<p>The raw GenBank flat-files live under the <code>[source.genbank]</code> source directory and are
+never copied per data section. The filtered output is the <strong>first processed
+artefact</strong> for these sections and lives directly under <code>processed_data/</code>.</p>
 <table>
 <thead>
 <tr>
 <th>Key</th>
 <th>Type</th>
+<th>Required</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>taxid</code></td>
-<td>integer</td>
-<td>NCBI taxonomy ID used to filter sequences</td>
-</tr>
-<tr>
 <td><code>divisions</code></td>
 <td>array of strings</td>
-<td>GenBank division codes for this dataset</td>
+<td>yes</td>
+<td>GenBank division codes to select (<code>bct</code>, <code>pln</code>, …). Must be a subset of the divisions declared in <code>[source.genbank] divisions</code>.</td>
+</tr>
+<tr>
+<td><code>release</code></td>
+<td>string</td>
+<td>no</td>
+<td>Pin a specific release (e.g. <code>"270.0"</code>). Defaults to the latest downloaded release.</td>
+</tr>
+<tr>
+<td><code>taxid</code></td>
+<td>integer</td>
+<td>no</td>
+<td>NCBI taxonomy ID. If present, only sequences belonging to this taxon are retained after division filtering.</td>
 </tr>
 </tbody>
 </table>
@@ -712,7 +825,7 @@ directory = &quot;kmercount&quot;
 <hr />
 <h2 id="examples">Examples</h2>
 <h3 id="current-data-sections">Current data sections</h3>
-<pre><code class="language-toml">[human]
+<pre><code class="language-toml">[data.human]
 source           = &quot;ncbi&quot;
 role             = &quot;decontamination&quot;
 example          = true
@@ -722,21 +835,23 @@ assembly_source  = &quot;refseq&quot;
 assembly_level   = &quot;chromosome&quot;
 assembly_version = &quot;latest&quot;
 
-[fungi]
-source    = &quot;genbank&quot;
-role      = &quot;decontamination&quot;
-example   = true
-taxid     = 4751
-divisions = [&quot;pln&quot;]
+[data.fungi]
+source     = &quot;genbank&quot;
+role       = &quot;decontamination&quot;
+example    = true
+by_species = false
+divisions  = [&quot;pln&quot;]
+taxid      = 4751
 
-[bacteria]
-source    = &quot;genbank&quot;
-role      = &quot;decontamination&quot;
-example   = true
-taxid     = 1
-divisions = [&quot;bct&quot;]
+[data.bacteria]
+source     = &quot;genbank&quot;
+role       = &quot;decontamination&quot;
+example    = true
+by_species = false
+divisions  = [&quot;bct&quot;]
+taxid      = 1
 
-[plants]
+[data.plants]
 source           = &quot;ncbi&quot;
 role             = &quot;decontamination&quot;
 example          = false            # counter-example: must NOT be filtered out
@@ -748,7 +863,7 @@ one_per          = &quot;genus&quot;
 </code></pre>
 <h3 id="future-data-sections-not-yet-active">Future data sections (not yet active)</h3>
 <pre><code class="language-toml"># Complete reference genome downloaded from NCBI
-# [arabidopsis]
+# [data.arabidopsis]
 # source           = &quot;ncbi&quot;
 # role             = &quot;genomes&quot;
 # taxon            = &quot;Arabidopsis thaliana&quot;
@@ -756,7 +871,7 @@ one_per          = &quot;genus&quot;
 # assembly_version = &quot;latest&quot;
 
 # Internal skim-sequenced genome
-# [betula_nana]
+# [data.betula_nana]
 # source    = &quot;internal&quot;
 # role      = &quot;genome_skims&quot;
 # directory = &quot;Betula_nana&quot;
@@ -764,19 +879,31 @@ one_per          = &quot;genus&quot;
 <hr />
 <h2 id="validation-rules">Validation Rules</h2>
 <ol>
-<li>Every section that is <strong>not</strong> a reserved section must have both <code>source</code> and <code>role</code>.</li>
-<li>Reserved sections must <strong>not</strong> have <code>source</code> or <code>role</code>.</li>
+<li>The section type is determined by its TOML prefix: <code>source.</code>, <code>role.</code>, <code>processing.</code>, <code>data.</code>, or no prefix (configuration).</li>
+<li>Configuration sections (no prefix) must <strong>not</strong> contain <code>source</code> or <code>role</code> keys. The valid configuration sections are: <code>local_directories</code>, <code>logging</code>, <code>processed_data</code>, <code>indexes</code>, <code>stamp</code>.</li>
+<li>Data sections (<code>data.*</code>) must contain both <code>source</code> and <code>role</code>.</li>
 <li><code>source</code> must be one of: <code>"ncbi"</code>, <code>"genbank"</code>, <code>"internal"</code>.</li>
 <li><code>role</code> must be one of: <code>"decontamination"</code>, <code>"genomes"</code>, <code>"genome_skims"</code>.</li>
 <li>For <code>role = "decontamination"</code>, the <code>example</code> key is required (<code>true</code> or <code>false</code>).</li>
 <li>For <code>source = "ncbi"</code>, the <code>taxon</code> key is required.</li>
-<li>For <code>source = "genbank"</code>, both <code>taxid</code> and <code>divisions</code> are required.</li>
+<li>For <code>source = "genbank"</code>, <code>divisions</code> is required and must be a subset of
+   the codes listed in <code>[source.genbank] divisions</code>.</li>
+<li>For <code>source = "genbank"</code>, <code>taxid</code> is optional; when absent all sequences of
+   the selected divisions are used.</li>
+<li>For <code>source = "genbank"</code>, <code>by_species = true</code> is reserved for a future
+    pre-processing step that would distribute sequences into per-species files
+    using <code>obidistribute</code> (not yet implemented).</li>
+<li>A <code>[processing.X]</code> section must have exactly one of <code>type</code> or <code>steps</code> (mutually exclusive).</li>
+<li>A processing section referenced by a <code>run</code> key must have <code>directory</code>.</li>
+<li>Inline steps inside <code>steps</code> (<code>{type=...}</code>) must not have <code>steps</code> themselves (always atomic).</li>
+<li>See <a href="../processing/">Processing Model</a> for the full processing validation rules.</li>
 </ol>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
         <a href="../directory-structure/" class="btn btn-neutral float-left" title="Directory Structure"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../environment-variables/" class="btn btn-neutral float-right" title="Environment Variables">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -801,6 +928,8 @@ one_per          = &quot;genus&quot;
     
       <span><a href="../directory-structure/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
+    
+      <span><a href="../environment-variables/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

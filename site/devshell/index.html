@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Writing Shell Commands - skimindex</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Writing Shell Commands";
+        var mkdocs_page_input_path = "devshell.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> skimindex
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../directory-structure/">Directory Structure</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../config-format/">Configuration Format</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../environment-variables/">Environment Variables</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../data/">Data Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../processing/">Processing Model</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Writing Shell Commands</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#quick-start">Quick start</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#how-it-works">How it works</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#adding-options">Adding options</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#using-configuration-variables">Using configuration variables</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#logging-functions">Logging functions</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#stamp-functions">Stamp functions</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#advanced-development-shipping-a-command-inside-the-image">Advanced development — shipping a command inside the image</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#adding-a-built-in-subcommand">Adding a built-in subcommand</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#how-the-build-system-works">How the build system works</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">skimindex</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Writing Shell Commands</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="writing-shell-commands">Writing Shell Commands</h1>
+<p>Shell commands are bash scripts placed in the project's <code>usercmd/</code> directory.
+They become available as <code>skimindex &lt;name&gt;</code> subcommands <strong>without rebuilding
+the container image</strong>.</p>
+<hr />
+<h2 id="quick-start">Quick start</h2>
+<p><strong>Step 1.</strong> Create <code>usercmd/</code> in your project root (done automatically by <code>skimindex init</code>):</p>
+<pre><code class="language-bash">mkdir -p usercmd
+</code></pre>
+<p><strong>Step 2.</strong> Write a script there, e.g. <code>usercmd/hello.sh</code>:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# ============================================================
+# hello.sh
+# Say hello — one-line description shown in skimindex --help.
+# ============================================================
+set -euo pipefail
+
+source &quot;${SKIMINDEX_SCRIPTS_DIR}/__skimindex.sh&quot;   # logging + config + stamping
+
+loginfo &quot;Hello, skimindex!&quot;
+</code></pre>
+<p><strong>Step 3.</strong> Invoke it immediately — no rebuild needed:</p>
+<pre><code class="language-bash">skimindex hello
+</code></pre>
+<p>The first non-empty, non-separator comment line after the filename becomes the
+description shown in <code>skimindex --help</code> under the <em>user subcommands</em> section.</p>
+<h3 id="how-it-works">How it works</h3>
+<p><code>usercmd/</code> is declared in <code>config/skimindex.toml</code>:</p>
+<pre><code class="language-toml">[local_directories]
+usercmd = &quot;usercmd&quot;   # bind-mounted to /usercmd inside the container
+</code></pre>
+<p>When a subcommand is not built-in, <code>skimindex.sh</code> checks for
+<code>/usercmd/&lt;subcmd&gt;.sh</code> and executes it with <code>bash</code>.  Before calling the script
+it exports <code>SKIMINDEX_SCRIPTS_DIR=/app/scripts</code> so that <code>__skimindex.sh</code> can
+always be sourced portably.</p>
+<hr />
+<h2 id="adding-options">Adding options</h2>
+<p>Use a standard <code>while</code> / <code>case</code> loop.  Expose <code>--help</code> by re-printing the
+header block with <code>sed</code>:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# ============================================================
+# greet.sh
+# Print a greeting for a given name.
+#
+# Usage:
+#   skimindex greet --name NAME [--shout]
+# ============================================================
+
+set -euo pipefail
+
+source &quot;${SKIMINDEX_SCRIPTS_DIR}/__skimindex.sh&quot;
+
+NAME=&quot;&quot;
+SHOUT=false
+
+while [[ $# -gt 0 ]]; do
+    case &quot;$1&quot; in
+        -h|--help)
+            sed -En '2,/^# =+$/{ s/^# ?//; /^=+$/d; p; }' &quot;$0&quot;
+            exit 0
+            ;;
+        --name)   NAME=&quot;$2&quot;;  shift 2 ;;
+        --shout)  SHOUT=true; shift   ;;
+        *) logerror &quot;Unknown option: $1&quot;; exit 1 ;;
+    esac
+done
+
+[[ -z &quot;$NAME&quot; ]] &amp;&amp; { logerror &quot;--name is required&quot;; exit 1; }
+
+msg=&quot;Hello, ${NAME}!&quot;
+[[ &quot;$SHOUT&quot; == true ]] &amp;&amp; msg=&quot;${msg^^}&quot;
+loginfo &quot;$msg&quot;
+</code></pre>
+<hr />
+<h2 id="using-configuration-variables">Using configuration variables</h2>
+<p>After <code>source __skimindex.sh</code>, all <code>[data.X]</code>, <code>[role.X]</code>, <code>[source.X]</code> and
+root-level values from <code>config/skimindex.toml</code> are available as environment
+variables.  See <a href="../environment-variables/">Environment Variables</a> for the full
+naming convention.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# ============================================================
+# show_config.sh
+# Display resolved paths for a data section.
+#
+# Usage:
+#   skimindex show_config --section NAME
+# ============================================================
+
+set -euo pipefail
+
+source &quot;${SKIMINDEX_SCRIPTS_DIR}/__skimindex.sh&quot;
+
+SECTION=&quot;&quot;
+
+while [[ $# -gt 0 ]]; do
+    case &quot;$1&quot; in
+        --section) SECTION=&quot;$2&quot;; shift 2 ;;
+        *) logerror &quot;Unknown option: $1&quot;; exit 1 ;;
+    esac
+done
+
+[[ -z &quot;$SECTION&quot; ]] &amp;&amp; { logerror &quot;--section is required&quot;; exit 1; }
+
+SECTION_UP=&quot;${SECTION^^}&quot;
+
+source_var=&quot;SKIMINDEX__DATA__${SECTION_UP}__SOURCE&quot;
+role_var=&quot;SKIMINDEX__DATA__${SECTION_UP}__ROLE&quot;
+dir_var=&quot;SKIMINDEX__DATA__${SECTION_UP}__DIRECTORY&quot;
+
+loginfo &quot;Section  : $SECTION&quot;
+loginfo &quot;Source   : ${!source_var:-&lt;not set&gt;}&quot;
+loginfo &quot;Role     : ${!role_var:-&lt;not set&gt;}&quot;
+loginfo &quot;Directory: ${!dir_var:-&lt;not set&gt;}&quot;
+</code></pre>
+<p>The full list of sections and their variables is produced at runtime by
+<code>python3 -m skimindex.config</code> (the same call made by <code>__skimindex_config.sh</code>).</p>
+<hr />
+<h2 id="logging-functions">Logging functions</h2>
+<p><code>__skimindex_log.sh</code> provides structured logging through file descriptor 3
+(default: stderr; redirected to the log file when configured).</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Level</th>
+<th>Colour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logdebug &lt;msg&gt;</code></td>
+<td>DEBUG</td>
+<td>cyan</td>
+</tr>
+<tr>
+<td><code>loginfo &lt;msg&gt;</code></td>
+<td>INFO</td>
+<td>green</td>
+</tr>
+<tr>
+<td><code>logwarning &lt;msg&gt;</code></td>
+<td>WARNING</td>
+<td>yellow</td>
+</tr>
+<tr>
+<td><code>logerror &lt;msg&gt;</code></td>
+<td>ERROR</td>
+<td>red</td>
+</tr>
+</tbody>
+</table>
+<p>The active level is set by <code>[logging].level</code> in the config (default: <code>INFO</code>).
+Messages below the active level are silently discarded.</p>
+<pre><code class="language-bash">loginfo  &quot;Starting download for $SECTION&quot;
+logwarning &quot;Output directory already exists — skipping&quot;
+logerror &quot;Required variable not set&quot;; exit 1
+</code></pre>
+<hr />
+<h2 id="stamp-functions">Stamp functions</h2>
+<p><code>__skimindex_stamping.sh</code> exposes the Python stamp API as shell functions
+(prefixed <code>ski_</code>).  They map boolean returns to POSIX exit codes
+(True → 0, False → 1), so they work directly in <code>if</code> statements.</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ski_stamp &lt;path&gt;</code></td>
+<td>Mark <em>path</em> as successfully completed</td>
+</tr>
+<tr>
+<td><code>ski_is_stamped &lt;path&gt;</code></td>
+<td>Return 0 if <em>path</em> has a stamp</td>
+</tr>
+<tr>
+<td><code>ski_unstamp &lt;path&gt;</code></td>
+<td>Remove the stamp (force re-run)</td>
+</tr>
+<tr>
+<td><code>ski_remove_if_not_stamped &lt;path&gt;</code></td>
+<td>Delete <em>path</em> if it has no stamp</td>
+</tr>
+<tr>
+<td><code>ski_needs_run &lt;path&gt; [sources…] [--dry-run] [--label L] [--action A]</code></td>
+<td>Three-way branch: already done / dry-run / must run</td>
+</tr>
+<tr>
+<td><code>ski_newer_than_stamp &lt;path&gt; &lt;stamped&gt;</code></td>
+<td>Return 0 if <em>path</em> is newer than the stamp of <em>stamped</em></td>
+</tr>
+<tr>
+<td><code>ski_unstamp_if_newer &lt;path&gt; [sources…]</code></td>
+<td>Invalidate stamp when a dependency changes</td>
+</tr>
+<tr>
+<td><code>ski_stamp_gz &lt;path&gt;</code></td>
+<td>Verify gzip integrity then stamp</td>
+</tr>
+</tbody>
+</table>
+<p>Pass <code>--help</code> to any function to see the full argument reference:</p>
+<pre><code class="language-bash">ski_needs_run --help
+</code></pre>
+<p>Typical pattern for an idempotent step:</p>
+<pre><code class="language-bash">OUTPUT_DIR=&quot;/processed_data/Human/split&quot;
+
+if ski_needs_run &quot;$OUTPUT_DIR&quot; &quot;$INPUT_FILE&quot; \
+        --label &quot;human:split&quot; --action &quot;split sequences&quot;; then
+    ski_remove_if_not_stamped &quot;$OUTPUT_DIR&quot;
+    mkdir -p &quot;$OUTPUT_DIR&quot;
+
+    # … do the work …
+
+    ski_stamp &quot;$OUTPUT_DIR&quot;
+fi
+</code></pre>
+<hr />
+<h2 id="advanced-development-shipping-a-command-inside-the-image">Advanced development — shipping a command inside the image</h2>
+<p>In normal use, scripts live in <code>usercmd/</code> and never require a rebuild.
+The steps below are only needed when you want to <strong>ship a command inside the
+container image</strong> itself — for example to distribute it to users who do not
+have access to the project directory.</p>
+<h3 id="adding-a-built-in-subcommand">Adding a built-in subcommand</h3>
+<p><strong>Step 1.</strong> Place the script in <code>scripts/</code> (no <code>_</code> prefix).  Use <code>$SCRIPT_DIR</code> to
+locate the library instead of <code>SKIMINDEX_SCRIPTS_DIR</code>:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# ============================================================
+# hello.sh
+# Say hello — built-in version.
+# ============================================================
+set -euo pipefail
+
+SCRIPT_DIR=&quot;$(cd &quot;$(dirname &quot;${BASH_SOURCE[0]}&quot;)&quot; &amp;&amp; pwd)&quot;
+source &quot;${SCRIPT_DIR}/__skimindex.sh&quot;
+
+loginfo &quot;Hello from inside the image!&quot;
+</code></pre>
+<p><strong>Step 2.</strong> Rebuild the image <strong>and</strong> regenerate <code>skimindex.sh</code>:</p>
+<pre><code class="language-bash">make -C docker
+</code></pre>
+<p>The script now appears as a built-in in <code>skimindex --help</code> and is available
+even without a <code>usercmd/</code> directory.</p>
+<h3 id="how-the-build-system-works">How the build system works</h3>
+<p><code>docker/build_user_script.sh</code> assembles <code>skimindex.sh</code> from the template
+<code>docker/skimindex.sh.in</code> by:</p>
+<ul>
+<li>scanning <code>scripts/</code> for user-facing scripts (no <code>_</code> prefix) and generating
+  the sub-command dispatch table (<code>@@SUBCOMMANDS@@</code>) and help list
+  (<code>@@SUBCOMMANDS_LIST@@</code>),</li>
+<li>inlining library files referenced as <code># @@INLINE: path@@</code>,</li>
+<li>substituting <code>@@KEY@@</code> placeholders with values supplied via <code>--set KEY=VALUE</code>.</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../processing/" class="btn btn-neutral float-left" title="Processing Model"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../processing/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

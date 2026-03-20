@@ -59,6 +59,22 @@
                 <li class="toctree-l1"><a class="reference internal" href="config-format/">Configuration Format</a>
                 </li>
               </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="environment-variables/">Environment Variables</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="data/">Data Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="processing/">Processing Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="devshell/">Writing Shell Commands</a>
+                </li>
+              </ul>
       </div>
     </div>
     </nav>
@@ -97,6 +113,15 @@ via a single TOML file.</p>
 <p><a href="config-format/">Configuration File Format</a> — specification of
   <code>config/skimindex.toml</code>: configuration sections, source sections, role
   sections, processing sections, and data sections</p>
+</li>
+<li>
+<p><a href="data/">Data Model</a> — runtime concepts: sources (ncbi, genbank, internal),
+  datasets (<code>Dataset</code>, <code>to_data()</code>), and roles — how they bind together and
+  drive the pipeline</p>
+</li>
+<li>
+<p><a href="processing/">Processing Model</a> — how processing sections work: atomic vs
+  composite, Data abstraction, input chaining, output resolution</p>
 </li>
 </ul>
 <h2 id="quick-start">Quick Start</h2>
@@ -168,5 +193,5 @@ Processing steps: <code>split</code>, <code>kmercount</code></p>
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2026-03-19 12:24:40.007378+00:00
+Build Date UTC : 2026-03-20 08:50:56.462687+00:00
 -->

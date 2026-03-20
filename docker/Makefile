@@ -215,8 +215,8 @@ test: $(VENV_PYTHON)
 
 DOCS_PID := $(PROJECT_ROOT)/.mkdocs.pid
 
-## docs               : Start the documentation server as a daemon (live-reload on docs/ changes)
-docs: $(VENV_PYTHON) docs-stop
+## docs               : Build static site then start the documentation server as a daemon (live-reload on docs/ changes)
+docs: $(VENV_PYTHON) docs-stop docs-build
 	nohup $(VENV)/bin/mkdocs serve --config-file $(PROJECT_ROOT)/mkdocs.yml \
 		> $(PROJECT_ROOT)/log/mkdocs.log 2>&1 & echo $$! > $(DOCS_PID)
 	@echo "Docs server started (pid $$(cat $(DOCS_PID))) → http://127.0.0.1:8000"

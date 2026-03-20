@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Data Model - skimindex</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Data Model";
+        var mkdocs_page_input_path = "data.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> skimindex
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../directory-structure/">Directory Structure</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../config-format/">Configuration Format</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../environment-variables/">Environment Variables</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Data Model</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#sources">Sources</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#ncbi">ncbi</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#genbank">genbank</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#internal">internal</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#datasets">Datasets</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#runtime-representation-dataset">Runtime representation — Dataset</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#listing-and-filtering-datasets">Listing and filtering datasets</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#roles">Roles</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#linking-datasets-to-roles">Linking datasets to roles</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#linking-roles-to-processing">Linking roles to processing</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#linking-processing-to-roles">Linking processing to roles</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#data-flow-summary">Data flow summary</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../processing/">Processing Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../devshell/">Writing Shell Commands</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">skimindex</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Data Model</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="skimindex-data-model-sources-datasets-and-roles">skimindex Data Model — Sources, Datasets, and Roles</h1>
+<h2 id="overview">Overview</h2>
+<p>Three concepts organise all data in skimindex:</p>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Config prefix</th>
+<th>What it represents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Source</strong></td>
+<td><code>[source.X]</code></td>
+<td>Where raw sequences come from (download origin)</td>
+</tr>
+<tr>
+<td><strong>Dataset</strong></td>
+<td><code>[data.X]</code></td>
+<td>A named collection of sequences with a specific purpose</td>
+</tr>
+<tr>
+<td><strong>Role</strong></td>
+<td><code>[role.X]</code></td>
+<td>A category of use — groups datasets and drives processing</td>
+</tr>
+</tbody>
+</table>
+<p>Every dataset binds exactly one source and one role:</p>
+<pre><code>[source.ncbi] ──────────────────┐
+                                 ▼
+                          [data.human]  ──▶  [role.decontamination]
+                                 ▲
+[source.genbank] ───────────────┘  (e.g. [data.fungi])
+</code></pre>
+<p>The TOML syntax for all three is specified in
+<a href="../config-format/">Configuration File Format</a>.</p>
+<hr />
+<h2 id="sources">Sources</h2>
+<p>A source represents an <strong>origin</strong> for raw sequence data. There are three:</p>
+<h3 id="ncbi"><code>ncbi</code></h3>
+<p>Data downloaded via the NCBI Datasets CLI (<code>datasets download genome</code>).
+Files are organised per genome assembly:</p>
+<pre><code>{source.ncbi.directory}/
+  {data.directory}/
+    {Species}--{accession}.gbff.gz     ← level-0 layout
+    {Species}/
+      {accession}.gbff.gz              ← level-1 layout
+      {accession}/
+        *.gbff.gz                      ← level-2 layout (multi-file assemblies)
+</code></pre>
+<p>The canonical filename convention uses <code>--</code> as the separator between species
+and accession (see <a href="../directory-structure/">Directory Structure</a>).</p>
+<h3 id="genbank"><code>genbank</code></h3>
+<p>Data downloaded as GenBank flat-file releases from the NCBI FTP site.
+Files are <strong>not</strong> split per dataset — the entire release is shared:</p>
+<pre><code>{source.genbank.directory}/
+  Release_{N}.0/
+    fasta/
+      bct/    ← bacterial sequences
+      pln/    ← plant/fungi sequences
+      …
+    taxonomy/
+      ncbi_taxonomy.tgz
+</code></pre>
+<p>A dataset with <code>source = "genbank"</code> filters sequences out of these flat-files
+at pipeline time using <code>obigrep</code> with:
+- a <strong>division filter</strong> (<code>divisions</code> key) — selects flat-files by GenBank division
+- an optional <strong>taxid filter</strong> (<code>taxid</code> key) — keeps only sequences in a given taxon</p>
+<h3 id="internal"><code>internal</code></h3>
+<p>In-house sequencing data. No download step — files must be placed manually
+in the source directory. No additional convention is imposed.</p>
+<hr />
+<h2 id="datasets">Datasets</h2>
+<p>A dataset (<code>[data.X]</code>) is a named collection of sequences that:
+- comes from one <strong>source</strong> (where to find the raw files)
+- serves one <strong>role</strong> (what the pipeline will do with them)</p>
+<h3 id="runtime-representation-dataset">Runtime representation — <code>Dataset</code></h3>
+<p>At runtime, a dataset is represented by a <code>Dataset</code> object
+(<code>skimindex.datasets.Dataset</code>). Its primary method is:</p>
+<pre><code class="language-python">ds.to_data() -&gt; Iterator[Data]
+</code></pre>
+<p><code>to_data()</code> yields one or more <code>Data</code> objects ready to enter a processing
+pipeline. The exact number and kind depends on the source:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Yields</th>
+<th>One <code>Data</code> per</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ncbi</code></td>
+<td><code>FILES</code></td>
+<td>genome assembly file (recursive scan of download dir)</td>
+</tr>
+<tr>
+<td><code>genbank</code></td>
+<td><code>FILES</code> or <code>STREAM</code></td>
+<td>division (after optional taxid filtering)</td>
+</tr>
+<tr>
+<td><code>internal</code></td>
+<td><em>not yet implemented</em></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Each <code>Data</code> object carries a <code>subdir</code> — the relative path from the processed
+data root up to (but not including) the processing output directory. This
+encodes the full dataset/species/accession context so that the pipeline can
+compute output paths without additional parameters.</p>
+<h3 id="listing-and-filtering-datasets">Listing and filtering datasets</h3>
+<pre><code class="language-python">from skimindex.datasets import datasets_for_role, get_dataset, all_datasets
+
+# All datasets with a given role
+for ds in datasets_for_role(&quot;decontamination&quot;):
+    print(ds.name, ds.source)
+
+# A single named dataset
+ds = get_dataset(&quot;human&quot;)
+</code></pre>
+<hr />
+<h2 id="roles">Roles</h2>
+<p>A role (<code>[role.X]</code>) defines <strong>how</strong> a group of datasets is processed. It:
+- provides an output <code>directory</code> name (the role subdirectory in processed data)
+- declares the default processing pipeline to run (<code>run</code> key)</p>
+<h3 id="linking-datasets-to-roles">Linking datasets to roles</h3>
+<p>Every dataset declares its role via the <code>role</code> key:</p>
+<pre><code class="language-toml">[data.human]
+source = &quot;ncbi&quot;
+role   = &quot;decontamination&quot;   # ← belongs to this role
+
+[data.fungi]
+source = &quot;genbank&quot;
+role   = &quot;decontamination&quot;   # ← also belongs to this role
+</code></pre>
+<p>The role groups all datasets that share the same processing purpose.</p>
+<h3 id="linking-roles-to-processing">Linking roles to processing</h3>
+<p>A role declares which processing pipeline to run by default:</p>
+<pre><code class="language-toml">[role.decontamination]
+directory = &quot;decontamination&quot;
+run       = &quot;prepare_decontam&quot;   # default pipeline for all datasets in this role
+</code></pre>
+<p>Individual datasets can override this with their own <code>run</code> key (see
+<a href="../config-format/#data-sections">Configuration File Format</a>).</p>
+<h3 id="linking-processing-to-roles">Linking processing to roles</h3>
+<p>A processing section can also declare which role it operates on via its own
+<code>role</code> key. This makes the section self-describing — the runner can discover
+which datasets to process without any hardcoding:</p>
+<pre><code class="language-toml">[processing.prepare_decontam]
+role      = &quot;decontamination&quot;   # operates on all datasets with this role
+directory = &quot;parts&quot;
+steps     = [...]
+</code></pre>
+<p>See <a href="../processing/#dataset-binding-and-input-chaining">Processing Model</a> for
+details on how <code>role</code> and <code>input</code> interact in processing sections.</p>
+<hr />
+<h2 id="data-flow-summary">Data flow summary</h2>
+<pre><code>[source.X]          [data.Y]           [role.Z]         [processing.W]
+   │                   │                   │                   │
+   │ raw files         │ source + role     │ directory         │ role + input
+   │                   │ → Dataset         │ run = &quot;W&quot;         │ directory
+   ▼                   ▼                   ▼                   ▼
+download/          Dataset.to_data()  processed_data/    pipeline execution
+{data}/              → Data(FILES)     {role}/             → output in
+{species}/           → Data(STREAM)     {data}/              {role}/{data}/
+{accession}/                             {species}/            {species}/
+                                          {accession}/          {accession}/
+                                           {processing}/
+</code></pre>
+<p>The <code>subdir</code> carried by each <code>Data</code> object encodes the path segments between
+the processed data root and the processing output directory, so that output
+paths are always computed from the data itself, never passed as external
+parameters.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../environment-variables/" class="btn btn-neutral float-left" title="Environment Variables"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../processing/" class="btn btn-neutral float-right" title="Processing Model">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../environment-variables/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../processing/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Processing Model - skimindex</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Processing Model";
+        var mkdocs_page_input_path = "processing.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> skimindex
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../directory-structure/">Directory Structure</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../config-format/">Configuration Format</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../environment-variables/">Environment Variables</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../data/">Data Model</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Processing Model</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#atomic-processing">Atomic processing</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#composite-processing">Composite processing</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#persistence">Persistence</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#who-persists-what">Who persists what</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#how-the-runner-persists-each-outputkind">How the runner persists each OutputKind</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#stream-output-with-directory-non-terminal-step">STREAM output with directory, non-terminal step</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#stream-output-with-directory-terminal-step-last-in-composite">STREAM output with directory, terminal step (last in composite)</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#directory-or-file-output-with-directory">DIRECTORY or FILE output with directory</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#without-directory-temporary">Without directory (temporary)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#stamp-management">Stamp management</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#linking-processing-to-roles-and-data">Linking processing to roles and data</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#full-example">Full example</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#data-model">Data model</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#output-resolution">Output resolution</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#effective-output-directory">Effective output directory</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#output-filename-for-stream-and-file-types">Output filename for STREAM and FILE types</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#runnability">Runnability</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#dataset-binding-and-input-chaining">Dataset binding and input chaining</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#role-which-datasets-a-processing-operates-on">role — which datasets a processing operates on</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#input-where-input-data-comes-from">input — where input data comes from</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#input-resolution-rules">Input resolution rules</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#validation-rules">Validation rules</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../devshell/">Writing Shell Commands</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">skimindex</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Processing Model</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="skimindex-processing-model">skimindex Processing Model</h1>
+<h2 id="overview">Overview</h2>
+<p>Processing sections (<code>[processing.X]</code>) describe how raw or downloaded data are
+transformed into pipeline outputs. Each section is either <strong>atomic</strong> (a single
+operation) or <strong>composite</strong> (an ordered sequence of steps).</p>
+<p>The <code>type</code> and <code>steps</code> keys are <strong>mutually exclusive</strong> — a processing section
+must have exactly one of them.</p>
+<hr />
+<h2 id="atomic-processing">Atomic processing</h2>
+<p>An atomic section wraps a single registered operation. The <code>type</code> value maps
+to a Python function decorated with <code>@processing</code> in the <code>skimindex.processing</code>
+module — the set of valid types is therefore determined by the implementation.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+<td>yes</td>
+<td>Registered processing function name</td>
+</tr>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>no</td>
+<td>Output subdirectory. If absent, output is temporary (see <a href="#persistence">Persistence</a>)</td>
+</tr>
+<tr>
+<td><em>(others)</em></td>
+<td>any</td>
+<td>no</td>
+<td>Operation-specific parameters passed to the function</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[processing.split_decontam]
+type      = &quot;split&quot;
+directory = &quot;split&quot;     # results saved to this subdirectory
+size      = 200         # fragment size in bp
+overlap   = 28          # overlap = kmer_size - 1
+
+[processing.remove_n]
+type = &quot;remove_n_only&quot;  # no directory → temporary
+
+[processing.distribute_batches]
+type    = &quot;distribute&quot;
+batches = 20            # no directory → temporary
+</code></pre>
+<hr />
+<h2 id="composite-processing">Composite processing</h2>
+<p>A composite section chains multiple steps in order. Each step is either a
+<strong>named reference</strong> (string) or an <strong>inline atomic</strong> (TOML inline table).</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>steps</code></td>
+<td>array</td>
+<td>yes</td>
+<td>Ordered list of steps (strings or inline tables)</td>
+</tr>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>yes*</td>
+<td>Output subdirectory. *Required when this section is referenced by <code>run</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each element of <code>steps</code> is one of:</p>
+<table>
+<thead>
+<tr>
+<th>Form</th>
+<th>Example</th>
+<th>Parameters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Named reference</td>
+<td><code>"split_decontam"</code></td>
+<td>Defined in its own <code>[processing.X]</code> section</td>
+</tr>
+<tr>
+<td>Inline atomic</td>
+<td><code>{type = "remove_n_only"}</code></td>
+<td>Always temporary, always atomic</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[processing.prepare_decontam]
+directory = &quot;prepared&quot;                        # required: this section is run by a role
+steps = [
+  &quot;split_decontam&quot;,                           # named reference — saved if it has directory
+  {type = &quot;remove_n_only&quot;},                   # inline — always temporary
+  {type = &quot;distribute&quot;, batches = 20},        # inline — always temporary
+]
+</code></pre>
+<hr />
+<h2 id="persistence">Persistence</h2>
+<p>Whether a step's output is saved to disk depends on whether it declares a
+<code>directory</code> key. The <strong>runner</strong> (not the atomic bricks) enforces these rules.</p>
+<h3 id="who-persists-what">Who persists what</h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th><code>directory</code> present?</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Top-level <code>[processing.X]</code> referenced by <code>run</code></td>
+<td>must be present</td>
+<td>saved</td>
+</tr>
+<tr>
+<td>Named reference inside <code>steps</code></td>
+<td>yes</td>
+<td>saved to its <code>directory</code></td>
+</tr>
+<tr>
+<td>Named reference inside <code>steps</code></td>
+<td>no</td>
+<td>temporary (cleaned up after pipeline)</td>
+</tr>
+<tr>
+<td>Inline table <code>{type=...}</code> inside <code>steps</code></td>
+<td>n/a</td>
+<td>always temporary</td>
+</tr>
+</tbody>
+</table>
+<p>Only the <strong>composite output directory</strong> carries a stamp. Intermediate steps
+saved to their own <code>directory</code> are persisted but not stamped — they will not
+trigger a short-circuit on re-run.</p>
+<h3 id="how-the-runner-persists-each-outputkind">How the runner persists each OutputKind</h3>
+<h4 id="stream-output-with-directory-non-terminal-step">STREAM output with <code>directory</code>, <strong>non-terminal</strong> step</h4>
+<p>The runner injects <code>tee</code> into the pipe so the byte stream is simultaneously
+written to disk and forwarded to the next step:</p>
+<pre><code>input_cmd | tee(out_file) | next_step
+</code></pre>
+<p>The output file is <code>step_dir / output_filename</code> (declared by the type).</p>
+<h4 id="stream-output-with-directory-terminal-step-last-in-composite">STREAM output with <code>directory</code>, <strong>terminal</strong> step (last in composite)</h4>
+<p>The runner redirects stdout to the output file and executes the pipeline:</p>
+<pre><code class="language-python">(input_cmd &gt; str(out_file))()
+</code></pre>
+<p>Execution happens here; the next Data object is <code>files_data([out_file])</code>.</p>
+<h4 id="directory-or-file-output-with-directory">DIRECTORY or FILE output with <code>directory</code></h4>
+<p>The runner passes <code>step_dir</code> as the output directory to the atomic brick:</p>
+<pre><code class="language-python">fn(data, step_dir, dry_run=dry_run)
+</code></pre>
+<p>The brick creates the directory, writes its files, and returns a <code>Data</code> object.</p>
+<h4 id="without-directory-temporary">Without <code>directory</code> (temporary)</h4>
+<ul>
+<li><strong>STREAM</strong>: the step is chained without executing (no intermediate file).</li>
+<li><strong>DIRECTORY / FILE</strong>: the runner creates a temporary directory via
+  <code>tempfile.mkdtemp()</code>, passes it to the brick, and removes it in a
+  <code>try/finally</code> block after the pipeline completes.</li>
+</ul>
+<h3 id="stamp-management">Stamp management</h3>
+<pre><code>needs_run(composite_output_dir, *sources)  →  skip if already stamped
+remove_if_not_stamped(composite_output_dir)  →  clean partial results
+… all steps execute …
+stamp(composite_output_dir)  →  mark success
+</code></pre>
+<p>Stamp files live under the <code>[stamp]</code> directory configured in <code>skimindex.toml</code>.</p>
+<hr />
+<h2 id="linking-processing-to-roles-and-data">Linking processing to roles and data</h2>
+<p>A role or data section triggers a processing pipeline via the <code>run</code> key:</p>
+<pre><code class="language-toml">[role.decontamination]
+directory = &quot;decontamination&quot;
+run       = &quot;prepare_decontam&quot;   # references [processing.prepare_decontam]
+</code></pre>
+<p>A data section can override the role's <code>run</code>:</p>
+<pre><code class="language-toml">[data.fungi]
+source = &quot;genbank&quot;
+role   = &quot;decontamination&quot;
+run    = &quot;prepare_gb_decontam&quot;   # overrides [role.decontamination].run
+</code></pre>
+<p><strong>Rule</strong>: the processing section referenced by <code>run</code> must have a <code>directory</code> key.</p>
+<hr />
+<h2 id="full-example">Full example</h2>
+<pre><code class="language-toml"># Atomic steps
+[processing.split_decontam]
+type      = &quot;split&quot;
+directory = &quot;split&quot;
+size      = 200
+overlap   = 28
+
+[processing.count_kmers]
+type      = &quot;kmercount&quot;
+directory = &quot;kmercount&quot;
+kmer_size = 29
+
+# Composite pipeline — run by [role.decontamination]
+[processing.prepare_decontam]
+directory = &quot;prepared&quot;
+steps = [
+  &quot;split_decontam&quot;,                     # saved to split/
+  {type = &quot;remove_n_only&quot;},             # temporary
+  &quot;count_kmers&quot;,                        # saved to kmercount/
+]
+
+# Role referencing the pipeline
+[role.decontamination]
+directory = &quot;decontamination&quot;
+run       = &quot;prepare_decontam&quot;
+</code></pre>
+<hr />
+<h2 id="data-model">Data model</h2>
+<p>Data flowing between processing steps is represented as a <code>Data</code> object.
+The plumbum execution layer is an implementation detail — pipeline orchestration
+only sees <code>Data</code>.</p>
+<p>Three kinds, aligned with <code>OutputKind</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Description</th>
+<th>Carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>STREAM</strong></td>
+<td>A deferred pipeline not yet executed</td>
+<td>a plumbum command/pipe</td>
+</tr>
+<tr>
+<td><strong>FILES</strong></td>
+<td>One or more files on disk</td>
+<td><code>list[Path]</code></td>
+</tr>
+<tr>
+<td><strong>DIRECTORY</strong></td>
+<td>A directory of files</td>
+<td>a single <code>Path</code></td>
+</tr>
+</tbody>
+</table>
+<p>Every processing type has the uniform interface <code>Data → Data</code>.
+The pipeline executor chains steps by passing the <code>Data</code> output of one step as
+the <code>Data</code> input of the next.</p>
+<p>Initial data (downloaded sources) is wrapped into <code>Data</code> before entering the
+pipeline:</p>
+<pre><code class="language-python">files_data(Path(&quot;genome.gbff.gz&quot;), format=&quot;gbff.gz&quot;)   # single genome file
+files_data(list(dir.glob(&quot;*.fasta.gz&quot;)), format=&quot;fasta.gz&quot;)  # batch of files
+directory_data(Path(&quot;/genbank/fasta/bct&quot;))              # directory of FASTA files
+stream_data(cmd, format=&quot;fasta&quot;)                        # pre-filtered stream
+</code></pre>
+<p>The <code>to_stream_command(data)</code> adapter is the <strong>only</strong> place where <code>Data</code> touches
+plumbum — it converts any <code>Data</code> kind into a plumbum source command via
+<code>obiconvert</code>. Atomic type implementations call it internally; pipeline
+orchestration never sees plumbum objects.</p>
+<hr />
+<h2 id="output-resolution">Output resolution</h2>
+<h3 id="effective-output-directory">Effective output directory</h3>
+<p>The effective output directory of a processing section is determined as follows:</p>
+<ul>
+<li><strong>Atomic</strong> with <code>directory</code>: its own <code>directory</code>.</li>
+<li><strong>Atomic</strong> without <code>directory</code>: no persistent output (temporary / piped).</li>
+<li><strong>Composite</strong> with <code>directory</code>: its own <code>directory</code> (ignores last step's directory).</li>
+<li><strong>Composite</strong> without <code>directory</code>: the effective output directory of its <strong>last step</strong>
+  (which itself must have one, otherwise the composite has no persistent output).</li>
+</ul>
+<p>The output type (STREAM / DIRECTORY / FILE) of a composite is always the output type
+of its <strong>last step</strong>, regardless of whether the composite has its own <code>directory</code>.</p>
+<h3 id="output-filename-for-stream-and-file-types">Output filename for STREAM and FILE types</h3>
+<p>When a STREAM or FILE output must be persisted to disk (because a <code>directory</code> is
+declared), the filename is determined by the processing <strong>type implementation</strong>, not
+by the TOML config. Each registered processing type declares its <code>output_filename</code> in
+code (e.g. <code>"filtered.fasta.gz"</code>), because the type knows its own output format.</p>
+<p>A type with no declared <code>output_filename</code> cannot be persisted and must remain
+temporary; declaring a <code>directory</code> for such a type is a validation error.</p>
+<h3 id="runnability">Runnability</h3>
+<p>A processing section is <strong>runnable as a top-level step</strong> only if it has an effective
+output directory. Sections without a persistent output can only appear as intermediate
+steps inside a composite.</p>
+<hr />
+<h2 id="dataset-binding-and-input-chaining">Dataset binding and input chaining</h2>
+<h3 id="role-which-datasets-a-processing-operates-on"><code>role</code> — which datasets a processing operates on</h3>
+<p>A processing section can declare the role of datasets it operates on via the
+optional <code>role</code> key. When a pipeline is executed without an explicit dataset
+list, the runner uses <code>role</code> to discover the relevant datasets automatically.</p>
+<pre><code class="language-toml">[processing.prepare_decontam]
+role      = &quot;decontamination&quot;  # operates on all datasets with role=&quot;decontamination&quot;
+directory = &quot;parts&quot;
+steps = [...]
+</code></pre>
+<p>This makes the processing section self-describing: it knows its own dataset
+scope without any hardcoding in the calling code.</p>
+<h3 id="input-where-input-data-comes-from"><code>input</code> — where input data comes from</h3>
+<p>A processing section can declare where its input data comes from via the
+optional <code>input</code> key:</p>
+<table>
+<thead>
+<tr>
+<th><code>input</code> present?</th>
+<th>Source of input data</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>absent</td>
+<td>raw dataset files (<code>dataset.to_data()</code>)</td>
+</tr>
+<tr>
+<td><code>input = "X"</code></td>
+<td>output directory of <code>[processing.X]</code> for the same dataset</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[processing.prepare_decontam]
+role      = &quot;decontamination&quot;
+directory = &quot;parts&quot;
+steps = [
+  {type = &quot;split&quot;,         size = 200, overlap = 28},
+  {type = &quot;filter_n_only&quot;},
+  {type = &quot;distribute&quot;,    batches = 20},
+]
+# no input → reads raw downloaded files
+
+[processing.count_kmers_decontam]
+type      = &quot;kmercount&quot;
+input     = &quot;prepare_decontam&quot;   # reads from parts/ produced by prepare_decontam
+directory = &quot;kmercount&quot;
+kmer_size = 29
+</code></pre>
+<p>These two sections implicitly define a chain:</p>
+<pre><code>dataset.to_data()
+    → prepare_decontam   (role=&quot;decontamination&quot;) → parts/
+    → count_kmers_decontam                        → kmercount/
+</code></pre>
+<p>Each section can be run independently: <code>decontam prepare</code> starts from raw files,
+<code>decontam count</code> starts from <code>parts/</code> without re-running <code>prepare_decontam</code>.</p>
+<h3 id="input-resolution-rules">Input resolution rules</h3>
+<p>The rule is recursive and uniform:</p>
+<p><strong>Standalone execution</strong> (referenced by <code>run</code> or called directly):
+- no <code>input</code> → <code>dataset.to_data()</code> (raw source files)
+- <code>input = "X"</code> → <code>directory_data(output_dir_of_X / for_this_dataset)</code></p>
+<p><strong>As a step inside a composite</strong>:
+- the step's own <code>input</code> key is <strong>silently ignored</strong>
+- first step → receives the composite's resolved input (same rules as standalone)
+- subsequent steps → receive the output of the previous step</p>
+<p>The composite resolves its own <code>input</code> first, then propagates the result through
+its steps in order. A step's <code>input</code> is only meaningful when that section is
+executed as a top-level pipeline.</p>
+<hr />
+<h2 id="validation-rules">Validation rules</h2>
+<ol>
+<li>A <code>[processing.X]</code> section must have exactly one of <code>type</code> or <code>steps</code>.</li>
+<li>A section with <code>steps</code> is composite; all elements must be strings or inline tables with <code>type</code>.</li>
+<li>Inline tables inside <code>steps</code> must not have <code>steps</code> (inline steps are always atomic).</li>
+<li>Any processing section referenced by a <code>run</code> key must have a runnable effective output directory.</li>
+<li><code>type</code> values must match a registered <code>@processing_type</code> function in <code>skimindex.processing</code>.</li>
+<li>A STREAM/FILE atomic with <code>directory</code> must have a declared <code>output_filename</code> in its type.</li>
+<li>Composite sections (<code>steps</code>) are <strong>not</strong> registered in the <code>@processing_type</code> registry.
+   They are structural constructs executed by the pipeline runner, not named operations.</li>
+<li>If <code>input</code> is present, it must reference an existing <code>[processing.X]</code> section that has a <code>directory</code>.</li>
+<li>If <code>role</code> is present, it must be a valid role name declared in a <code>[role.X]</code> section.</li>
+</ol>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../data/" class="btn btn-neutral float-left" title="Data Model"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../devshell/" class="btn btn-neutral float-right" title="Writing Shell Commands">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../data/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../devshell/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
