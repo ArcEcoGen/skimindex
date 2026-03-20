@@ -1,5 +1,10 @@
 # skimindex Documentation
 
+<div style="background:#fff3cd;border-left:4px solid #ffc107;padding:0.8em 1em;margin-bottom:1em">
+<strong>⚠ Project under active development</strong><br>
+Results produced by the pipeline should not be considered correct or reliable at this stage.
+</div>
+
 ## Contents
 
 - [Directory Structure](directory-structure.md) — layout of runtime data directories
