@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Entry Point (skimindex.sh) - skimindex</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Entry Point (skimindex.sh)";
+        var mkdocs_page_input_path = "entrypoint.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> skimindex
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../directory-structure/">Directory Structure</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../config-format/">Configuration Format</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../environment-variables/">Environment Variables</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../data/">Data Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../processing/">Processing Model</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Entry Point (skimindex.sh)</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#global-options">Global Options</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#built-in-subcommands">Built-in Subcommands</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#init">init</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#update">update</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#shell">shell</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#pipeline-subcommands">Pipeline subcommands</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#user-subcommands-usercmd">User subcommands (usercmd/)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#container-runtime">Container Runtime</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#bind-mounts">Bind-Mounts</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../commands/">Pipeline Commands</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../devshell/">Writing Shell Commands</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">skimindex</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Entry Point (skimindex.sh)</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="skimindex-entry-point">skimindex Entry Point</h1>
+<p><code>skimindex.sh</code> is the single user-facing entry point for the pipeline.
+It handles container runtime detection, bind-mounting project directories,
+image lifecycle, and subcommand dispatch.</p>
+<hr />
+<h2 id="usage">Usage</h2>
+<pre><code>skimindex [--project-dir DIR] [--local] &lt;subcommand&gt; [subcommand-options]
+skimindex --help
+</code></pre>
+<hr />
+<h2 id="global-options">Global Options</h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--project-dir DIR</code></td>
+<td>Project root directory. Defaults to the current working directory. All relative paths in <code>config/skimindex.toml</code> are resolved from this directory.</td>
+</tr>
+<tr>
+<td><code>--local</code></td>
+<td>Use the locally cached image without checking the registry for updates.</td>
+</tr>
+<tr>
+<td><code>-h</code>, <code>--help</code></td>
+<td>Show help and exit.</td>
+</tr>
+</tbody>
+</table>
+<p>Global options must appear <strong>before</strong> the subcommand. Options after the
+subcommand name are passed through to the subcommand unchanged.</p>
+<hr />
+<h2 id="built-in-subcommands">Built-in Subcommands</h2>
+<h3 id="init"><code>init</code></h3>
+<p>Initialise a new project directory:</p>
+<ol>
+<li>Creates <code>config/</code> and downloads a default <code>skimindex.toml</code> from the
+   source repository if none is present.</li>
+<li>Creates all host-side directories declared in <code>[local_directories]</code>
+   (including <code>usercmd/</code>, <code>log/</code>, <code>stamp/</code>, etc.).</li>
+</ol>
+<pre><code class="language-bash">skimindex --project-dir /path/to/project init
+</code></pre>
+<p>The project directory is created if it does not exist. If <code>config/skimindex.toml</code>
+already exists it is left untouched. The directory creation step is always
+performed, so <code>init</code> is safe to re-run.</p>
+<h3 id="update"><code>update</code></h3>
+<p>Pull the latest container image from the registry (or rebuild the SIF for
+Apptainer). An automatic update check is performed at every
+run unless <code>--local</code> is set.</p>
+<pre><code class="language-bash">skimindex update
+</code></pre>
+<h3 id="shell"><code>shell</code></h3>
+<p>Start an interactive shell inside the container with all project directories
+bind-mounted. Useful for debugging and manual inspection.</p>
+<pre><code class="language-bash">skimindex shell [--mount SRC:DST] …
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--mount SRC:DST</code></td>
+<td>Add an extra bind-mount on top of the config-driven ones. May be repeated.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pipeline-subcommands">Pipeline subcommands</h3>
+<p>All other subcommands are dispatched to scripts inside the container image
+(in <code>/app/scripts/</code>). Run <code>skimindex --help</code> to see the full list available
+in your installed version. See <a href="../commands/">Pipeline Commands</a> for the full
+reference.</p>
+<h3 id="user-subcommands-usercmd">User subcommands (<code>usercmd/</code>)</h3>
+<p>Scripts placed in the project's <code>usercmd/</code> directory are available as
+additional subcommands without rebuilding the image.
+See <a href="../devshell/">Writing Shell Commands</a> for details.</p>
+<hr />
+<h2 id="container-runtime">Container Runtime</h2>
+<p>The runtime is auto-detected in priority order:</p>
+<pre><code>apptainer  →  docker  →  podman
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Runtime</th>
+<th>Image location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Apptainer</td>
+<td><code>&lt;project-dir&gt;/images/&lt;name&gt;-&lt;tag&gt;.sif</code> (local file)</td>
+</tr>
+<tr>
+<td>Docker / Podman</td>
+<td>Registry: pulled on first use, then cached locally</td>
+</tr>
+</tbody>
+</table>
+<p>For Docker and Podman, <code>--pull always</code> is the default — the registry is
+checked for a newer image at every run. Use <code>--local</code> to skip this check.</p>
+<p>For Apptainer, the SIF digest is compared against the registry at startup.
+If the registry is unreachable (offline), the local SIF is used as-is.</p>
+<hr />
+<h2 id="bind-mounts">Bind-Mounts</h2>
+<p>All directories declared in <code>[local_directories]</code> in <code>config/skimindex.toml</code>
+are automatically bind-mounted into the container.</p>
+<p>Each key <code>&lt;k&gt;</code> maps its host path to <code>/&lt;k&gt;</code> inside the container:</p>
+<pre><code class="language-toml">[local_directories]
+genbank        = &quot;genbank&quot;          # host: &lt;project-dir&gt;/genbank/  →  /genbank
+processed_data = &quot;processed_data&quot;   # host: &lt;project-dir&gt;/processed_data/  →  /processed_data
+usercmd        = &quot;usercmd&quot;          # host: &lt;project-dir&gt;/usercmd/  →  /usercmd
+…
+</code></pre>
+<p>Extra mounts can be added when using the <code>shell</code> subcommand via <code>--mount SRC:DST</code> (not available for pipeline subcommands).</p>
+<hr />
+<h2 id="configuration">Configuration</h2>
+<p>The pipeline configuration file is read from:</p>
+<pre><code>&lt;project-dir&gt;/config/skimindex.toml
+</code></pre>
+<p>See <a href="../config-format/">Configuration File Format</a> for the full specification.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../processing/" class="btn btn-neutral float-left" title="Processing Model"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../commands/" class="btn btn-neutral float-right" title="Pipeline Commands">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../processing/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../commands/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

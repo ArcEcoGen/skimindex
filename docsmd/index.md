@@ -19,7 +19,12 @@ Results produced by the pipeline should not be considered correct or reliable at
   datasets (`Dataset`, `to_data()`), and roles — how they bind together and
   drive the pipeline
 
-- [Processing Model](processing.md) — how processing sections work: atomic vs
+- [Processing Model](processing.md)
+
+- [Entry Point](entrypoint.md)
+
+- [Pipeline Commands](commands.md) — reference for `download`, `decontam`, and `validate` subcommands — `skimindex.sh` usage, global options, built-in
+  subcommands, container runtime detection, and bind-mount mechanism — how processing sections work: atomic vs
   composite, Data abstraction, input chaining, output resolution
 
 ## Quick Start

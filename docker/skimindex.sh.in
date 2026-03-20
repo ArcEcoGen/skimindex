@@ -63,8 +63,10 @@ _remaining_args=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --project-dir)
+            mkdir -p "$2"
             PROJECT_ROOT="$(cd "$2" && pwd)"; shift 2 ;;
         --project-dir=*)
+            mkdir -p "${1#--project-dir=}"
             PROJECT_ROOT="$(cd "${1#--project-dir=}" && pwd)"; shift ;;
         --local)
             _SKI_LOCAL=1; shift ;;

@@ -51,25 +51,26 @@ directory = "genbank"     # → ${SKIMINDEX_ROOT}/genbank/
 The generic layout inside that mount point is:
 
 **Species-organised data** ([`by_species = true`](config-format.md#common-keys), default) — one subdirectory
-per data section, files named with the canonical `--` separator:
+per data section, files named with the canonical `--` separator.
+Each accession corresponds to one sequenced individual of the species.
 
 ```
 {source-directory}/
 └── {data.directory}/
     │
-    │  # Level 0 — one file per species (single accession)
+    │  # Level 0 — one file per species (single accession = single individual)
     ├── {Species_name}--{accession}.<ext>
     │
-    │  # Level 1 — multiple accessions, one file each
+    │  # Level 1 — multiple individuals, one file each
     ├── {Species_name}/
-    │   ├── {accession_1}.<ext>
-    │   └── {accession_2}.<ext>
+    │   ├── {accession_1}.<ext>      # individual 1
+    │   └── {accession_2}.<ext>      # individual 2
     │
-    │  # Level 2 — multiple accessions, multiple files each
+    │  # Level 2 — multiple individuals, multiple files each
     └── {Species_name}/
-        ├── {accession_1}/
+        ├── {accession_1}/           # individual 1
         │   └── *.<ext>
-        └── {accession_2}/
+        └── {accession_2}/           # individual 2
             └── *.<ext>
 ```
 
@@ -139,18 +140,18 @@ directory = "raw_data"    # → ${SKIMINDEX_ROOT}/raw_data/
 The generic layout inside that mount point is:
 
 Internal data follows the same species-organised layout (`by_species = true`
-by default):
+by default). Each accession corresponds to one sequenced individual.
 
 ```
 {source-directory}/
 └── {data.directory}/
     │
-    │  # Level 0 — one file per species (single accession)
+    │  # Level 0 — one file per species (single individual)
     ├── {Species_name}--{accession}.<ext>
     │
-    │  # Level 1 — multiple accessions, one file each
+    │  # Level 1 — multiple individuals, one file each
     ├── {Species_name}/
-    │   ├── {accession_1}.<ext>
+    │   ├── {accession_1}.<ext>      # individual 1
     │   └── {accession_2}.<ext>
     │
     │  # Level 2 — multiple accessions, multiple files each

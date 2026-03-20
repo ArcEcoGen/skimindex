@@ -9,6 +9,8 @@ nav:
   - Environment Variables: environment-variables.md
   - Data Model: data.md
   - Processing Model: processing.md
+  - Entry Point (skimindex.sh): entrypoint.md
+  - Pipeline Commands: commands.md
   - Writing Shell Commands: devshell.md
 
 theme:

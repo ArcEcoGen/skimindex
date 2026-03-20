@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Pipeline Commands - skimindex</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Pipeline Commands";
+        var mkdocs_page_input_path = "commands.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> skimindex
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../directory-structure/">Directory Structure</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../config-format/">Configuration Format</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../environment-variables/">Environment Variables</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../data/">Data Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../processing/">Processing Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../entrypoint/">Entry Point (skimindex.sh)</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Pipeline Commands</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#download-download-raw-data">download — Download raw data</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#download-genbank">download genbank</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#download-ncbi">download ncbi</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#decontam-prepare-decontamination-filter">decontam — Prepare decontamination filter</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#decontam-prepare">decontam prepare</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#decontam-count">decontam count</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#validate-validate-configuration">validate — Validate configuration</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../devshell/">Writing Shell Commands</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">skimindex</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Pipeline Commands</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="pipeline-commands">Pipeline Commands</h1>
+<p>The following subcommands are built into the container image and available via
+<code>skimindex &lt;command&gt;</code>. For global options, runtime detection, and bind-mount
+configuration see <a href="../entrypoint/">Entry Point</a>.</p>
+<p>All pipeline commands share a common set of flags inherited from the
+<code>SkimCommand</code> base class:</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--list</code></td>
+<td>Print available sections (datasets or divisions) as CSV and exit.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Show what would be done without executing anything.</td>
+</tr>
+<tr>
+<td><code>--help</code></td>
+<td>Show command help and exit.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="download-download-raw-data"><code>download</code> — Download raw data</h2>
+<p>Download GenBank flat-file releases and NCBI reference genome assemblies.</p>
+<pre><code>skimindex download                        # download everything
+skimindex download genbank [options]      # GenBank flat-files only
+skimindex download ncbi    [options]      # NCBI genome assemblies only
+</code></pre>
+<h3 id="download-genbank"><code>download genbank</code></h3>
+<p>Downloads GenBank flat-file divisions declared in <code>[source.genbank]</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--division DIV</code></td>
+<td>Process a single GenBank division (e.g. <code>pln</code>, <code>bct</code>).</td>
+</tr>
+<tr>
+<td><code>--status</code></td>
+<td>Show download status without downloading.</td>
+</tr>
+<tr>
+<td><code>--list</code></td>
+<td>Print available divisions and exit.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Show what would be downloaded without executing.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="download-ncbi"><code>download ncbi</code></h3>
+<p>Downloads NCBI reference genome assemblies declared as <code>source = "ncbi"</code> data
+sections.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--dataset NAME</code></td>
+<td>Process a single NCBI dataset (e.g. <code>human</code>, <code>plants</code>).</td>
+</tr>
+<tr>
+<td><code>--taxon TAXON</code></td>
+<td>Query assemblies for a taxon and display results (no download).</td>
+</tr>
+<tr>
+<td><code>--one-per species\|genus</code></td>
+<td>Keep only one assembly per species or genus.</td>
+</tr>
+<tr>
+<td><code>--assembly-level LEVEL</code></td>
+<td>Filter by assembly level (e.g. <code>complete</code>, <code>chromosome</code>).</td>
+</tr>
+<tr>
+<td><code>--assembly-source SOURCE</code></td>
+<td>Filter by assembly source (<code>refseq</code>, <code>genbank</code>).</td>
+</tr>
+<tr>
+<td><code>--assembly-version VERSION</code></td>
+<td>Filter by assembly version (e.g. <code>latest</code>).</td>
+</tr>
+<tr>
+<td><code>--reference</code></td>
+<td>Filter to reference assemblies only.</td>
+</tr>
+<tr>
+<td><code>--status</code></td>
+<td>Show download status without downloading.</td>
+</tr>
+<tr>
+<td><code>--list</code></td>
+<td>Print available datasets and exit.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Show what would be downloaded without executing.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="decontam-prepare-decontamination-filter"><code>decontam</code> — Prepare decontamination filter</h2>
+<p>Prepare reference sequences for building the decontamination k-mer filter.</p>
+<pre><code>skimindex decontam                        # run full pipeline (prepare + count)
+skimindex decontam prepare [options]      # split genomes into fragments
+skimindex decontam count   [options]      # count k-mers in fragments
+</code></pre>
+<h3 id="decontam-prepare"><code>decontam prepare</code></h3>
+<p>Splits reference genomes into overlapping fragments using the
+<code>[processing.prepare_decontam]</code> pipeline.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--dataset NAME</code></td>
+<td>Process a single decontamination dataset (e.g. <code>human</code>, <code>fungi</code>).</td>
+</tr>
+<tr>
+<td><code>--list</code></td>
+<td>Print available datasets and exit.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Show what would be processed without executing.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="decontam-count"><code>decontam count</code></h3>
+<p>Counts k-mers in prepared fragments using <code>[processing.count_kmers_decontam]</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--dataset NAME</code></td>
+<td>Process a single decontamination dataset.</td>
+</tr>
+<tr>
+<td><code>--list</code></td>
+<td>Print available datasets and exit.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Show what would be processed without executing.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="validate-validate-configuration"><code>validate</code> — Validate configuration</h2>
+<p>Loads <code>config/skimindex.toml</code>, runs all validation rules, and reports errors.</p>
+<pre><code>skimindex validate [--config PATH]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--config PATH</code></td>
+<td>Path to the config file (default: <code>/config/skimindex.toml</code>).</td>
+</tr>
+</tbody>
+</table>
+<p>Exits with code <code>0</code> if valid, <code>1</code> if errors are found.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../entrypoint/" class="btn btn-neutral float-left" title="Entry Point (skimindex.sh)"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../devshell/" class="btn btn-neutral float-right" title="Writing Shell Commands">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../entrypoint/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../devshell/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
