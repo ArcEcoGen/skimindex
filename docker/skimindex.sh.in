@@ -186,9 +186,29 @@ _ski_ensure_dirs() {
 # Run helpers
 # =============================================================================
 
+# _ski_docker_needs_update
+#   Returns 0 (true) when the registry digest differs from the local image digest,
+#   or when the image is not present locally.  Returns 1 when up-to-date or
+#   when the registry cannot be reached (offline mode).
+_ski_docker_needs_update() {
+    local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
+    # If the image is not present locally, we need to pull it
+    if ! "$RUNTIME" image inspect "$_SKI_FULL_IMAGE" >/dev/null 2>&1; then
+        return 0
+    fi
+    local remote_digest local_digest
+    remote_digest=$(_ski_registry_digest \
+        "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
+    [[ -z "$remote_digest" ]] && return 1   # offline / unreachable → skip
+    local_digest=$("$RUNTIME" image inspect --format '{{index .RepoDigests 0}}' \
+        "$_SKI_FULL_IMAGE" 2>/dev/null | grep -o 'sha256:[^@]*' || true)
+    [[ "$remote_digest" != "$local_digest" ]]
+}
+
 # _ski_ensure_current
 #   Apptainer: update SIF when digest differs or SIF is absent.
-#   Docker/podman: pull silently; print output only when the image actually changed.
+#   Docker/podman: compare registry digest first; pull with live output only
+#                  when an update is actually needed.  Silent when up-to-date.
 #   Skipped with --local.
 _ski_ensure_current() {
     (( _SKI_LOCAL )) && return 0
@@ -196,9 +216,10 @@ _ski_ensure_current() {
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_apptainer_needs_update && _ski_update
     else
-        local _out
-        _out=$("$RUNTIME" pull "$_SKI_FULL_IMAGE" 2>&1) || true
-        grep -qF "Status: Image is up to date" <<< "$_out" || printf '%s\n' "$_out" >&2
+        if _ski_docker_needs_update; then
+            loginfo "Pulling updated image: ${_SKI_FULL_IMAGE}"
+            "$RUNTIME" pull "$_SKI_FULL_IMAGE"
+        fi
     fi
     return 0
 }
