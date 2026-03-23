@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Tools installed in the container image - skimindex</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Tools installed in the container image";
+        var mkdocs_page_input_path = "tools.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> skimindex
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../directory-structure/">Directory Structure</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../config-format/">Configuration Format</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../environment-variables/">Environment Variables</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../data/">Data Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../processing/">Processing Model</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../entrypoint/">Entry Point (skimindex.sh)</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../commands/">Pipeline Commands</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../devshell/">Writing Shell Commands</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">skimindex</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Tools installed in the container image</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="tools-installed-in-the-container-image">Tools installed in the container image</h1>
+<p>This page documents all third-party tools bundled in the skimindex container image.
+Versions are pinned in <code>docker/Makefile</code> and substituted at build time via <code>--build-arg</code>.</p>
+<hr />
+<h2 id="obitools4">OBITools4</h2>
+<p>Bioinformatics suite for the analysis of DNA metabarcoding data.
+Provides sequence manipulation, demultiplexing, taxonomic assignment,
+and quality filtering.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Version</strong></td>
+<td>4.4.29 (pinned; <code>OBITOOLS_VERSION</code> in <code>docker/Makefile</code>)</td>
+</tr>
+<tr>
+<td><strong>Binary location</strong></td>
+<td><code>/usr/local/bin/obi*</code></td>
+</tr>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>Compiled from source for each target platform (builder stage)</td>
+</tr>
+<tr>
+<td><strong>Language</strong></td>
+<td>Go</td>
+</tr>
+<tr>
+<td><strong>GitHub</strong></td>
+<td><a href="https://github.com/metabarcoding/obitools4">https://github.com/metabarcoding/obitools4</a></td>
+</tr>
+<tr>
+<td><strong>Documentation</strong></td>
+<td><a href="https://metabarcoding.org/obitools4">https://metabarcoding.org/obitools4</a></td>
+</tr>
+<tr>
+<td><strong>Institution</strong></td>
+<td>LECA / Université Grenoble Alpes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reference">Reference</h3>
+<blockquote>
+<p>Boyer F., Mercier C., Bonin A., Le Bras Y., Taberlet P., Coissac E. (2016).
+<strong>obitools: a unix-inspired software package for DNA metabarcoding.</strong>
+<em>Molecular Ecology Resources</em>, 16(1), 176–182.
+<a href="https://doi.org/10.1111/1755-0998.12428">https://doi.org/10.1111/1755-0998.12428</a></p>
+</blockquote>
+<hr />
+<h2 id="kmindex">kmindex</h2>
+<p>Fast and memory-efficient k-mer indexing and querying across large collections
+of genomic datasets. Used by skimindex for decontamination k-mer index construction
+and querying.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Version</strong></td>
+<td>latest bioconda release (<code>bioconda::kmindex</code>)</td>
+</tr>
+<tr>
+<td><strong>Binary location</strong></td>
+<td><code>/opt/conda/bin/kmindex</code></td>
+</tr>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>linux/amd64, linux/arm64</td>
+</tr>
+<tr>
+<td><strong>Language</strong></td>
+<td>C++</td>
+</tr>
+<tr>
+<td><strong>GitHub</strong></td>
+<td><a href="https://github.com/tlemane/kmindex">https://github.com/tlemane/kmindex</a></td>
+</tr>
+<tr>
+<td><strong>Documentation</strong></td>
+<td><a href="https://tlemane.github.io/kmindex">https://tlemane.github.io/kmindex</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reference_1">Reference</h3>
+<blockquote>
+<p>Marchet C., Mehta N., Sinno R., Pibiri G.E., Limasset A. (2024).
+<strong>Scalable sequence search and taxonomic classification using kmindex and FULGOR.</strong>
+<em>iScience</em>, 27, 109308.
+<a href="https://doi.org/10.1016/j.isci.2024.109308">https://doi.org/10.1016/j.isci.2024.109308</a></p>
+</blockquote>
+<hr />
+<h2 id="ntcard">ntCard</h2>
+<p>Streaming algorithm for estimating k-mer frequency histograms from sequencing data.
+Used to estimate genome size and coverage prior to k-mer counting.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Version</strong></td>
+<td>latest bioconda release (<code>bioconda::ntcard</code>)</td>
+</tr>
+<tr>
+<td><strong>Binary location</strong></td>
+<td><code>/opt/conda/bin/ntcard</code></td>
+</tr>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>linux/amd64, linux/arm64</td>
+</tr>
+<tr>
+<td><strong>Language</strong></td>
+<td>C++</td>
+</tr>
+<tr>
+<td><strong>GitHub</strong></td>
+<td><a href="https://github.com/bcgsc/ntCard">https://github.com/bcgsc/ntCard</a></td>
+</tr>
+<tr>
+<td><strong>Website</strong></td>
+<td><a href="https://bcgsc.ca/resources/software/ntcard">https://bcgsc.ca/resources/software/ntcard</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reference_2">Reference</h3>
+<blockquote>
+<p>Mohamadi H., Khan H., Birol I. (2017).
+<strong>ntCard: a streaming algorithm for cardinality estimation in genomics data.</strong>
+<em>Bioinformatics</em>, 33(9), 1324–1330.
+<a href="https://doi.org/10.1093/bioinformatics/btw832">https://doi.org/10.1093/bioinformatics/btw832</a></p>
+</blockquote>
+<hr />
+<h2 id="ncbi-sra-toolkit">NCBI SRA Toolkit</h2>
+<p>Suite of tools for downloading, validating, and converting sequencing data
+from the NCBI Sequence Read Archive (SRA). Provides <code>prefetch</code>, <code>fasterq-dump</code>,
+<code>sam-dump</code>, and many others.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Version</strong></td>
+<td>3.2.0 (latest bioconda; <code>bioconda::sra-tools</code>)</td>
+</tr>
+<tr>
+<td><strong>Binary location</strong></td>
+<td><code>/opt/conda/bin/prefetch</code>, <code>/opt/conda/bin/fasterq-dump</code>, …</td>
+</tr>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>linux/amd64, linux/arm64 (via bioconda + <code>conda-forge::ossuuid</code>)</td>
+</tr>
+<tr>
+<td><strong>Language</strong></td>
+<td>C / C++</td>
+</tr>
+<tr>
+<td><strong>GitHub</strong></td>
+<td><a href="https://github.com/ncbi/sra-tools">https://github.com/ncbi/sra-tools</a></td>
+</tr>
+<tr>
+<td><strong>Documentation</strong></td>
+<td><a href="https://github.com/ncbi/sra-tools/wiki">https://github.com/ncbi/sra-tools/wiki</a></td>
+</tr>
+<tr>
+<td><strong>Website</strong></td>
+<td><a href="https://www.ncbi.nlm.nih.gov/sra/docs/sradownload/">https://www.ncbi.nlm.nih.gov/sra/docs/sradownload/</a></td>
+</tr>
+<tr>
+<td><strong>Institution</strong></td>
+<td>NCBI / National Library of Medicine</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reference_3">Reference</h3>
+<blockquote>
+<p>Leinonen R., Sugawara H., Shumway M., International Nucleotide Sequence Database Collaboration (2011).
+<strong>The sequence read archive.</strong>
+<em>Nucleic Acids Research</em>, 39(Database issue), D19–D21.
+<a href="https://doi.org/10.1093/nar/gkq1019">https://doi.org/10.1093/nar/gkq1019</a></p>
+</blockquote>
+<hr />
+<h2 id="ncbi-datasets-cli">NCBI Datasets CLI</h2>
+<p>Command-line interface for downloading genome assemblies, gene sequences, and
+associated metadata directly from NCBI. Provides <code>datasets</code> and <code>dataformat</code>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Version</strong></td>
+<td>v18.21.0 (pinned; <code>NCBI_DATASETS_VERSION</code> in <code>docker/Makefile</code>)</td>
+</tr>
+<tr>
+<td><strong>Binaries</strong></td>
+<td><code>/usr/local/bin/datasets</code>, <code>/usr/local/bin/dataformat</code></td>
+</tr>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>linux/amd64, linux/arm64 (official NCBI releases)</td>
+</tr>
+<tr>
+<td><strong>Language</strong></td>
+<td>Go</td>
+</tr>
+<tr>
+<td><strong>GitHub</strong></td>
+<td><a href="https://github.com/ncbi/datasets">https://github.com/ncbi/datasets</a></td>
+</tr>
+<tr>
+<td><strong>Documentation</strong></td>
+<td><a href="https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/">https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/</a></td>
+</tr>
+<tr>
+<td><strong>Institution</strong></td>
+<td>NCBI / National Library of Medicine</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="ibm-aspera-transfer-sdk-ascp">IBM Aspera Transfer SDK (<code>ascp</code>)</h2>
+<p>High-speed file transfer client using the FASP protocol. Used by the SRA Toolkit
+to accelerate downloads from NCBI when available, falling back transparently to
+HTTPS otherwise.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.1.7 (pinned; <code>ASPERA_SDK_VERSION</code> in <code>docker/Makefile</code>)</td>
+</tr>
+<tr>
+<td><strong>Binary</strong></td>
+<td><code>/usr/local/bin/ascp</code></td>
+</tr>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>linux/amd64 (<code>linux-amd64</code>), linux/arm64 (<code>linux-aarch64</code>)</td>
+</tr>
+<tr>
+<td><strong>Distribution</strong></td>
+<td>IBM CloudFront CDN (<code>d3pgwzphl5a0ty.cloudfront.net</code>)</td>
+</tr>
+<tr>
+<td><strong>Documentation</strong></td>
+<td><a href="https://www.ibm.com/docs/en/ahts/4.4.x">https://www.ibm.com/docs/en/ahts/4.4.x</a></td>
+</tr>
+<tr>
+<td><strong>SDK</strong></td>
+<td><a href="https://developer.ibm.com/apis/catalog/aspera--aspera-transfer-sdk/">https://developer.ibm.com/apis/catalog/aspera--aspera-transfer-sdk/</a></td>
+</tr>
+<tr>
+<td><strong>Website</strong></td>
+<td><a href="https://www.ibm.com/products/aspera">https://www.ibm.com/products/aspera</a></td>
+</tr>
+<tr>
+<td><strong>Institution</strong></td>
+<td>IBM</td>
+</tr>
+<tr>
+<td><strong>SRA integration</strong></td>
+<td>Configured via <code>vdb-config --set /TOOLS/ascp-path=/usr/local/bin/ascp</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Note:</strong> ARM64 support was introduced in SDK 1.1.4 (transferd 1.1.4).</p>
+</blockquote>
+<hr />
+<h2 id="kmerasm">kmerasm</h2>
+<p>Simple de Bruijn unitig assembler for 31-mers.
+Reads canonical 31-mers (one per line) and outputs unitigs in FASTA format,
+built from non-branching paths in the de Bruijn graph.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Version</strong></td>
+<td>in-house (built from <code>src/kmerasm/</code>)</td>
+</tr>
+<tr>
+<td><strong>Binary</strong></td>
+<td><code>/app/bin/kmerasm</code></td>
+</tr>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>Compiled for each target platform (builder stage)</td>
+</tr>
+<tr>
+<td><strong>Language</strong></td>
+<td>C</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td><code>src/kmerasm/kmerasm.c</code> in this repository</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="base-environment">Base environment</h2>
+<h3 id="miniconda3-conda">Miniconda3 / conda</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Base image</strong></td>
+<td><code>continuumio/miniconda3:latest</code></td>
+</tr>
+<tr>
+<td><strong>Python</strong></td>
+<td><code>/opt/conda/bin/python3</code></td>
+</tr>
+<tr>
+<td><strong>Website</strong></td>
+<td><a href="https://docs.conda.io">https://docs.conda.io</a></td>
+</tr>
+</tbody>
+</table>
+<p>Tools installed via conda are in <code>/opt/conda/bin/</code> and available on <code>PATH</code>.</p>
+<h3 id="system-utilities-apt">System utilities (apt)</h3>
+<p>Installed via <code>apt-get</code> in the container:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pigz</code></td>
+<td>Parallel gzip compression / decompression</td>
+</tr>
+<tr>
+<td><code>jq</code></td>
+<td>JSON processor</td>
+</tr>
+<tr>
+<td><code>curl</code></td>
+<td>HTTP/FTP client</td>
+</tr>
+<tr>
+<td><code>make</code></td>
+<td>Build automation</td>
+</tr>
+<tr>
+<td><code>less</code></td>
+<td>Pager</td>
+</tr>
+<tr>
+<td><code>sudo</code></td>
+<td>Privilege escalation (user <code>skimindex</code> has <code>NOPASSWD:ALL</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="version-management">Version management</h2>
+<p>All pinned versions are centralised in <code>docker/Makefile</code>:</p>
+<pre><code class="language-makefile">OBITOOLS_VERSION      := 4.4.29
+NCBI_DATASETS_VERSION := v18.21.0
+KMINDEX_VERSION       := bioconda::kmindex
+NTCARD_VERSION        := bioconda::ntcard
+SRATOOLS_VERSION      := bioconda::sra-tools
+ASPERA_SDK_VERSION    := 1.1.7
+</code></pre>
+<p>To update a tool, change the corresponding variable and rebuild with <code>make all</code>.</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

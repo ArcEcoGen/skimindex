@@ -23,6 +23,10 @@ Results produced by the pipeline should not be considered correct or reliable at
 
 - [Entry Point](entrypoint.md)
 
+- [Tools](tools.md) — third-party tools bundled in the container image:
+  OBITools4, kmindex, ntCard, SRA Toolkit, NCBI Datasets CLI, IBM Aspera,
+  with versions, binary locations, and bibliographic references
+
 - [Pipeline Commands](commands.md) — reference for `download`, `decontam`, and `validate` subcommands — `skimindex.sh` usage, global options, built-in
   subcommands, container runtime detection, and bind-mount mechanism — how processing sections work: atomic vs
   composite, Data abstraction, input chaining, output resolution

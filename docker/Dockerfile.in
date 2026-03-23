@@ -59,7 +59,6 @@ RUN mkdir -p /usr/local/bin \
     && rm /tmp/ncbi_datasets.zip
 
 RUN conda install --yes ${KMINDEX_VERSION} ${NTCARD_VERSION} ${OSSUUID_VERSION} ${SRATOOLS_VERSION} \
-    && vdb-config --restore-defaults || true \
     && conda clean --all --yes
 
 # Install IBM Aspera Transfer SDK (provides ascp) — architecture-aware.
