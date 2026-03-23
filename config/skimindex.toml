@@ -54,7 +54,7 @@ directory = "stamp"            # references [local_directories] key → ${SKIMIN
 
 
 # -----------------------------------------------------------------------------
-# Source sections
+# Data source sections
 # -----------------------------------------------------------------------------
 
 # Data downloaded via the NCBI Datasets CLI.
@@ -124,7 +124,7 @@ directory        = "Human"
 source           = "ncbi"
 role             = "decontamination"
 example          = true
-taxon            = "human"
+taxon            = "human"     # As understood by the NCBI datasets command
 reference        = true
 assembly_source  = "refseq"
 assembly_level   = "chromosome"
@@ -138,7 +138,7 @@ role       = "decontamination"
 example    = true
 by_species = false             # bulk flat-file source; obidistribute support planned (not yet implemented)
 divisions  = ["pln"]           # subset of [source.genbank] divisions
-taxid      = 4751              # taxonomic filter: Fungi kingdom
+taxid      = 4751              # NCBI TAXID based taxonomic filter: Fungi kingdom
 
 # Bacteria sequences from GenBank bacterial flat-files.
 [data.bacteria]
@@ -148,7 +148,7 @@ role       = "decontamination"
 example    = true
 by_species = false             # bulk flat-file source; obidistribute support planned (not yet implemented)
 divisions  = ["bct"]           # subset of [source.genbank] divisions
-taxid      = 1                 # taxonomic filter: root (all bacteria)
+taxid      = 1                 # NCBI TAXID based taxonomic filter: root (all sequences)
 
 # Spermatophyta (seed plants) — counter-examples: must NOT be filtered out.
 [data.plants]
