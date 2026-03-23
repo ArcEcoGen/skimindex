@@ -205,6 +205,14 @@ directories bind-mounted.</p>
 </table>
 <p>The shell automatically loads <code>config/skimindex.toml</code> on startup and exports
 all values as <code>SKIMINDEX__*</code> environment variables.</p>
+<p>Use <code>--mount</code> to make additional host directories available inside the
+container. The source path may be relative to the current working directory:</p>
+<pre><code class="language-bash">skimindex shell --mount ./sandbox:/sandbox
+</code></pre>
+<p>Inside the container, the directory is then accessible at <code>/sandbox</code>. Multiple
+mounts can be stacked:</p>
+<pre><code class="language-bash">skimindex shell --mount ./sandbox:/sandbox --mount /data/ref:/ref
+</code></pre>
 <h4 id="reload_config"><code>reload_config</code></h4>
 <p>A <code>reload_config</code> function is available in the shell to re-read the
 configuration file at any time:</p>
@@ -266,7 +274,7 @@ processed_data = &quot;processed_data&quot;   # host: &lt;project-dir&gt;/proces
 usercmd        = &quot;usercmd&quot;          # host: &lt;project-dir&gt;/usercmd/  →  /usercmd
 …
 </code></pre>
-<p>Extra mounts can be added when using the <code>shell</code> subcommand via <code>--mount SRC:DST</code> (not available for pipeline subcommands).</p>
+<p>Extra mounts can be added at shell time via <code>--mount SRC:DST</code> (see <a href="#shell"><code>shell</code></a> above). They are not available for pipeline subcommands.</p>
 <hr />
 <h2 id="configuration">Configuration</h2>
 <p>The pipeline configuration file is read from:</p>
