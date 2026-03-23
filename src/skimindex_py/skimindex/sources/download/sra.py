@@ -257,11 +257,10 @@ def _compress_run(
     run: str,
     scratch: Path,
     output_paths: list[Path],
-    stamp_key: Path,
     paired: bool,
 ) -> bool:
     """Compress FASTQ files to .fastq.gz in the final output directory."""
-    if is_stamped(stamp_key):
+    if is_stamped(output_paths[-1]):
         loginfo(f"    [{run}] Already compressed (stamp exists)")
         return True
 
@@ -283,14 +282,14 @@ def _compress_run(
             pigz("-f", "-k", str(fastq))()
             gz = Path(str(fastq) + ".gz")
             shutil.move(str(gz), out)
-        stamp(stamp_key)
+        stamp(output_paths[-1])
         loginfo(f"    [{run}] Compression complete")
         return True
     except Exception as e:
         logerror(f"    [{run}] Compression failed: {e}")
         for out in output_paths:
             out.unlink(missing_ok=True)
-        unstamp(stamp_key)
+            unstamp(out)
         return False
 
 
@@ -316,9 +315,6 @@ def process_sra_dataset(
         logwarning(f"[{dataset_name}] No runs resolved — check accessions/biosamples in config")
         return True
 
-    from skimindex.config import stamp_dir
-    stamp_base = stamp_dir() / "sra" / ds.get("directory", dataset_name)
-
     errors = 0
     total = len(runs)
 
@@ -334,8 +330,7 @@ def process_sra_dataset(
         scratch   = scratch_run_dir(run)
 
         # All output files already present and stamped → skip
-        compress_stamp = stamp_base / biosample / run / "compress"
-        if not needs_run(compress_stamp, dry_run=dry_run,
+        if not needs_run(out_paths[-1], dry_run=dry_run,
                          label=run, action=f"download+convert+compress {run}"):
             continue
 
@@ -343,14 +338,17 @@ def process_sra_dataset(
             loginfo(f"    [{run}] Would download → {out_paths}")
             continue
 
-        dl_stamp      = stamp_base / biosample / run / "download"
-        conv_stamp    = stamp_base / biosample / run / "convert"
+        # Virtual stamp keys for intermediate steps — anchored in the data tree
+        # so _stamp_path() mirrors them correctly under /stamp/ (no double nesting)
+        bs_dir     = out_paths[-1].parent
+        dl_stamp   = bs_dir / f"{run}.download"
+        conv_stamp = bs_dir / f"{run}.convert"
 
         ok = _prefetch_run(run, scratch, dl_stamp)
         if ok:
             ok = _fasterq_dump_run(run, scratch, conv_stamp, threads)
         if ok:
-            ok = _compress_run(run, scratch, out_paths, compress_stamp, paired)
+            ok = _compress_run(run, scratch, out_paths, paired)
 
         # Always clean up scratch regardless of success
         shutil.rmtree(scratch, ignore_errors=True)

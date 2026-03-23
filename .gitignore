@@ -24,6 +24,7 @@ CLAUDE.md
 
 .venv
 scratch
+stamp
 sra
 genbank
 !genbank/Makefile
