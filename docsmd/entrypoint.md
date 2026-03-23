@@ -59,8 +59,8 @@ skimindex update
 
 ### `shell`
 
-Start an interactive shell inside the container with all project directories
-bind-mounted. Useful for debugging and manual inspection.
+Start an interactive bash session inside the container with all project
+directories bind-mounted.
 
 ```bash
 skimindex shell [--mount SRC:DST] …
@@ -69,6 +69,28 @@ skimindex shell [--mount SRC:DST] …
 | Option | Description |
 |--------|-------------|
 | `--mount SRC:DST` | Add an extra bind-mount on top of the config-driven ones. May be repeated. |
+
+The shell automatically loads `config/skimindex.toml` on startup and exports
+all values as `SKIMINDEX__*` environment variables.
+
+#### `reload_config`
+
+A `reload_config` function is available in the shell to re-read the
+configuration file at any time:
+
+```bash
+reload_config
+```
+
+It first unsets all `SKIMINDEX__*` variables, then re-sources the config
+module. The TOML file always wins — any value previously overridden by a
+manual `export` is discarded. To keep an override across a reload, re-export
+it afterwards:
+
+```bash
+reload_config
+export SKIMINDEX__PROCESSING__KMER_SIZE=31
+```
 
 ### Pipeline subcommands
 
@@ -80,8 +102,9 @@ reference.
 ### User subcommands (`usercmd/`)
 
 Scripts placed in the project's `usercmd/` directory are available as
-additional subcommands without rebuilding the image.
-See [Writing Shell Commands](devshell.md) for details.
+additional subcommands without rebuilding the image. They run inside the
+container with access to all skimindex libraries.
+See [Pipeline Commands — User subcommands](commands.md#user-subcommands) for details.
 
 ---
 
@@ -98,8 +121,9 @@ apptainer  →  docker  →  podman
 | Apptainer | `<project-dir>/images/<name>-<tag>.sif` (local file) |
 | Docker / Podman | Registry: pulled on first use, then cached locally |
 
-For Docker and Podman, `--pull always` is the default — the registry is
-checked for a newer image at every run. Use `--local` to skip this check.
+For Docker and Podman, the registry is checked for a newer image at every run.
+The pull is silent — output is only shown when an update is actually downloaded.
+Use `--local` to skip this check entirely.
 
 For Apptainer, the SIF digest is compared against the registry at startup.
 If the registry is unreachable (offline), the local SIF is used as-is.

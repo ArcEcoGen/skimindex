@@ -102,3 +102,27 @@ skimindex validate [--config PATH]
 | `--config PATH` | Path to the config file (default: `/config/skimindex.toml`). |
 
 Exits with code `0` if valid, `1` if errors are found.
+
+---
+
+## User subcommands
+
+Scripts placed in the project's `usercmd/` directory are automatically
+available as subcommands without rebuilding the image.
+
+```
+skimindex <name> [options]
+```
+
+Each script runs **inside the container** with:
+
+- `usercmd/` bind-mounted to `/usercmd/`
+- `SKIMINDEX_SCRIPTS_DIR=/app/scripts` set, so scripts can source the
+  skimindex libraries:
+
+```bash
+source "${SKIMINDEX_SCRIPTS_DIR}/__skimindex.sh"   # log + config + stamping
+```
+
+The first non-empty comment line of the script (after the shebang and any
+separator) is used as its description in `skimindex --help`.

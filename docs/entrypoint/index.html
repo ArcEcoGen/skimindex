@@ -77,6 +77,10 @@
     <li class="toctree-l3"><a class="reference internal" href="#update">update</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#shell">shell</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#reload_config">reload_config</a>
+    </li>
+        </ul>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#pipeline-subcommands">Pipeline subcommands</a>
     </li>
@@ -181,8 +185,8 @@ run unless <code>--local</code> is set.</p>
 <pre><code class="language-bash">skimindex update
 </code></pre>
 <h3 id="shell"><code>shell</code></h3>
-<p>Start an interactive shell inside the container with all project directories
-bind-mounted. Useful for debugging and manual inspection.</p>
+<p>Start an interactive bash session inside the container with all project
+directories bind-mounted.</p>
 <pre><code class="language-bash">skimindex shell [--mount SRC:DST] …
 </code></pre>
 <table>
@@ -199,6 +203,20 @@ bind-mounted. Useful for debugging and manual inspection.</p>
 </tr>
 </tbody>
 </table>
+<p>The shell automatically loads <code>config/skimindex.toml</code> on startup and exports
+all values as <code>SKIMINDEX__*</code> environment variables.</p>
+<h4 id="reload_config"><code>reload_config</code></h4>
+<p>A <code>reload_config</code> function is available in the shell to re-read the
+configuration file at any time:</p>
+<pre><code class="language-bash">reload_config
+</code></pre>
+<p>It first unsets all <code>SKIMINDEX__*</code> variables, then re-sources the config
+module. The TOML file always wins — any value previously overridden by a
+manual <code>export</code> is discarded. To keep an override across a reload, re-export
+it afterwards:</p>
+<pre><code class="language-bash">reload_config
+export SKIMINDEX__PROCESSING__KMER_SIZE=31
+</code></pre>
 <h3 id="pipeline-subcommands">Pipeline subcommands</h3>
 <p>All other subcommands are dispatched to scripts inside the container image
 (in <code>/app/scripts/</code>). Run <code>skimindex --help</code> to see the full list available
@@ -206,8 +224,9 @@ in your installed version. See <a href="../commands/">Pipeline Commands</a> for 
 reference.</p>
 <h3 id="user-subcommands-usercmd">User subcommands (<code>usercmd/</code>)</h3>
 <p>Scripts placed in the project's <code>usercmd/</code> directory are available as
-additional subcommands without rebuilding the image.
-See <a href="../devshell/">Writing Shell Commands</a> for details.</p>
+additional subcommands without rebuilding the image. They run inside the
+container with access to all skimindex libraries.
+See <a href="../commands/#user-subcommands">Pipeline Commands — User subcommands</a> for details.</p>
 <hr />
 <h2 id="container-runtime">Container Runtime</h2>
 <p>The runtime is auto-detected in priority order:</p>
@@ -231,8 +250,9 @@ See <a href="../devshell/">Writing Shell Commands</a> for details.</p>
 </tr>
 </tbody>
 </table>
-<p>For Docker and Podman, <code>--pull always</code> is the default — the registry is
-checked for a newer image at every run. Use <code>--local</code> to skip this check.</p>
+<p>For Docker and Podman, the registry is checked for a newer image at every run.
+The pull is silent — output is only shown when an update is actually downloaded.
+Use <code>--local</code> to skip this check entirely.</p>
 <p>For Apptainer, the SIF digest is compared against the registry at startup.
 If the registry is unreachable (offline), the local SIF is used as-is.</p>
 <hr />

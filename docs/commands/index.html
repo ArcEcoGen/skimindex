@@ -88,6 +88,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#validate-validate-configuration">validate — Validate configuration</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#user-subcommands">User subcommands</a>
+    </li>
     </ul>
                 </li>
               </ul>
@@ -310,6 +312,22 @@ skimindex decontam count   [options]      # count k-mers in fragments
 </tbody>
 </table>
 <p>Exits with code <code>0</code> if valid, <code>1</code> if errors are found.</p>
+<hr />
+<h2 id="user-subcommands">User subcommands</h2>
+<p>Scripts placed in the project's <code>usercmd/</code> directory are automatically
+available as subcommands without rebuilding the image.</p>
+<pre><code>skimindex &lt;name&gt; [options]
+</code></pre>
+<p>Each script runs <strong>inside the container</strong> with:</p>
+<ul>
+<li><code>usercmd/</code> bind-mounted to <code>/usercmd/</code></li>
+<li><code>SKIMINDEX_SCRIPTS_DIR=/app/scripts</code> set, so scripts can source the
+  skimindex libraries:</li>
+</ul>
+<pre><code class="language-bash">source &quot;${SKIMINDEX_SCRIPTS_DIR}/__skimindex.sh&quot;   # log + config + stamping
+</code></pre>
+<p>The first non-empty comment line of the script (after the shebang and any
+separator) is used as its description in <code>skimindex --help</code>.</p>
               
             </div>
           </div><footer>

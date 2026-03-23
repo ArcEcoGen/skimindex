@@ -330,15 +330,18 @@ _ski_run_interactive() {
     _ski_ensure_current
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
+    local _shell_init=/app/scripts/__ski_shell_init.sh
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_build_bind_array "--bind"
         for _m in "$@"; do BIND+=(--bind "$_m"); done
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
-        apptainer run --pwd /app "${BIND[@]}" "$SIF_FILE"
+        apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" \
+            bash --init-file "$_shell_init"
     else
         _ski_build_bind_array "-v"
         for _m in "$@"; do BIND+=(-v "$_m"); done
-        "$RUNTIME" run --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE"
+        "$RUNTIME" run --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE" \
+            bash --init-file "$_shell_init"
     fi
 }
 
