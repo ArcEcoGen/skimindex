@@ -23,6 +23,8 @@ CLAUDE.md
 **/*.hist
 
 .venv
+scratch
+sra
 genbank
 !genbank/Makefile
 

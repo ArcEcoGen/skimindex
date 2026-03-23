@@ -84,6 +84,8 @@ RUN mkdir -p /genbank \
              /processed_data/decontamination \
              /processed_data/skims \
              /skims \
+             /sra \
+             /scratch \
              /app/scripts /app/bin /app/obiluascripts \
              /config \
              /log

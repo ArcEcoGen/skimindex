@@ -20,6 +20,11 @@ from skimindex.sources.download.ncbi import (
     process_ncbi_dataset,
     query_assemblies,
 )
+from skimindex.sources.download.sra import (
+    list_datasets as list_sra_datasets,
+    process_sra,
+    process_sra_dataset,
+)
 from skimindex.sources.download.status import (
     download_status,
     print_status,
@@ -124,12 +129,40 @@ def _(sections, args, dry_run):
 
 
 # ---------------------------------------------------------------------------
+# sra subcommand
+# ---------------------------------------------------------------------------
+
+_sra_cmd = SkimCommand(
+    name="download sra",
+    description="Download raw sequencing reads from NCBI SRA",
+    list_fn=list_sra_datasets,
+    examples=[
+        "%(prog)s",
+        "%(prog)s --list",
+        "%(prog)s --dataset betula_skims",
+        "%(prog)s --dry-run",
+    ],
+    section_arg="dataset",
+    section_metavar="NAME",
+    section_help="Process a single SRA dataset (e.g. betula_skims)",
+)
+
+
+@_sra_cmd.handler
+def _(sections, args, dry_run):
+    if sections:
+        return 0 if process_sra_dataset(sections[0], dry_run=dry_run) else 1
+    return process_sra(dry_run=dry_run)
+
+
+# ---------------------------------------------------------------------------
 # download — top-level entry point
 # ---------------------------------------------------------------------------
 
 _SUBCOMMANDS = {
     "genbank": _genbank_cmd.main,
     "ncbi":    _ncbi_cmd.main,
+    "sra":     _sra_cmd.main,
 }
 
 
@@ -150,7 +183,8 @@ def main(argv: list | None = None) -> int:
         epilog=(
             "Subcommands:\n"
             "  download genbank   Download GenBank flat-file divisions\n"
-            "  download ncbi      Download NCBI reference genome assemblies\n\n"
+            "  download ncbi      Download NCBI reference genome assemblies\n"
+            "  download sra       Download raw sequencing reads from NCBI SRA\n\n"
             "Run 'download <subcommand> --help' for subcommand-specific options."
         ),
     )
@@ -166,7 +200,9 @@ def main(argv: list | None = None) -> int:
 
     if process_genbank(dry_run=args.dry_run) != 0:
         return 1
-    return process_ncbi(dry_run=args.dry_run)
+    if process_ncbi(dry_run=args.dry_run) != 0:
+        return 1
+    return process_sra(dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

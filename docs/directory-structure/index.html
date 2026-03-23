@@ -60,6 +60,10 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#internal-raw-data-source-internal">Internal raw data (source: internal)</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#sra-raw-reads-source-sra">SRA raw reads (source: sra)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#scratch-temporary-files">scratch/ — Temporary files</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#processed_data-processed-data">processed_data/ — Processed data</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#indexes-k-mer-indexes">indexes/ — K-mer indexes</a>
@@ -324,6 +328,44 @@ by default). Each accession corresponds to one sequenced individual.</p>
         │   └── *.&lt;ext&gt;
         └── {accession_2}/
             └── *.&lt;ext&gt;
+</code></pre>
+<h3 id="sra-raw-reads-source-sra">SRA raw reads (source: <code>sra</code>)</h3>
+<p>Stores raw FASTQ reads downloaded from NCBI SRA. The <code>sra</code> source points to
+the <code>sra</code> entry in <code>[local_directories]</code>. By default:</p>
+<pre><code class="language-toml">[source.sra]
+directory = &quot;sra&quot;     # → ${SKIMINDEX_ROOT}/sra/
+</code></pre>
+<p>The hierarchy inside that mount point is:</p>
+<pre><code>{source-directory}/
+└── {data.directory}/          # [data.X].directory (e.g. Betula)
+    └── {Organism_name}/       # canonical species name from SRA metadata
+        └── {biosample}/       # biosample accession (e.g. SAMEA9098823)
+            ├── {run}_1.fastq.gz   # paired-end R1
+            ├── {run}_2.fastq.gz   # paired-end R2
+            └── {run}.fastq.gz     # single-end
+</code></pre>
+<p>Organism names are sanitised with the same <code>canonical_species()</code> rules
+as NCBI genome filenames (spaces → underscores, special characters removed).</p>
+<p>Stamp files follow the pattern:</p>
+<pre><code>/stamp/sra/{data.directory}/{biosample}/{run}/download
+/stamp/sra/{data.directory}/{biosample}/{run}/convert
+/stamp/sra/{data.directory}/{biosample}/{run}/compress
+</code></pre>
+<h3 id="scratch-temporary-files"><code>scratch/</code> — Temporary files</h3>
+<p>Stores intermediate files during SRA processing:
+- <code>.sra</code> archives downloaded by <code>prefetch</code>
+- Uncompressed FASTQ files produced by <code>fasterq-dump</code></p>
+<p>These are cleaned up automatically after each run. On HPC systems, point
+<code>scratch</code> to a fast local scratch filesystem (e.g. <code>$TMPDIR</code> or a node-local NVMe):</p>
+<pre><code class="language-toml">[local_directories]
+scratch = &quot;/path/to/fast/local/storage&quot;
+</code></pre>
+<pre><code>scratch/
+└── sra/
+    └── {run}/               # one directory per run, removed after compression
+        ├── {run}.sra        # prefetch output
+        ├── {run}_1.fastq    # fasterq-dump output (paired-end)
+        └── {run}_2.fastq
 </code></pre>
 <h3 id="processed_data-processed-data"><code>processed_data/</code> — Processed data</h3>
 <p>Stores all pipeline outputs. Layout depends on whether the data section is

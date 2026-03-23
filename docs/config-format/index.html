@@ -64,6 +64,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#stamp">[stamp]</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#scratch">[scratch]</a>
+    </li>
         </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#source-sections">Source Sections</a>
@@ -73,6 +75,8 @@
     <li class="toctree-l3"><a class="reference internal" href="#sourcegenbank">[source.genbank]</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#sourceinternal">[source.internal]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#sourcesra">[source.sra]</a>
     </li>
         </ul>
     </li>
@@ -107,6 +111,8 @@
     <li class="toctree-l4"><a class="reference internal" href="#source-genbank">source = "genbank"</a>
     </li>
     <li class="toctree-l4"><a class="reference internal" href="#source-internal">source = "internal"</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#source-sra">source = "sra"</a>
     </li>
         </ul>
     </li>
@@ -364,6 +370,31 @@ Stamp files allow interrupted runs to resume without reprocessing already-comple
 <pre><code class="language-toml">[stamp]
 directory = &quot;stamp&quot;               # references [local_directories] key → ${SKIMINDEX_ROOT}/stamp/
 </code></pre>
+<h3 id="scratch"><code>[scratch]</code></h3>
+<p>Root location for temporary files used during SRA processing (<code>prefetch</code> archives
+and uncompressed FASTQ files). Files are removed automatically after each run.</p>
+<p>On HPC systems, point this to a fast local scratch filesystem (e.g. <code>$TMPDIR</code> or
+a node-local NVMe) by setting the corresponding <code>[local_directories]</code> entry to an
+absolute host path.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> where temporary files are written</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[scratch]
+directory = &quot;scratch&quot;             # references [local_directories] key → ${SKIMINDEX_ROOT}/scratch/
+</code></pre>
 <hr />
 <h2 id="source-sections">Source Sections</h2>
 <p>One section per data origin. Each source section has a <code>directory</code> key
@@ -439,6 +470,28 @@ divisions = [&quot;bct&quot;, &quot;pln&quot;]
 </table>
 <pre><code class="language-toml">[source.internal]
 directory = &quot;raw_data&quot;            # references [local_directories] key → ${SKIMINDEX_ROOT}/raw_data/
+</code></pre>
+<h3 id="sourcesra"><code>[source.sra]</code></h3>
+<p>Raw sequencing reads downloaded from NCBI SRA. EBI (ERR/ERS/SAMEA) and DDBJ
+accessions are mirrored at NCBI and supported transparently.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>directory</code></td>
+<td>string</td>
+<td>Key from <code>[local_directories]</code> where SRA reads are stored</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[source.sra]
+directory = &quot;sra&quot;                 # references [local_directories] key → ${SKIMINDEX_ROOT}/sra/
 </code></pre>
 <hr />
 <h2 id="role-sections">Role Sections</h2>
@@ -685,6 +738,11 @@ identifier chosen by the user.</p>
 <td>Internal sequencing data produced in-house</td>
 </tr>
 <tr>
+<td></td>
+<td><code>"sra"</code></td>
+<td>Raw reads downloaded from NCBI SRA</td>
+</tr>
+<tr>
 <td><code>role</code></td>
 <td><code>"decontamination"</code></td>
 <td>Sequences used to build the decontamination filter</td>
@@ -816,6 +874,49 @@ artefact</strong> for these sections and lives directly under <code>processed_da
 </table>
 <h4 id="source-internal"><code>source = "internal"</code></h4>
 <p>No additional keys beyond the common <code>directory</code>.</p>
+<h4 id="source-sra"><code>source = "sra"</code></h4>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>accessions</code></td>
+<td>array of strings</td>
+<td>no</td>
+<td>Run accessions (SRR/ERR/DRR) or experiment accessions (SRX/ERX/DRX). For runs, the biosample is looked up automatically. For experiments, all associated runs are discovered.</td>
+</tr>
+<tr>
+<td><code>biosamples</code></td>
+<td>array of strings</td>
+<td>no</td>
+<td>Biosample IDs (SAMEA/ERS/SRS/SAMN). All associated run accessions are discovered automatically.</td>
+</tr>
+<tr>
+<td><code>threads</code></td>
+<td>integer</td>
+<td>no</td>
+<td>Number of threads for <code>fasterq-dump</code> (default: 4)</td>
+</tr>
+</tbody>
+</table>
+<p>At least one of <code>accessions</code> or <code>biosamples</code> must be present. Both may coexist;
+runs are deduplicated across all sources.</p>
+<p>Metadata (organism name, biosample, library layout) is resolved via the NCBI
+Entrez API at download time.</p>
+<pre><code class="language-toml">[data.betula_skims]
+source     = &quot;sra&quot;
+role       = &quot;genome_skims&quot;
+directory  = &quot;Betula&quot;
+accessions = [&quot;ERR7254752&quot;]           # SRR/ERR/DRR run accessions
+biosamples = [&quot;SAMEA9098823&quot;]         # SAMEA/ERS/SRS → all associated runs fetched
+threads    = 4
+</code></pre>
 <h3 id="role-specific-keys">Role-specific Keys</h3>
 <h4 id="role-decontamination"><code>role = "decontamination"</code></h4>
 <table>
@@ -892,16 +993,17 @@ one_per          = &quot;genus&quot;
 <h2 id="validation-rules">Validation Rules</h2>
 <ol>
 <li>The section type is determined by its TOML prefix: <code>source.</code>, <code>role.</code>, <code>processing.</code>, <code>data.</code>, or no prefix (configuration).</li>
-<li>Configuration sections (no prefix) must <strong>not</strong> contain <code>source</code> or <code>role</code> keys. The valid configuration sections are: <code>local_directories</code>, <code>logging</code>, <code>processed_data</code>, <code>indexes</code>, <code>stamp</code>.</li>
+<li>Configuration sections (no prefix) must <strong>not</strong> contain <code>source</code> or <code>role</code> keys. The valid configuration sections are: <code>local_directories</code>, <code>logging</code>, <code>processed_data</code>, <code>indexes</code>, <code>stamp</code>, <code>scratch</code>.</li>
 <li>Data sections (<code>data.*</code>) must contain both <code>source</code> and <code>role</code>.</li>
-<li><code>source</code> must be one of: <code>"ncbi"</code>, <code>"genbank"</code>, <code>"internal"</code>.</li>
+<li><code>source</code> must be one of: <code>"ncbi"</code>, <code>"genbank"</code>, <code>"internal"</code>, <code>"sra"</code>.</li>
 <li><code>role</code> must be one of: <code>"decontamination"</code>, <code>"genomes"</code>, <code>"genome_skims"</code>.</li>
 <li>For <code>role = "decontamination"</code>, the <code>example</code> key is required (<code>true</code> or <code>false</code>).</li>
 <li>For <code>source = "ncbi"</code>, the <code>taxon</code> key is required.</li>
 <li>For <code>source = "genbank"</code>, <code>divisions</code> is required and must be a subset of
    the codes listed in <code>[source.genbank] divisions</code>.</li>
 <li>For <code>source = "genbank"</code>, <code>taxid</code> is optional; when absent all sequences of
-   the selected divisions are used.</li>
+   the selected divisions are used.
+9b. For <code>source = "sra"</code>, at least one of <code>accessions</code> or <code>biosamples</code> must be present.</li>
 <li>For <code>source = "genbank"</code>, <code>by_species = true</code> is reserved for a future
     pre-processing step that would distribute sequences into per-species files
     using <code>obidistribute</code> (not yet implemented).</li>

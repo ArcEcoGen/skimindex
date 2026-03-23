@@ -40,7 +40,7 @@ from skimindex.config.validate import (  # noqa: E402 — after class definition
 DEFAULT_CONFIG = Path(os.environ.get("SKIMINDEX_CONFIG", "/config/skimindex.toml"))
 
 CONFIGURATION_SECTIONS = frozenset({
-    "local_directories", "logging", "processed_data", "indexes", "stamp"
+    "local_directories", "logging", "processed_data", "indexes", "stamp", "scratch"
 })
 SECTION_PREFIXES = frozenset({"source", "role", "processing", "data"})
 
@@ -130,6 +130,14 @@ class Config:
             if ds.get("source") == "ncbi"
         ]
 
+    @property
+    def sra_datasets(self) -> list[str]:
+        """Names of all datasets with source 'sra'."""
+        return [
+            name for name, ds in self.datasets.items()
+            if ds.get("source") == "sra"
+        ]
+
     # ------------------------------------------------------------------
     # Root-level config section helpers
     # ------------------------------------------------------------------
@@ -169,6 +177,11 @@ class Config:
     def stamp_dir(self) -> Path:
         """Return the stamp root (root / [stamp].directory)."""
         directory = self._config_section("stamp").get("directory", "stamp")
+        return self._local_dir(directory)
+
+    def scratch_dir(self) -> Path:
+        """Return the scratch root (root / [scratch].directory)."""
+        directory = self._config_section("scratch").get("directory", "scratch")
         return self._local_dir(directory)
 
     def log_file(self) -> Path:
@@ -396,3 +409,8 @@ def stamp_dir() -> Path:
 def raw_data_dir() -> Path:
     """Return the internal/raw data root (source_dir('internal'))."""
     return config().raw_data_dir()
+
+
+def scratch_dir() -> Path:
+    """Return the scratch root."""
+    return config().scratch_dir()
