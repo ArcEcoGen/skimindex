@@ -5,11 +5,11 @@ Usage:
   download                       Download everything (GenBank + all NCBI datasets)
   download genbank [options]     Download GenBank flat-file divisions only
   download ncbi    [options]     Download NCBI reference genome assemblies only
+  download sra     [options]     Download raw sequencing reads from NCBI SRA
 
-Run 'download genbank --help' or 'download ncbi --help' for subcommand options.
+Run 'download <subcommand> --help' for subcommand options.
 """
 
-import argparse
 import sys
 
 from skimindex.cli import SkimCommand
@@ -156,54 +156,46 @@ def _(sections, args, dry_run):
 
 
 # ---------------------------------------------------------------------------
-# download — top-level entry point
+# download — top-level command with subcommands
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {
-    "genbank": _genbank_cmd.main,
-    "ncbi":    _ncbi_cmd.main,
-    "sra":     _sra_cmd.main,
-}
+def _list_all() -> str:
+    return ""
 
 
-def main(argv: list | None = None) -> int:
-    """Download everything, or a specific source via subcommand."""
-    if argv is None:
-        argv = sys.argv[1:]
+_download_cmd = SkimCommand(
+    name="download",
+    description="Download all configured data sources.",
+    list_fn=_list_all,
+    examples=[
+        "%(prog)s",
+        "%(prog)s --dry-run",
+        "%(prog)s --status",
+        "%(prog)s genbank --division pln",
+        "%(prog)s ncbi --dataset human",
+        "%(prog)s sra --dataset betula_skims",
+    ],
+)
+_download_cmd.add_argument("--status", action="store_true",
+    help="Show download status for all sources (no download)")
+_download_cmd.subcommand("genbank", _genbank_cmd)
+_download_cmd.subcommand("ncbi",    _ncbi_cmd)
+_download_cmd.subcommand("sra",     _sra_cmd)
 
-    # Route to subcommand if the first argument names one
-    if argv and argv[0] in _SUBCOMMANDS:
-        return _SUBCOMMANDS[argv[0]](argv[1:])
 
-    # No subcommand: download everything (or show global status)
-    parser = argparse.ArgumentParser(
-        prog="download",
-        description="Download all configured data sources.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "Subcommands:\n"
-            "  download genbank   Download GenBank flat-file divisions\n"
-            "  download ncbi      Download NCBI reference genome assemblies\n"
-            "  download sra       Download raw sequencing reads from NCBI SRA\n\n"
-            "Run 'download <subcommand> --help' for subcommand-specific options."
-        ),
-    )
-    parser.add_argument("--dry-run", action="store_true",
-        help="Show what would be downloaded without executing anything")
-    parser.add_argument("--status", action="store_true",
-        help="Show download status for all sources (no download)")
-    args = parser.parse_args(argv)
-
+@_download_cmd.handler
+def _(sections, args, dry_run):
     if args.status:
         print_status(download_status())
         return 0
-
-    if process_genbank(dry_run=args.dry_run) != 0:
+    if process_genbank(dry_run=dry_run) != 0:
         return 1
-    if process_ncbi(dry_run=args.dry_run) != 0:
+    if process_ncbi(dry_run=dry_run) != 0:
         return 1
-    return process_sra(dry_run=args.dry_run)
+    return process_sra(dry_run=dry_run)
 
+
+main = _download_cmd.main
 
 if __name__ == "__main__":
     sys.exit(main())

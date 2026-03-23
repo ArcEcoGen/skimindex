@@ -66,6 +66,18 @@ from collections.abc import Callable
 from skimindex.log import logerror, loginfo
 
 
+def validate_config() -> int:
+    """Validate the current config. Returns 0 if valid, 1 if errors."""
+    from skimindex.config import config, validate
+    errors = validate(config())
+    if errors:
+        for e in errors:
+            logerror(f"ConfigError(section='{e.section}', key='{e.key}', message={e.message!r})")
+        logerror(f"{len(errors)} configuration error(s) — aborting.")
+        return 1
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # run_sections — standardised outer loop
 # ---------------------------------------------------------------------------
@@ -144,6 +156,7 @@ class SkimCommand:
         self._list_fn = list_fn
         self._handler: Callable | None = None
         self._section_arg = section_arg.replace("-", "_")
+        self._subcommands: dict[str, "SkimCommand"] = {}
 
         epilog = ""
         if examples:
@@ -199,12 +212,27 @@ class SkimCommand:
         self._handler = fn
         return fn
 
+    def subcommand(self, name: str, cmd: "SkimCommand") -> None:
+        """Register a named subcommand. Must be called before main() is used."""
+        self._subcommands[name] = cmd
+
     def main(self, argv: list[str] | None = None) -> int:
         """Parse *argv* and dispatch to the registered handler.
+
+        If the first argument matches a registered subcommand, delegates to it
+        (validation happens inside the subcommand's main()).
+        Otherwise validates config, then calls the top-level handler.
 
         Compatible with pyproject.toml entry points:
             foo = "skimindex._foo:main"  # works because main = cmd.main
         """
+        if argv is None:
+            import sys
+            argv = sys.argv[1:]
+
+        if argv and argv[0] in self._subcommands:
+            return self._subcommands[argv[0]].main(argv[1:])
+
         if self._handler is None:
             raise RuntimeError(
                 f"No handler registered for command '{self._parser.prog}'. "
@@ -216,6 +244,10 @@ class SkimCommand:
         if args.list:
             print(self._list_fn() or "")
             return 0
+
+        rc = validate_config()
+        if rc != 0:
+            return rc
 
         section_val = getattr(args, self._section_arg, None)
         sections = [section_val] if section_val else None

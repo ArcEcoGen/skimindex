@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from skimindex.config import Config
 
-VALID_SOURCES = frozenset({"ncbi", "genbank", "internal"})
+VALID_SOURCES = frozenset({"ncbi", "genbank", "internal", "sra"})
 VALID_ROLES = frozenset({"decontamination", "genomes", "genome_skims"})
 VALID_GB_DIVISIONS = frozenset({"bct", "inv", "mam", "phg", "pln", "pri", "rod", "vrl", "vrt"})
 VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR"})
@@ -189,13 +189,17 @@ def _validate_role_sections(cfg: "Config") -> list[ConfigError]:
         if "run" in role:
             errors += _check_run_ref(sec, "run", role["run"], declared_processing)
 
-        # B13 — run required when datasets are assigned to this role
+        # B13 — run required when datasets are assigned to this role,
+        # unless all datasets for this role use source = "sra" (raw reads, no processing step)
         elif name in roles_with_datasets:
-            errors.append(ConfigError(
-                sec, "run",
-                f"required: {len([d for d in cfg.datasets.values() if d.get('role') == name])} "
-                f"dataset(s) are assigned to this role but no processing pipeline is declared"
-            ))
+            role_datasets = [d for d in cfg.datasets.values() if d.get("role") == name]
+            all_sra = all(d.get("source") == "sra" for d in role_datasets)
+            if not all_sra:
+                errors.append(ConfigError(
+                    sec, "run",
+                    f"required: {len(role_datasets)} "
+                    f"dataset(s) are assigned to this role but no processing pipeline is declared"
+                ))
 
     return errors
 
