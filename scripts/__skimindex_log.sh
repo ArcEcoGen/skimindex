@@ -21,6 +21,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     exit 1
 fi
 
+# @@STRIP_INLINE_BEGIN@@
 # Guard against multiple inclusion
 [[ -n "${_SKIMINDEX_LOG_LOADED:-}" ]] && return 0
 
@@ -29,6 +30,7 @@ if [[ -z "${_skimindex_sh_dir:-}" ]]; then
     echo "ERROR: source __skimindex.sh instead of __skimindex_log.sh directly." >&2
     return 1
 fi
+# @@STRIP_INLINE_END@@
 
 _SKIMINDEX_LOG_LOADED=1
 

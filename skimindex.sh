@@ -61,14 +61,6 @@ set -euo pipefail
 # ============================================================
 
 
-# Guard against multiple inclusion
-[[ -n "${_SKIMINDEX_LOG_LOADED:-}" ]] && return 0
-
-# Require __skimindex.sh as entry point (_skimindex_sh_dir must be set)
-if [[ -z "${_skimindex_sh_dir:-}" ]]; then
-    echo "ERROR: source __skimindex.sh instead of __skimindex_log.sh directly." >&2
-    return 1
-fi
 
 _SKIMINDEX_LOG_LOADED=1
 

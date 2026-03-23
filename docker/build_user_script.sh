@@ -104,6 +104,12 @@ fi
 # ---------------------------------------------------------------------------
 strip_guard() {
     awk '
+        # Strip explicit inline-strip regions
+        /^# @@STRIP_INLINE_BEGIN@@/  { strip=1; next }
+        strip && /^# @@STRIP_INLINE_END@@/ { strip=0; next }
+        strip { next }
+
+        # Strip the BASH_SOURCE direct-execution guard block
         /^# Guard against direct execution/      { skip=1; next }
         skip && /^if[[:space:]]*\[\[.*BASH_SOURCE/ { in_if=1; next }
         skip && !in_if                           { skip=0 }
