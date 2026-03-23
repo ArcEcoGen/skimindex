@@ -35,7 +35,6 @@ from skimindex.sources.sra import (
     biosample_dir,
     run_output_paths,
     scratch_run_dir,
-    dataset_sra_dir,
 )
 from skimindex.stamp import is_stamped, needs_run, stamp, unstamp
 from skimindex.unix.compress import pigz

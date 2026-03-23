@@ -17,31 +17,13 @@ Stamp paths mirror the output hierarchy under /stamp/sra/.
 from pathlib import Path
 
 from skimindex.config import config
-from skimindex.datasets import dataset_config
 from skimindex.naming import canonical_species
-
-
-def sra_dir() -> Path:
-    """Root directory for the SRA source (/sra or configured equivalent)."""
-    return config().source_dir("sra")
+from skimindex.sources import dataset_download_dir
 
 
 def scratch_dir() -> Path:
     """Scratch directory for temporary SRA files (/scratch or configured equivalent)."""
     return config().scratch_dir()
-
-
-def dataset_sra_dir(dataset_name: str) -> Path:
-    """Download directory for a named SRA dataset.
-
-    Resolves: sra_dir() / dataset.directory
-
-    Example:
-        dataset_sra_dir("betula_skims") → /sra/Betula
-    """
-    ds = dataset_config(dataset_name)
-    directory = ds.get("directory", dataset_name)
-    return sra_dir() / directory
 
 
 def organism_dir(dataset_name: str, organism: str) -> Path:
@@ -50,7 +32,7 @@ def organism_dir(dataset_name: str, organism: str) -> Path:
     Example:
         organism_dir("betula_skims", "Betula pendula") → /sra/Betula/Betula_pendula
     """
-    return dataset_sra_dir(dataset_name) / canonical_species(organism)
+    return dataset_download_dir(dataset_name) / canonical_species(organism)
 
 
 def biosample_dir(dataset_name: str, organism: str, biosample: str) -> Path:
