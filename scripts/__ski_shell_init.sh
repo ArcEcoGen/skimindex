@@ -21,7 +21,7 @@ source "${SKIMINDEX_SCRIPTS_DIR:-/app/scripts}/__skimindex.sh"
 [[ -f ~/.bashrc    ]] && source ~/.bashrc
 
 # Re-ensure container tools take precedence after profile sourcing
-export PATH="/app/bin:/app/scripts:${PATH}"
+export PATH="/app/bin:/app/scripts:/opt/conda/bin:${PATH}"
 
 # reload_config
 #   Unsets all SKIMINDEX__* variables and the config-loaded guard,

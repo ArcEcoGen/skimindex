@@ -352,12 +352,10 @@ _ski_run_exec() {
     local BIND=()
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_build_bind_array "--bind"
-        [[ -d "${PROJECT_ROOT}/usercmd" ]] && BIND+=(--bind "${PROJECT_ROOT}/usercmd:/usercmd")
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" "$@"
     else
         _ski_build_bind_array "-v"
-        [[ -d "${PROJECT_ROOT}/usercmd" ]] && BIND+=(-v "${PROJECT_ROOT}/usercmd:/usercmd")
         "$RUNTIME" run --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
     fi
 }
