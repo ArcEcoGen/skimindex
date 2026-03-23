@@ -307,12 +307,19 @@ _ski_ensure_dirs() {
 # =============================================================================
 
 # _ski_ensure_current
-#   For apptainer: auto-update the SIF when the digest is unknown (no .digest
-#   file) or when the registry has a newer image.  Skipped with --local.
+#   Apptainer: update SIF when digest differs or SIF is absent.
+#   Docker/podman: pull silently; print output only when the image actually changed.
+#   Skipped with --local.
 _ski_ensure_current() {
-    [[ "$RUNTIME" == "apptainer" ]] || return 0
     (( _SKI_LOCAL )) && return 0
-    _ski_apptainer_needs_update && _ski_update
+    local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
+    if [[ "$RUNTIME" == "apptainer" ]]; then
+        _ski_apptainer_needs_update && _ski_update
+    else
+        local _out
+        _out=$("$RUNTIME" pull "$_SKI_FULL_IMAGE" 2>&1) || true
+        grep -qF "Status: Image is up to date" <<< "$_out" || printf '%s\n' "$_out" >&2
+    fi
     return 0
 }
 
@@ -323,8 +330,6 @@ _ski_run_interactive() {
     _ski_ensure_current
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
-    local pull_flag=()
-    (( _SKI_LOCAL )) || pull_flag=(--pull always)
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_build_bind_array "--bind"
         for _m in "$@"; do BIND+=(--bind "$_m"); done
@@ -333,7 +338,7 @@ _ski_run_interactive() {
     else
         _ski_build_bind_array "-v"
         for _m in "$@"; do BIND+=(-v "$_m"); done
-        "$RUNTIME" run "${pull_flag[@]}" --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE"
+        "$RUNTIME" run --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE"
     fi
 }
 
@@ -342,15 +347,15 @@ _ski_run_exec() {
     _ski_ensure_current
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     local BIND=()
-    local pull_flag=()
-    (( _SKI_LOCAL )) || pull_flag=(--pull always)
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_build_bind_array "--bind"
+        [[ -d "${PROJECT_ROOT}/usercmd" ]] && BIND+=(--bind "${PROJECT_ROOT}/usercmd:/usercmd")
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" "$@"
     else
         _ski_build_bind_array "-v"
-        "$RUNTIME" run "${pull_flag[@]}" --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
+        [[ -d "${PROJECT_ROOT}/usercmd" ]] && BIND+=(-v "${PROJECT_ROOT}/usercmd:/usercmd")
+        "$RUNTIME" run --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
     fi
 }
 
@@ -541,11 +546,10 @@ case "$SUBCMD" in
         _ski_run_exec validate "$@"
         ;;
     *)
-        # Dynamic lookup in ${PROJECT_ROOT}/usercmd/ (host-side project dir).
-        # Scripts placed there are available without rebuilding the image.
+        # Dynamic lookup in ${PROJECT_ROOT}/usercmd/ — run inside the container
+        # with /usercmd bind-mounted, so scripts can source /app/scripts libs.
         if [[ -f "${PROJECT_ROOT}/usercmd/${SUBCMD}.sh" ]]; then
-            export SKIMINDEX_SCRIPTS_DIR=/app/scripts
-            bash "${PROJECT_ROOT}/usercmd/${SUBCMD}.sh" "$@"
+            _ski_run_exec env SKIMINDEX_SCRIPTS_DIR=/app/scripts bash "/usercmd/${SUBCMD}.sh" "$@"
         else
             logerror "Unknown subcommand '$SUBCMD'."
             logerror "Run '$(basename "$0") --help' for usage."

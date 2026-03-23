@@ -77,9 +77,15 @@ if [[ -n "${SKIMINDEX__LOGGING__LEVEL:-}" ]]; then
 fi
 
 if [[ -n "${SKIMINDEX__LOGGING__FILE:-}" ]]; then
-    openlogfile "${SKIMINDEX__LOGGING__FILE}" \
+    if [[ -n "${SKIMINDEX__LOGGING__DIRECTORY:-}" ]]; then
+        _ski_logpath="/${SKIMINDEX__LOGGING__DIRECTORY}/${SKIMINDEX__LOGGING__FILE}"
+    else
+        _ski_logpath="${SKIMINDEX__LOGGING__FILE}"
+    fi
+    openlogfile "$_ski_logpath" \
                 "${SKIMINDEX__LOGGING__MIRROR:-false}" \
                 "${SKIMINDEX__LOGGING__EVERYTHING:-false}"
+    unset _ski_logpath
 fi
 
 # =============================================================
