@@ -64,10 +64,11 @@ class DatasetStatus:
 class DownloadStatus:
     genbank: GenBankStatus
     ncbi: list[DatasetStatus]
+    sra: list[DatasetStatus]
 
     @property
     def complete(self) -> bool:
-        return self.genbank.complete and all(d.complete for d in self.ncbi)
+        return self.genbank.complete and all(d.complete for d in self.ncbi) and all(d.complete for d in self.sra)
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +132,28 @@ def ncbi_status() -> list[DatasetStatus]:
 
 
 # ---------------------------------------------------------------------------
+# SRA inspection
+# ---------------------------------------------------------------------------
+
+def sra_dataset_status(dataset_name: str) -> DatasetStatus:
+    """Inspect download status for a single SRA dataset."""
+    output_dir = dataset_download_dir(dataset_name)
+    source = config().datasets.get(dataset_name, {}).get("source", "sra")
+
+    if not output_dir.exists():
+        return DatasetStatus(dataset_name, source, output_dir, 0, 0)
+
+    files = list(output_dir.glob("**/*.fastq.gz"))
+    stamped = sum(1 for f in files if is_stamped(f))
+    return DatasetStatus(dataset_name, source, output_dir, len(files), stamped)
+
+
+def sra_status() -> list[DatasetStatus]:
+    """Inspect download status for all configured SRA datasets."""
+    return [sra_dataset_status(name) for name in datasets_for_source("sra")]
+
+
+# ---------------------------------------------------------------------------
 # Combined status
 # ---------------------------------------------------------------------------
 
@@ -139,6 +162,7 @@ def download_status() -> DownloadStatus:
     return DownloadStatus(
         genbank=genbank_status(),
         ncbi=ncbi_status(),
+        sra=sra_status(),
     )
 
 
@@ -197,6 +221,17 @@ def print_ncbi_status(statuses: list[DatasetStatus] | None = None) -> None:
     print(f"Overall: {overall}")
 
 
+def _print_sra_section(sra: list[DatasetStatus]) -> None:
+    print("=== SRA datasets ===")
+    if sra:
+        for ds in sra:
+            bar = f"{ds.files_stamped}/{ds.files_present}"
+            label = _ok(ds.complete) if ds.started else "-"
+            print(f"  {label} {ds.name:<20} {bar} files  ({ds.output_dir})")
+    else:
+        print("  No SRA datasets configured.")
+
+
 def print_status(status: DownloadStatus | None = None) -> None:
     """Print a human-readable download status report to stdout."""
     if status is None:
@@ -205,6 +240,8 @@ def print_status(status: DownloadStatus | None = None) -> None:
     _print_genbank_section(status.genbank)
     print()
     _print_ncbi_section(status.ncbi)
+    print()
+    _print_sra_section(status.sra)
     print()
     overall = "complete" if status.complete else "incomplete"
     print(f"Overall: {overall}")

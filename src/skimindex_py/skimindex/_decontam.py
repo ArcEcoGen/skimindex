@@ -9,7 +9,6 @@ Usage:
 Run 'decontam <subcommand> --help' for subcommand options.
 """
 
-import argparse
 import sys
 
 from skimindex.cli import SkimCommand
@@ -129,40 +128,33 @@ def _(sections, args, dry_run):
 
 
 # ---------------------------------------------------------------------------
-# decontam — top-level entry point
+# decontam — top-level command with subcommands
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {
-    "prepare": _prepare_cmd.main,
-    "count":   _count_cmd.main,
-}
+_decontam_cmd = SkimCommand(
+    name="decontam",
+    description="Prepare decontamination filter data.",
+    list_fn=_list_sections,
+    examples=[
+        "%(prog)s",
+        "%(prog)s --dry-run",
+        "%(prog)s prepare --dataset human",
+        "%(prog)s count --dataset human",
+    ],
+    section_arg="dataset",
+    section_metavar="NAME",
+    section_help="Process a single decontamination dataset",
+)
+_decontam_cmd.subcommand("prepare", _prepare_cmd)
+_decontam_cmd.subcommand("count",   _count_cmd)
 
 
-def main(argv: list | None = None) -> int:
-    """Prepare decontamination data, or a specific step via subcommand."""
-    if argv is None:
-        argv = sys.argv[1:]
+@_decontam_cmd.handler
+def _(sections, args, dry_run):
+    return _run_pipeline("prepare_decontam", sections or None, dry_run)
 
-    if argv and argv[0] in _SUBCOMMANDS:
-        return _SUBCOMMANDS[argv[0]](argv[1:])
 
-    parser = argparse.ArgumentParser(
-        prog="decontam",
-        description="Prepare decontamination filter data.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "Subcommands:\n"
-            "  decontam prepare   Split reference genomes into fragments\n"
-            "  decontam count     Count k-mers in prepared fragments\n\n"
-            "Run 'decontam <subcommand> --help' for subcommand-specific options."
-        ),
-    )
-    parser.add_argument("--dry-run", action="store_true",
-        help="Show what would be done without executing anything")
-    args = parser.parse_args(argv)
-
-    return _run_pipeline("prepare_decontam", None, args.dry_run)
-
+main = _decontam_cmd.main
 
 if __name__ == "__main__":
     sys.exit(main())

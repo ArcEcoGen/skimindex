@@ -27,6 +27,8 @@ genbank        = "genbank"
 indexes        = "indexes"
 raw_data       = "raw_data"
 processed_data = "processed_data"
+sra            = "sra"            # raw sequencing reads from NCBI SRA
+scratch        = "scratch"        # temporary files (HPC: point to $TMPDIR or fast local storage)
 config         = "config"
 log            = "log"
 stamp          = "stamp"
@@ -52,6 +54,11 @@ directory = "indexes"          # references [local_directories] key → ${SKIMIN
 [stamp]
 directory = "stamp"            # references [local_directories] key → ${SKIMINDEX_ROOT}/stamp/
 
+# Root location for temporary files (prefetch .sra archives, fasterq-dump outputs).
+# On HPC systems, point this to a fast local scratch filesystem.
+[scratch]
+directory = "scratch"          # references [local_directories] key → ${SKIMINDEX_ROOT}/scratch/
+
 
 # -----------------------------------------------------------------------------
 # Data source sections
@@ -69,6 +76,11 @@ divisions = ["bct", "pln"]     # divisions to download: bacteria + land plants/f
 # Internal sequencing data produced in-house.
 [source.internal]
 directory = "raw_data"         # references [local_directories] key → ${SKIMINDEX_ROOT}/raw_data/
+
+# Raw sequencing reads downloaded from NCBI SRA.
+# EBI (ERR/ERS/SAMEA) and DDBJ accessions are mirrored at NCBI and supported transparently.
+[source.sra]
+directory = "sra"              # references [local_directories] key → ${SKIMINDEX_ROOT}/sra/
 
 
 # -----------------------------------------------------------------------------
@@ -162,6 +174,14 @@ assembly_level   = "complete"
 assembly_version = "latest"
 one_per          = "genus"
 
+# SRA reads — provide run accessions, biosample IDs, or both
+[data.vaccinium_skims]
+source     = "sra"
+role       = "genome_skims"
+directory  = "Vaccinum"
+accessions = ["ERR7254753", "ERX6824156"]           # SRR/ERR/DRR run accessions
+biosamples = ["SAMEA10885714" , "ERS8536882"]         # SAMEA/ERS/SRS biosample IDs → all associated runs fetched
+threads    = 4                        # fasterq-dump parallelism
 
 # -----------------------------------------------------------------------------
 # Future data sections (not yet active)

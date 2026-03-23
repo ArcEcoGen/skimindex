@@ -73,6 +73,20 @@ skimindex shell [--mount SRC:DST] …
 The shell automatically loads `config/skimindex.toml` on startup and exports
 all values as `SKIMINDEX__*` environment variables.
 
+Use `--mount` to make additional host directories available inside the
+container. The source path may be relative to the current working directory:
+
+```bash
+skimindex shell --mount ./sandbox:/sandbox
+```
+
+Inside the container, the directory is then accessible at `/sandbox`. Multiple
+mounts can be stacked:
+
+```bash
+skimindex shell --mount ./sandbox:/sandbox --mount /data/ref:/ref
+```
+
 #### `reload_config`
 
 A `reload_config` function is available in the shell to re-read the
@@ -145,7 +159,7 @@ usercmd        = "usercmd"          # host: <project-dir>/usercmd/  →  /usercm
 …
 ```
 
-Extra mounts can be added when using the `shell` subcommand via `--mount SRC:DST` (not available for pipeline subcommands).
+Extra mounts can be added at shell time via `--mount SRC:DST` (see [`shell`](#shell) above). They are not available for pipeline subcommands.
 
 ---
 

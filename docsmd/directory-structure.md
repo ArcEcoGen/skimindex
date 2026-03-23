@@ -162,6 +162,61 @@ by default). Each accession corresponds to one sequenced individual.
             └── *.<ext>
 ```
 
+### SRA raw reads (source: `sra`)
+
+Stores raw FASTQ reads downloaded from NCBI SRA. The `sra` source points to
+the `sra` entry in `[local_directories]`. By default:
+
+```toml
+[source.sra]
+directory = "sra"     # → ${SKIMINDEX_ROOT}/sra/
+```
+
+The hierarchy inside that mount point is:
+
+```
+{source-directory}/
+└── {data.directory}/          # [data.X].directory (e.g. Betula)
+    └── {Organism_name}/       # canonical species name from SRA metadata
+        └── {biosample}/       # biosample accession (e.g. SAMEA9098823)
+            ├── {run}_1.fastq.gz   # paired-end R1
+            ├── {run}_2.fastq.gz   # paired-end R2
+            └── {run}.fastq.gz     # single-end
+```
+
+Organism names are sanitised with the same `canonical_species()` rules
+as NCBI genome filenames (spaces → underscores, special characters removed).
+
+Stamp files follow the pattern:
+```
+/stamp/sra/{data.directory}/{biosample}/{run}/download
+/stamp/sra/{data.directory}/{biosample}/{run}/convert
+/stamp/sra/{data.directory}/{biosample}/{run}/compress
+```
+
+### `scratch/` — Temporary files
+
+Stores intermediate files during SRA processing:
+- `.sra` archives downloaded by `prefetch`
+- Uncompressed FASTQ files produced by `fasterq-dump`
+
+These are cleaned up automatically after each run. On HPC systems, point
+`scratch` to a fast local scratch filesystem (e.g. `$TMPDIR` or a node-local NVMe):
+
+```toml
+[local_directories]
+scratch = "/path/to/fast/local/storage"
+```
+
+```
+scratch/
+└── sra/
+    └── {run}/               # one directory per run, removed after compression
+        ├── {run}.sra        # prefetch output
+        ├── {run}_1.fastq    # fasterq-dump output (paired-end)
+        └── {run}_2.fastq
+```
+
 ### `processed_data/` — Processed data
 
 Stores all pipeline outputs. Layout depends on whether the data section is

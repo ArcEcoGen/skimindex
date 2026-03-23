@@ -40,6 +40,9 @@ NCBI_DATASETS_LATEST_TAG := $(shell curl -s https://api.github.com/repos/$(NCBI_
 
 KMINDEX_VERSION   := bioconda::kmindex
 NTCARD_VERSION    := bioconda::ntcard
+SRATOOLS_VERSION  := bioconda::sra-tools
+OSSUUID_VERSION   := conda-forge::ossuuid
+ASPERA_SDK_VERSION := 1.1.7
 
 # =============================================================================
 # Derived image identifiers
@@ -75,6 +78,9 @@ BUILD_ARGS := \
 	--build-arg NCBI_DATASETS_VERSION=$(NCBI_DATASETS_VERSION) \
 	--build-arg KMINDEX_VERSION=$(KMINDEX_VERSION) \
 	--build-arg NTCARD_VERSION=$(NTCARD_VERSION) \
+	--build-arg SRATOOLS_VERSION=$(SRATOOLS_VERSION) \
+	--build-arg OSSUUID_VERSION=$(OSSUUID_VERSION) \
+	--build-arg ASPERA_SDK_VERSION=$(ASPERA_SDK_VERSION) \
 	--build-arg OCI_VERSION=$(OCI_VERSION) \
 	--build-arg OCI_CREATED=$(OCI_CREATED) \
 	--build-arg OCI_REVISION=$(OCI_REVISION)

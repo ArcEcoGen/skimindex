@@ -116,6 +116,24 @@ Stamp files allow interrupted runs to resume without reprocessing already-comple
 directory = "stamp"               # references [local_directories] key → ${SKIMINDEX_ROOT}/stamp/
 ```
 
+### `[scratch]`
+
+Root location for temporary files used during SRA processing (`prefetch` archives
+and uncompressed FASTQ files). Files are removed automatically after each run.
+
+On HPC systems, point this to a fast local scratch filesystem (e.g. `$TMPDIR` or
+a node-local NVMe) by setting the corresponding `[local_directories]` entry to an
+absolute host path.
+
+| Key         | Type   | Description                                                       |
+|-------------|--------|-------------------------------------------------------------------|
+| `directory` | string | Key from `[local_directories]` where temporary files are written  |
+
+```toml
+[scratch]
+directory = "scratch"             # references [local_directories] key → ${SKIMINDEX_ROOT}/scratch/
+```
+
 ---
 
 ## Source Sections
@@ -166,6 +184,20 @@ Internal sequencing data produced in-house.
 ```toml
 [source.internal]
 directory = "raw_data"            # references [local_directories] key → ${SKIMINDEX_ROOT}/raw_data/
+```
+
+### `[source.sra]`
+
+Raw sequencing reads downloaded from NCBI SRA. EBI (ERR/ERS/SAMEA) and DDBJ
+accessions are mirrored at NCBI and supported transparently.
+
+| Key         | Type   | Description                                                       |
+|-------------|--------|-------------------------------------------------------------------|
+| `directory` | string | Key from `[local_directories]` where SRA reads are stored         |
+
+```toml
+[source.sra]
+directory = "sra"                 # references [local_directories] key → ${SKIMINDEX_ROOT}/sra/
 ```
 
 ---
@@ -298,6 +330,7 @@ identifier chosen by the user.
 | `source` | `"ncbi"`            | Downloaded via the NCBI Datasets CLI                           |
 |          | `"genbank"`         | Filtered from GenBank flat-files (FTP)                         |
 |          | `"internal"`        | Internal sequencing data produced in-house                     |
+|          | `"sra"`             | Raw reads downloaded from NCBI SRA                             |
 | `role`   | `"decontamination"` | Sequences used to build the decontamination filter             |
 |          | `"genomes"`         | Complete reference genomes                                     |
 |          | `"genome_skims"`    | Low-coverage skim-sequenced genomes                            |
@@ -347,6 +380,30 @@ artefact** for these sections and lives directly under `processed_data/`.
 #### `source = "internal"`
 
 No additional keys beyond the common `directory`.
+
+#### `source = "sra"`
+
+| Key          | Type             | Required | Description                                                            |
+|--------------|------------------|----------|------------------------------------------------------------------------|
+| `accessions` | array of strings | no       | Run accessions (SRR/ERR/DRR) or experiment accessions (SRX/ERX/DRX). For runs, the biosample is looked up automatically. For experiments, all associated runs are discovered. |
+| `biosamples` | array of strings | no       | Biosample IDs (SAMEA/ERS/SRS/SAMN). All associated run accessions are discovered automatically. |
+| `threads`    | integer          | no       | Number of threads for `fasterq-dump` (default: 4)                     |
+
+At least one of `accessions` or `biosamples` must be present. Both may coexist;
+runs are deduplicated across all sources.
+
+Metadata (organism name, biosample, library layout) is resolved via the NCBI
+Entrez API at download time.
+
+```toml
+[data.betula_skims]
+source     = "sra"
+role       = "genome_skims"
+directory  = "Betula"
+accessions = ["ERR7254752"]           # SRR/ERR/DRR run accessions
+biosamples = ["SAMEA9098823"]         # SAMEA/ERS/SRS → all associated runs fetched
+threads    = 4
+```
 
 ### Role-specific Keys
 
@@ -423,9 +480,9 @@ one_per          = "genus"
 ## Validation Rules
 
 1. The section type is determined by its TOML prefix: `source.`, `role.`, `processing.`, `data.`, or no prefix (configuration).
-2. Configuration sections (no prefix) must **not** contain `source` or `role` keys. The valid configuration sections are: `local_directories`, `logging`, `processed_data`, `indexes`, `stamp`.
+2. Configuration sections (no prefix) must **not** contain `source` or `role` keys. The valid configuration sections are: `local_directories`, `logging`, `processed_data`, `indexes`, `stamp`, `scratch`.
 3. Data sections (`data.*`) must contain both `source` and `role`.
-4. `source` must be one of: `"ncbi"`, `"genbank"`, `"internal"`.
+4. `source` must be one of: `"ncbi"`, `"genbank"`, `"internal"`, `"sra"`.
 5. `role` must be one of: `"decontamination"`, `"genomes"`, `"genome_skims"`.
 6. For `role = "decontamination"`, the `example` key is required (`true` or `false`).
 7. For `source = "ncbi"`, the `taxon` key is required.
@@ -433,6 +490,7 @@ one_per          = "genus"
    the codes listed in `[source.genbank] divisions`.
 9. For `source = "genbank"`, `taxid` is optional; when absent all sequences of
    the selected divisions are used.
+9b. For `source = "sra"`, at least one of `accessions` or `biosamples` must be present.
 10. For `source = "genbank"`, `by_species = true` is reserved for a future
     pre-processing step that would distribute sequences into per-species files
     using `obidistribute` (not yet implemented).

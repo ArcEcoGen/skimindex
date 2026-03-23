@@ -12,6 +12,7 @@ nav:
   - Entry Point (skimindex.sh): entrypoint.md
   - Pipeline Commands: commands.md
   - Writing Shell Commands: devshell.md
+  - Tools: tools.md
 
 theme:
   name: readthedocs

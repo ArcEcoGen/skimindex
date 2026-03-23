@@ -36,6 +36,9 @@ FROM continuumio/miniconda3:@@ANACONDA_VERSION@@ AS skimindex
 
 ARG KMINDEX_VERSION=bioconda::kmindex
 ARG NTCARD_VERSION=bioconda::ntcard
+ARG SRATOOLS_VERSION=bioconda::sra-tools
+ARG OSSUUID_VERSION=conda-forge::ossuuid
+ARG ASPERA_SDK_VERSION=1.1.7
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -55,14 +58,34 @@ RUN mkdir -p /usr/local/bin \
     && chmod 755 /usr/local/bin/datasets /usr/local/bin/dataformat \
     && rm /tmp/ncbi_datasets.zip
 
-RUN conda install --yes ${KMINDEX_VERSION} ${NTCARD_VERSION} \
+RUN conda install --yes ${KMINDEX_VERSION} ${NTCARD_VERSION} ${OSSUUID_VERSION} ${SRATOOLS_VERSION} \
     && conda clean --all --yes
+
+# Install IBM Aspera Transfer SDK (provides ascp) — architecture-aware.
+# amd64 → linux-amd64 ; arm64 → linux-aarch64
+# Pin ASPERA_SDK_VERSION for reproducible builds.
+ARG ASPERA_SDK_VERSION=1.1.7
+RUN case "${TARGETARCH}" in \
+        amd64) _ascp_arch="amd64"   ;; \
+        arm64) _ascp_arch="aarch64" ;; \
+        *)     echo "Unsupported arch: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && _ascp_archive="ibm-aspera-transfer-sdk-linux-${_ascp_arch}-${ASPERA_SDK_VERSION}.tar.gz" \
+    && curl -fsSL "https://d3pgwzphl5a0ty.cloudfront.net/${ASPERA_SDK_VERSION}/${_ascp_archive}" \
+        | tar -xz -C /usr/local/bin \
+            --strip-components=2 \
+            "ibm-aspera-transfer-sdk-linux-${_ascp_arch}-${ASPERA_SDK_VERSION}/bin/ascp" \
+    && chmod 755 /usr/local/bin/ascp \
+    && vdb-config --restore-defaults || true \
+    && vdb-config --set /TOOLS/ascp-path=/usr/local/bin/ascp || true
 
 RUN mkdir -p /genbank \
              /indexes \
              /processed_data/decontamination \
              /processed_data/skims \
              /skims \
+             /sra \
+             /scratch \
              /app/scripts /app/bin /app/obiluascripts \
              /config \
              /log
