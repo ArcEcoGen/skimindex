@@ -18,7 +18,7 @@ and quality filtering.
 | **Architecture** | Compiled from source for each target platform (builder stage) |
 | **Language** | Go |
 | **GitHub** | <https://github.com/metabarcoding/obitools4> |
-| **Documentation** | <https://metabarcoding.org/obitools4> |
+| **Documentation** | <https://obitools4.metabarcoding.org/> |
 | **Institution** | LECA / Université Grenoble Alpes |
 
 ### Reference
@@ -45,12 +45,17 @@ and querying.
 | **GitHub** | <https://github.com/tlemane/kmindex> |
 | **Documentation** | <https://tlemane.github.io/kmindex> |
 
-### Reference
+### References
 
-> Marchet C., Mehta N., Sinno R., Pibiri G.E., Limasset A. (2024).
-> **Scalable sequence search and taxonomic classification using kmindex and FULGOR.**
-> *iScience*, 27, 109308.
-> <https://doi.org/10.1016/j.isci.2024.109308>
+> Lemane T., Lezzoche N., Lecubin J., Pelletier E., Sunagawa S., Bork P., Hingamp P., Lavigne R., Chikhi R., Peterlongo P. (2024).
+> **Indexing and real-time user-friendly queries in terabyte-sized complex genomic datasets with kmindex and ORA.**
+> *Nature Computational Science*, 4, 104–109.
+> <https://doi.org/10.1038/s43588-024-00596-6>
+
+> Lemane T., Medvedev P., Chikhi R., Peterlongo P. (2022).
+> **kmtricks: efficient and flexible construction of Bloom filters for large sequencing data collections.**
+> *Bioinformatics Advances*, 2(1), vbac029.
+> <https://doi.org/10.1093/bioadv/vbac029>
 
 ---
 
