@@ -282,7 +282,8 @@ def _compress_run(
             pigz("-f", "-k", str(fastq))()
             gz = Path(str(fastq) + ".gz")
             shutil.move(str(gz), out)
-        stamp(output_paths[-1])
+        for out in output_paths:
+            stamp(out)
         loginfo(f"    [{run}] Compression complete")
         return True
     except Exception as e:
