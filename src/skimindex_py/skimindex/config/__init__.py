@@ -57,10 +57,37 @@ def _env_key(section: str, key: str) -> str:
 
 
 class Config:
-    """Parse and provide typed access to skimindex TOML configuration."""
+    """Parse and provide typed access to skimindex TOML configuration.
+
+    Reads a TOML file (default ``/config/skimindex.toml``, overridable via
+    ``SKIMINDEX_CONFIG`` environment variable), exports all scalar values as
+    ``SKIMINDEX__SECTION__KEY`` environment variables, and provides typed
+    accessors for every config section.
+
+    Precedence for any value: **env var > TOML > built-in default**.
+
+    Example:
+        ```python
+        from skimindex.config import config
+
+        cfg = config()
+        print(cfg.get("logging", "level"))   # "INFO"
+        print(cfg.processed_data_dir())      # Path("/processed_data")
+        ```
+    """
 
     def __init__(self, path: Path = DEFAULT_CONFIG, *, apply_logging: bool = True,
                  export_env: bool = True):
+        """Load configuration from a TOML file.
+
+        Args:
+            path: Path to the TOML configuration file.
+            apply_logging: If ``True``, configure the logging system from
+                ``[logging]`` immediately after loading.
+            export_env: If ``True``, export all config values as
+                ``SKIMINDEX__`` environment variables (existing vars are
+                never overwritten).
+        """
         self._path = Path(path)
         self._raw: dict[str, Any] = {}
 
@@ -200,14 +227,23 @@ class Config:
     # ------------------------------------------------------------------
 
     def get(self, section: str, key: str, default: str = "") -> str:
-        """Get a config value with precedence: env var > TOML > default.
+        """Get a config value with env-var / TOML / default precedence.
 
-        section may be dotted ("source.ncbi") for prefixed sections.
+        Args:
+            section: Section path, dotted for prefixed sections
+                (e.g. ``"logging"``, ``"source.ncbi"``, ``"data.human"``).
+            key: Key name within the section.
+            default: Fallback value when neither env var nor TOML entry exist.
 
-        Examples:
-            config.get("logging", "level")          → "INFO"
-            config.get("source.ncbi", "directory")  → "genbank"
-            config.get("data.human", "taxon")       → "human"
+        Returns:
+            The resolved value as a string.
+
+        Example:
+            ```python
+            cfg.get("logging", "level")          # "INFO"
+            cfg.get("source.ncbi", "directory")  # "genbank"
+            cfg.get("data.human", "taxon")       # "human"
+            ```
         """
         var_name = _env_key(section, key)
         if var_name in os.environ:
@@ -265,10 +301,14 @@ class Config:
         return str(value)
 
     def env_vars(self) -> dict[str, str]:
-        """Return all SKIMINDEX__ environment variables as a plain dict.
+        """Return all ``SKIMINDEX__`` environment variables as a plain dict.
 
-        Does not touch ``os.environ`` — suitable for inspection or shell export.
-        Derived variables (REF_TAXA, REF_GENOMES) are included.
+        Does **not** touch ``os.environ`` — suitable for inspection, testing,
+        or generating a shell export snippet.  Derived special variables
+        (``SKIMINDEX__REF_TAXA``, ``SKIMINDEX__REF_GENOMES``) are included.
+
+        Returns:
+            Mapping of variable name → serialised string value.
         """
         sv = self._serialize_value
         out: dict[str, str] = {}
@@ -305,13 +345,18 @@ class Config:
         return out
 
     def dump_env(self) -> str:
-        """Return a shell snippet that exports all SKIMINDEX__ variables.
+        """Return a shell snippet that exports all ``SKIMINDEX__`` variables.
 
-        Variables already present in ``os.environ`` are skipped (pre-existing
-        environment takes priority).  The output is safe to pass to
-        ``eval`` in bash::
+        Variables already present in ``os.environ`` are skipped so that
+        pre-existing environment values take priority.  The output is safe to
+        pass directly to ``eval`` in bash:
 
-            eval "$(python3 -m skimindex.config)"
+        ```bash
+        eval "$(python3 -m skimindex.config)"
+        ```
+
+        Returns:
+            A newline-separated string of ``export VAR=value`` statements.
         """
         lines = []
         for var, value in self.env_vars().items():

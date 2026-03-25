@@ -1387,9 +1387,24 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../unix/" class="md-nav__link">
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_2_11" id="__nav_3_2_2_11_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -1403,7 +1418,163 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    unix
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_compress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_ncbi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ncbi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_obitools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    obitools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1533,7 +1704,7 @@
 
 
 <h2 id="skimindex.sequences" class="doc doc-heading">
-            <code>skimindex.sequences</code>
+            <span class="doc doc-object-name doc-module-name">skimindex.sequences</span>
 
 
 </h2>
@@ -1590,10 +1761,19 @@ for name, path in species.items():
 
 
 <h3 id="skimindex.sequences.list_sequence_files" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">list_sequence_files</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;relative&#39;</span><span class="p">,</span> <span class="n">extensions</span><span class="o">=</span><span class="n">SEQUENCE_EXTENSIONS</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">uncompressed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">list_sequence_files</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">list_sequence_files</span><span class="p">(</span>
+    <span class="n">directory</span><span class="p">:</span> <span class="n">PathLike</span><span class="p">,</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="n">PathMode</span> <span class="o">=</span> <span class="s2">&quot;relative&quot;</span><span class="p">,</span>
+    <span class="n">extensions</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="n">SEQUENCE_EXTENSIONS</span><span class="p">,</span>
+    <span class="n">recursive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">compressed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">uncompressed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -1781,10 +1961,14 @@ uncompressed (".fasta") variants are searched, controlled by the
 
 
 <h3 id="skimindex.sequences.species_list" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">species_list</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;relative&#39;</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">species_list</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">species_list</span><span class="p">(</span>
+    <span class="n">directory</span><span class="p">:</span> <span class="n">PathLike</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="n">PathMode</span> <span class="o">=</span> <span class="s2">&quot;relative&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -1919,10 +2103,14 @@ uncompressed (".fasta") variants are searched, controlled by the
 
 
 <h3 id="skimindex.sequences.genome_species_list" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">genome_species_list</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;relative&#39;</span><span class="p">,</span> <span class="n">data_type</span><span class="o">=</span><span class="s1">&#39;raw&#39;</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">genome_species_list</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">genome_species_list</span><span class="p">(</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="n">PathMode</span> <span class="o">=</span> <span class="s2">&quot;relative&quot;</span><span class="p">,</span> <span class="n">data_type</span><span class="p">:</span> <span class="n">DataType</span> <span class="o">=</span> <span class="s2">&quot;raw&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 

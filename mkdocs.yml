@@ -20,6 +20,9 @@ plugins:
             show_root_heading: true
             show_submodules: false
             members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            merge_init_into_class: true
 
 nav:
   - Overview: index.md
@@ -54,4 +57,9 @@ nav:
               - sequences: api/sequences.md
               - naming: api/naming.md
               - log: api/log.md
-              - unix: api/unix.md
+              - unix:
+                  - Overview: api/unix.md
+                  - compress: api/unix_compress.md
+                  - ncbi: api/unix_ncbi.md
+                  - obitools: api/unix_obitools.md
+                  - download: api/unix_download.md

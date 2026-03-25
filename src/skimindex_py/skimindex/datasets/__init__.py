@@ -26,16 +26,20 @@ from skimindex.config import config
 # ---------------------------------------------------------------------------
 
 class Dataset:
-    """A configured [data.X] block with typed access and Data conversion.
+    """A configured ``[data.X]`` block with typed access and Data conversion.
 
-    Attributes
-    ----------
-    name   : dataset name (the X in [data.X])
-    source : "ncbi", "genbank", or "internal"
-    role   : "decontamination", "genomes", etc.
+    Attributes:
+        name:   Dataset name (the ``X`` in ``[data.X]``).
+        source: Data origin — ``"ncbi"``, ``"genbank"``, ``"sra"``, or ``"internal"``.
+        role:   Pipeline role — ``"decontamination"``, ``"genomes"``, etc.
     """
 
     def __init__(self, name: str, cfg: dict[str, Any]) -> None:
+        """
+        Args:
+            name: Dataset name as declared in the TOML file.
+            cfg:  Raw ``[data.X]`` dict from the parsed config.
+        """
         self.name   = name
         self._cfg   = cfg
 
@@ -81,10 +85,15 @@ class Dataset:
     # ------------------------------------------------------------------
 
     def to_data(self) -> Iterator["Data"]:  # noqa: F821
-        """Yield one or more Data objects representing this dataset's input.
+        """Yield ``Data`` objects representing this dataset's input files.
 
-        - ncbi    : FILES — one Data per genome file (.fasta.gz / .gbff.gz)
-        - genbank : STREAM — one Data (obigrep-filtered by taxid)
+        Yields:
+            One ``Data`` per genome file for ``ncbi`` sources (``FILES`` kind),
+            or one ``Data`` per GenBank division for ``genbank`` sources
+            (``STREAM`` kind, optionally filtered by taxid).
+
+        Raises:
+            ValueError: If ``source`` is not a supported value.
         """
         if self.source == "ncbi":
             yield from self._ncbi_data()
@@ -151,11 +160,19 @@ def all_datasets() -> dict[str, dict[str, Any]]:
 
 
 def datasets_for_source(source: str) -> list[str]:
-    """Return dataset names whose source matches *source*.
+    """Return the names of all datasets whose source matches *source*.
+
+    Args:
+        source: Source type to filter on (``"ncbi"``, ``"genbank"``, ``"sra"``, …).
+
+    Returns:
+        List of dataset names.
 
     Example:
-        datasets_for_source("ncbi")    → ["human", "fungi"]
-        datasets_for_source("genbank") → ["bacteria"]
+        ```python
+        datasets_for_source("ncbi")    # ["human", "fungi"]
+        datasets_for_source("genbank") # ["bacteria"]
+        ```
     """
     return [
         name for name, ds in all_datasets().items()
@@ -164,10 +181,19 @@ def datasets_for_source(source: str) -> list[str]:
 
 
 def datasets_for_role(role: str) -> list[Dataset]:
-    """Return Dataset objects whose role matches *role*.
+    """Return ``Dataset`` objects for all datasets assigned to *role*.
+
+    Args:
+        role: Role name to filter on (``"decontamination"``, ``"genomes"``, …).
+
+    Returns:
+        List of ``Dataset`` instances.
 
     Example:
-        datasets_for_role("decontamination") → [Dataset("human"), Dataset("bacteria")]
+        ```python
+        datasets_for_role("decontamination")
+        # [Dataset('human', ...), Dataset('bacteria', ...)]
+        ```
     """
     return [
         Dataset(name, ds)
@@ -187,9 +213,16 @@ def dataset_config(name: str) -> dict[str, Any]:
 
 
 def get_dataset(name: str) -> Dataset:
-    """Return a Dataset object for a named dataset.
+    """Return a ``Dataset`` object for a named dataset.
 
-    Raises KeyError if the dataset is not found.
+    Args:
+        name: Dataset name as declared in ``[data.X]``.
+
+    Returns:
+        The corresponding ``Dataset`` instance.
+
+    Raises:
+        KeyError: If *name* is not found in the config.
     """
     cfg = all_datasets()
     if name not in cfg:

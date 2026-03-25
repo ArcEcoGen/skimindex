@@ -106,9 +106,20 @@ def resolve_artifact(
       {"role": "idx:decontamination", "dir": ""}  → meta-index
 
     Args:
-        value:          Artifact reference — string or dict.
-        dataset_subdir: Relative subdir within the role tree (e.g. Path("Human/Homo_sapiens--GCF_…")).
-                        If None, the role directory is returned without a dataset level.
+        value:          Artifact reference — string (``"dir@[idx:]role"``) or dict
+                        (``{"role": "…", "dir": "…"}``).
+        dataset_subdir: Relative subdir within the role tree
+                        (e.g. ``Path("Human/Homo_sapiens--GCF_…")``).
+                        Pass ``None`` for meta-index references where no
+                        per-dataset level is needed.
+
+    Returns:
+        Absolute ``Path`` to the artifact directory.
+
+    Raises:
+        ValueError: If *value* is a string without an ``@`` separator, or if
+                    *role_name* cannot be resolved (falls back to role name as
+                    directory).
     """
     cfg = config()
 

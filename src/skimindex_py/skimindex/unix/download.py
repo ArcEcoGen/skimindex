@@ -7,7 +7,7 @@ Provides Pythonic interface to curl for HTTP/HTTPS operations.
 from skimindex.unix.base import LoggedBoundCommand, local
 
 
-def curl(*args) -> LoggedBoundCommand:
+def curl(*args: str) -> LoggedBoundCommand:
     """
     Execute curl command with given arguments.
 
@@ -22,7 +22,7 @@ def curl(*args) -> LoggedBoundCommand:
     return local["curl"][*args]
 
 
-def curl_download(url: str, *extra_args) -> LoggedBoundCommand:
+def curl_download(url: str, *extra_args: str) -> LoggedBoundCommand:
     """
     Download from URL with sensible defaults for robustness.
 

@@ -1,50 +1,37 @@
 """
 skimindex.processing — registry of data processing operation types.
 
-Each processing type is a Python function decorated with @processing_type.
-The decorator registers it so that:
-  - config validation can verify [processing.X].type values
-  - make_step() can build a ready-to-call pipeline step from a TOML config block
+Each processing type is a Python function decorated with ``@processing_type``.
+The decorator registers it so that config validation can verify
+``[processing.X].type`` values and ``build()`` can construct a ready-to-call
+pipeline step directly from a TOML config block.
 
-Concepts
---------
-OutputKind
-    Describes what a processing type produces:
-    - STREAM    : output on STDOUT, chainable in a plumbum pipe
-    - DIRECTORY : output written to a directory of files
-    - FILE      : output written to a single file
+Key concepts:
 
-ProcessingType
-    Metadata + builder for one registered type.
-    .pipable        → True iff output_kind == STREAM
-    .is_runnable()  → True iff params contain a 'directory' key
-    .build(params)  → callable configured with params, ready to execute
+- ``OutputKind`` — what a type produces: ``STREAM`` (stdout pipe), ``DIRECTORY``,
+  or ``FILE``.
+- ``ProcessingType`` — metadata + builder for one registered type.
+- ``@processing_type`` — registers a builder function by its ``__name__``.
+- ``build(name)`` — unified factory: detects atomic vs composite automatically.
+- ``make_pipeline(name)`` — builds a composite pipeline from a ``steps`` list.
 
-processing_type(output_kind, ...)
-    Decorator that registers a builder function as a ProcessingType.
-    Uses __name__ and __doc__ of the decorated function.
+Example:
+    ```python
+    from skimindex.processing import processing_type, OutputKind, build
 
-make_step(processing_name)
-    Builds a runnable callable from a [processing.X] TOML block.
-    Raises ValueError if the section is not runnable.
-
-Usage
------
-    # Registering a type (in the module that implements it):
-    from skimindex.processing import processing_type, OutputKind
-
+    # Registering a new type:
     @processing_type(output_kind=OutputKind.STREAM)
-    def split(params: dict):
-        \"\"\"Split reference sequences into overlapping fragments.\"\"\"
-        size = params.get("size", 200)
-        def run(input_cmd):
+    def my_filter(params: dict):
+        \"\"\"Filter sequences by a custom criterion.\"\"\"
+        threshold = params.get("threshold", 10)
+        def run(input_data):
             ...
         return run
 
-    # Building a step from config:
-    from skimindex.processing import make_step
-    step = make_step("split_decontam")
-    step(input_cmd, output_dir, dry_run=False)
+    # Building and running from config:
+    step = build("count_kmers_decontam")
+    result = step(input_data, dry_run=False)
+    ```
 """
 
 from dataclasses import dataclass, field
@@ -70,19 +57,24 @@ class OutputKind(Enum):
 
 @dataclass(slots=True)
 class ProcessingType:
-    """Metadata and builder for a registered processing operation type."""
+    """Metadata and builder for a registered processing operation type.
+
+    Attributes:
+        name:            Type name (used as ``type = "…"`` in TOML).
+        description:     Human-readable description (from ``__doc__``).
+        output_kind:     What the type produces (``STREAM``, ``DIRECTORY``, or ``FILE``).
+        needs_tmpdir:    ``True`` if the builder requires a temporary working directory.
+        is_indexer:      ``True`` if outputs go to the indexes tree instead of processed_data.
+        output_filename: Filename used when a ``STREAM``/``FILE`` output is persisted to disk
+                         (e.g. ``"filtered.fasta.gz"``).  ``None`` means the type cannot be
+                         persisted; declaring ``output`` for it is a validation error.
+    """
 
     name: str
     description: str
     output_kind: OutputKind
     needs_tmpdir: bool = False
     is_indexer: bool = False
-
-    # Filename used when output_kind=STREAM or FILE and the step must be
-    # persisted to disk (because a 'directory' is declared in config).
-    # Set in code by the type implementer — e.g. "filtered.fasta.gz".
-    # None means the type cannot be persisted; declaring 'directory' for
-    # it is a validation error.
     output_filename: str | None = None
 
     _builder: Callable[[dict[str, Any]], Callable] = field(repr=False, default=None)
@@ -105,7 +97,16 @@ class ProcessingType:
         return True
 
     def build(self, params: dict[str, Any]) -> Callable:
-        """Return a callable configured with params, ready to execute."""
+        """Return a callable configured with *params*, ready to execute.
+
+        Args:
+            params: The ``[processing.X]`` config dict for this step.
+
+        Returns:
+            A callable whose signature depends on ``output_kind``:
+            ``STREAM`` types return ``run(input_data) -> Data``;
+            ``DIRECTORY`` types return ``run(input_data, output_dir, dry_run) -> Data``.
+        """
         return self._builder(params)
 
 
@@ -277,19 +278,31 @@ def _step_output_dir(step_params: dict, data: Data) -> Path | None:
 
 
 def make_pipeline(processing_name: str) -> Callable:
-    """Build a runnable callable from a composite [processing.X] TOML block.
+    """Build a runnable callable from a composite ``[processing.X]`` TOML block.
 
-    Persistence rules (enforced by the runner, not the atomic bricks):
-    - STREAM step with directory, non-terminal: tee to file, pipe continues
-    - STREAM step with directory, terminal: redirect stdout to file
-    - DIRECTORY/FILE step: output_dir passed to brick (step_dir or tmpdir)
-    - No directory: STREAM chains without executing; DIRECTORY uses tmpdir (cleaned up)
+    A composite block has a ``steps`` list and a top-level ``output`` reference.
+    Each step is either an inline dict (``{type = "split", size = 200, …}``) or
+    a string reference to another named ``[processing.*]`` block.
 
-    Stamp rules:
-    - needs_run / stamp on the composite output_dir only
-    - Intermediate steps with directory are persisted but not stamped
+    Persistence rules (managed by the runner, not the atomic bricks):
 
-    Returns a callable: run(input_data: Data, dry_run=False) -> Data
+    - ``STREAM`` step with ``directory``, non-terminal → tee to file, pipe continues.
+    - ``STREAM`` step with ``directory``, terminal → redirect stdout to file.
+    - ``DIRECTORY``/``FILE`` step → ``output_dir`` passed to brick (step dir or tmpdir).
+    - No ``directory`` → ``STREAM`` chains without executing; ``DIRECTORY`` uses tmpdir.
+
+    Stamp management: ``needs_run`` / ``stamp`` operate on the composite ``output``
+    only.  Intermediate steps with a ``directory`` are persisted but not stamped.
+
+    Args:
+        processing_name: Key of the ``[processing.X]`` block in the TOML config.
+
+    Returns:
+        ``run(input_data: Data, dry_run: bool = False) -> Data``
+
+    Raises:
+        ValueError: If the block has no ``steps``, no ``output``, or references
+                    an unknown processing name.
     """
     import shutil
     import tempfile
@@ -376,16 +389,25 @@ def make_pipeline(processing_name: str) -> Callable:
 
 
 def build(processing_name: str) -> Callable:
-    """Build a runnable callable from any [processing.X] TOML block.
+    """Build a runnable callable from any ``[processing.X]`` TOML block.
 
-    Detects atomic vs composite automatically:
-    - 'steps' key → make_pipeline()
-    - 'type'  key → atomic build (must be runnable)
+    Dispatches automatically:
 
-    The returned callable handles needs_run / stamp automatically.
+    - ``steps`` key present → ``make_pipeline()`` (composite pipeline).
+    - ``type`` key present  → atomic build (type must be registered and runnable).
+
+    The returned callable wraps ``needs_run`` / ``stamp`` so callers do not
+    need to manage stamps themselves.
+
+    Args:
+        processing_name: Key of the ``[processing.X]`` block in the TOML config.
+
+    Returns:
+        ``run(input_data: Data, dry_run: bool = False) -> Data``
 
     Raises:
-        ValueError: Section not found, not runnable, or missing type/steps.
+        ValueError: If the block is not found, is not runnable (no ``output``),
+                    or is missing both ``type`` and ``steps``.
     """
     from skimindex.config import config  # local import to avoid circular dependency
     from skimindex.stamp import needs_run, remove_if_not_stamped, stamp

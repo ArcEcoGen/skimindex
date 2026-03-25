@@ -1431,9 +1431,24 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../unix/" class="md-nav__link">
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_2_11" id="__nav_3_2_2_11_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -1447,7 +1462,163 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    unix
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_compress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_ncbi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ncbi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_obitools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    obitools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1621,39 +1792,32 @@
 
 
 <h2 id="skimindex.log" class="doc doc-heading">
-            <code>skimindex.log</code>
+            <span class="doc doc-object-name doc-module-name">skimindex.log</span>
 
 
 </h2>
 
     <div class="doc doc-contents first">
 
-        <p>Logging module for skimindex — Pythonic equivalent of __utils_functions.sh</p>
-
-
-<details class="provides-logging-functions-matching-bash-implementation" open>
-  <summary>Provides logging functions matching bash implementation</summary>
-  <ul>
-<li>logdebug(message)</li>
-<li>loginfo(message)</li>
-<li>logwarning(message)</li>
-<li>logerror(message)</li>
-<li>setloglevel(level)</li>
-<li>openlogfile(path, mirror=False)</li>
-<li>closelogfile()</li>
-</ul>
-</details>        <p>Log levels: DEBUG, INFO, WARNING, ERROR
-Default level: INFO
-Colors are applied to terminal output; stripped from file output.</p>
+        <p>Logging module for skimindex — Python equivalent of <code>__skimindex_log.sh</code>.</p>
+<p>Provides structured log functions with VT100 colours on terminals, automatic
+colour-stripping in log files, and optional OS-level stderr redirection so
+that all subprocess output is captured alongside skimindex messages.</p>
+<p>Log format::</p>
+<pre><code>2025-03-25 14:00:00 [INFO   ] hostname.12345 -- message
+</code></pre>
+<p>Default level: <code>INFO</code>.  Precedence: <code>ERROR &gt; WARNING &gt; INFO &gt; DEBUG</code>.</p>
 
 
 <details class="example" open>
   <summary>Example</summary>
-  <p>from skimindex.log import loginfo, logwarning, openlogfile</p>
-<p>loginfo("Starting process")
-openlogfile("/tmp/process.log", mirror=True)
-logwarning("This goes to file and screen")
-closelogfile()</p>
+  <pre><code class="language-python">from skimindex.log import loginfo, logwarning, openlogfile, closelogfile
+
+loginfo(&quot;Starting process&quot;)
+openlogfile(&quot;/log/skimindex.log&quot;, mirror=True)
+logwarning(&quot;This goes to file and screen&quot;)
+closelogfile()
+</code></pre>
 </details>
 
 
@@ -1679,14 +1843,49 @@ closelogfile()</p>
 
 
 <h3 id="skimindex.log.logdebug" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">logdebug</span><span class="p">(</span><span class="o">*</span><span class="n">message</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">logdebug</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">logdebug</span><span class="p">(</span><span class="o">*</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Write debug level log message.</p>
+        <p>Emit a DEBUG-level log message.</p>
+<p>No-op when the current log level is above <code>DEBUG</code>.
+Multiple arguments are joined with a space.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>*message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Message parts to log.</p>
+              </div>
+            </td>
+            <td>
+                  <code>()</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -1697,14 +1896,49 @@ closelogfile()</p>
 
 
 <h3 id="skimindex.log.loginfo" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">loginfo</span><span class="p">(</span><span class="o">*</span><span class="n">message</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">loginfo</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">loginfo</span><span class="p">(</span><span class="o">*</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Write info level log message.</p>
+        <p>Emit an INFO-level log message.</p>
+<p>No-op when the current log level is above <code>INFO</code>.
+Multiple arguments are joined with a space.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>*message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Message parts to log.</p>
+              </div>
+            </td>
+            <td>
+                  <code>()</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -1715,14 +1949,49 @@ closelogfile()</p>
 
 
 <h3 id="skimindex.log.logwarning" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">logwarning</span><span class="p">(</span><span class="o">*</span><span class="n">message</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">logwarning</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">logwarning</span><span class="p">(</span><span class="o">*</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Write warning level log message.</p>
+        <p>Emit a WARNING-level log message.</p>
+<p>No-op when the current log level is above <code>WARNING</code>.
+Multiple arguments are joined with a space.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>*message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Message parts to log.</p>
+              </div>
+            </td>
+            <td>
+                  <code>()</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -1733,14 +2002,49 @@ closelogfile()</p>
 
 
 <h3 id="skimindex.log.logerror" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">logerror</span><span class="p">(</span><span class="o">*</span><span class="n">message</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">logerror</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">logerror</span><span class="p">(</span><span class="o">*</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Write error level log message.</p>
+        <p>Emit an ERROR-level log message.</p>
+<p>Always emitted regardless of the current log level.
+Multiple arguments are joined with a space.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>*message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Message parts to log.</p>
+              </div>
+            </td>
+            <td>
+                  <code>()</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -1751,14 +2055,49 @@ closelogfile()</p>
 
 
 <h3 id="skimindex.log.setloglevel" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">setloglevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">setloglevel</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">setloglevel</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Set logging level (DEBUG, INFO, WARNING, ERROR).</p>
+        <p>Set the active log level.</p>
+<p>Messages below the new level are silently discarded.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>level</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One of <code>"DEBUG"</code>, <code>"INFO"</code>, <code>"WARNING"</code>, <code>"ERROR"</code>
+   (case-insensitive).  Unknown values are ignored with a warning.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -1769,14 +2108,22 @@ closelogfile()</p>
 
 
 <h3 id="skimindex.log.openlogfile" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">openlogfile</span><span class="p">(</span><span class="n">logpath</span><span class="p">,</span> <span class="n">mirror</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">everything</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">openlogfile</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">openlogfile</span><span class="p">(</span>
+    <span class="n">logpath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">mirror</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">everything</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Open a log file for output.</p>
+        <p>Open a log file and redirect subsequent log output to it.</p>
+<p>The file is opened in append mode; parent directories are created if
+missing.  Falls back to stderr-only logging if the path is not writable.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1799,7 +2146,7 @@ closelogfile()</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to log file (appends if exists)</p>
+                <p>Path to the log file.</p>
               </div>
             </td>
             <td>
@@ -1815,7 +2162,7 @@ closelogfile()</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If True, also output to stderr</p>
+                <p>If <code>True</code>, also write each log line to stderr.</p>
               </div>
             </td>
             <td>
@@ -1831,8 +2178,9 @@ closelogfile()</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If True, redirect process stderr (fd 2) to log file,
-       capturing all command output and stderr</p>
+                <p>If <code>True</code>, redirect the process's stderr file descriptor
+        (fd 2) to the log file at the OS level, so all subprocess
+        output is captured alongside skimindex messages.</p>
               </div>
             </td>
             <td>
@@ -1851,10 +2199,12 @@ closelogfile()</p>
 
 
 <h3 id="skimindex.log.closelogfile" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">closelogfile</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">closelogfile</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">closelogfile</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 

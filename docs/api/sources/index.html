@@ -1420,9 +1420,24 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../unix/" class="md-nav__link">
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_2_11" id="__nav_3_2_2_11_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -1436,7 +1451,163 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    unix
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_compress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_ncbi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ncbi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_obitools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    obitools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1599,7 +1770,7 @@
 
 
 <h2 id="skimindex.sources" class="doc doc-heading">
-            <code>skimindex.sources</code>
+            <span class="doc doc-object-name doc-module-name">skimindex.sources</span>
 
 
 </h2>
@@ -1645,10 +1816,12 @@ human_out_dir = dataset_output_dir("human")
 
 
 <h3 id="skimindex.sources.source_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">source_dir</span><span class="p">(</span><span class="n">source</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">source_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">source_dir</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -1670,10 +1843,12 @@ source_dir("ncbi")    → Path("/data/genbank")  # shares dir with genbank</p>
 
 
 <h3 id="skimindex.sources.dataset_download_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">dataset_download_dir</span><span class="p">(</span><span class="n">dataset_name</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">dataset_download_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">dataset_download_dir</span><span class="p">(</span><span class="n">dataset_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -1696,10 +1871,12 @@ dataset_download_dir("betula_nana") → Path("/data/raw_data/Betula_nana")</p>
 
 
 <h3 id="skimindex.sources.output_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">output_dir</span><span class="p">(</span><span class="n">section_kind</span><span class="p">,</span> <span class="n">section_name</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">output_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">output_dir</span><span class="p">(</span><span class="n">section_kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">section_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -1770,10 +1947,12 @@ output_dir("role", "genomes")         → /processed_data/genomes_15x</p>
 
 
 <h3 id="skimindex.sources.dataset_output_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">dataset_output_dir</span><span class="p">(</span><span class="n">dataset_name</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">dataset_output_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">dataset_output_dir</span><span class="p">(</span><span class="n">dataset_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -1795,10 +1974,14 @@ dataset_output_dir("plants") → /processed_data/decontamination/Plants</p>
 
 
 <h3 id="skimindex.sources.resolve_artifact" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">resolve_artifact</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">dataset_subdir</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">resolve_artifact</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">resolve_artifact</span><span class="p">(</span>
+    <span class="n">value</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">dataset_subdir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -1834,7 +2017,8 @@ dataset_output_dir("plants") → /processed_data/decontamination/Plants</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Artifact reference — string or dict.</p>
+                <p>Artifact reference — string (<code>"dir@[idx:]role"</code>) or dict
+            (<code>{"role": "…", "dir": "…"}</code>).</p>
               </div>
             </td>
             <td>
@@ -1850,12 +2034,62 @@ dataset_output_dir("plants") → /processed_data/decontamination/Plants</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Relative subdir within the role tree (e.g. Path("Human/Homo_sapiens--GCF_…")).
-            If None, the role directory is returned without a dataset level.</p>
+                <p>Relative subdir within the role tree
+            (e.g. <code>Path("Human/Homo_sapiens--GCF_…")</code>).
+            Pass <code>None</code> for meta-index references where no
+            per-dataset level is needed.</p>
               </div>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Absolute <code>Path</code> to the artifact directory.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>value</em> is a string without an <code>@</code> separator, or if
+        <em>role_name</em> cannot be resolved (falls back to role name as
+        directory).</p>
+              </div>
             </td>
           </tr>
       </tbody>

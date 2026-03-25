@@ -1701,9 +1701,24 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../unix/" class="md-nav__link">
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_2_11" id="__nav_3_2_2_11_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -1717,7 +1732,163 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    unix
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_compress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_ncbi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ncbi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_obitools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    obitools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unix_download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2161,7 +2332,7 @@
 
 
 <h2 id="skimindex.config" class="doc doc-heading">
-            <code>skimindex.config</code>
+            <span class="doc doc-object-name doc-module-name">skimindex.config</span>
 
 
 </h2>
@@ -2214,17 +2385,106 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h3 id="skimindex.config.Config" class="doc doc-heading">
-            <code>Config</code>
+            <span class="doc doc-object-name doc-class-name">Config</span>
 
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">Config</span><span class="p">(</span>
+    <span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">DEFAULT_CONFIG</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">apply_logging</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">export_env</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
 
 
         <p>Parse and provide typed access to skimindex TOML configuration.</p>
+<p>Reads a TOML file (default <code>/config/skimindex.toml</code>, overridable via
+<code>SKIMINDEX_CONFIG</code> environment variable), exports all scalar values as
+<code>SKIMINDEX__SECTION__KEY</code> environment variables, and provides typed
+accessors for every config section.</p>
+<p>Precedence for any value: <strong>env var &gt; TOML &gt; built-in default</strong>.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <pre><code class="language-python">from skimindex.config import config
+
+cfg = config()
+print(cfg.get(&quot;logging&quot;, &quot;level&quot;))   # &quot;INFO&quot;
+print(cfg.processed_data_dir())      # Path(&quot;/processed_data&quot;)
+</code></pre>
+</details>
+        <p>Load configuration from a TOML file.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the TOML configuration file.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="skimindex.config.DEFAULT_CONFIG">DEFAULT_CONFIG</span></code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>apply_logging</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code>, configure the logging system from
+<code>[logging]</code> immediately after loading.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>export_env</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code>, export all config values as
+<code>SKIMINDEX__</code> environment variables (existing vars are
+never overwritten).</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 
@@ -2249,14 +2509,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.sources" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">sources</span></code>
+            <span class="doc doc-object-name doc-attribute-name">sources</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">sources</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2271,14 +2533,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.roles" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">roles</span></code>
+            <span class="doc doc-object-name doc-attribute-name">roles</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">roles</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2293,14 +2557,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.processing" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">processing</span></code>
+            <span class="doc doc-object-name doc-attribute-name">processing</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">processing</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2315,14 +2581,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.datasets" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">datasets</span></code>
+            <span class="doc doc-object-name doc-attribute-name">datasets</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">datasets</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2337,14 +2605,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.ref_taxa" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">ref_taxa</span></code>
+            <span class="doc doc-object-name doc-attribute-name">ref_taxa</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">ref_taxa</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2359,14 +2629,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.ref_genomes" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">ref_genomes</span></code>
+            <span class="doc doc-object-name doc-attribute-name">ref_genomes</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">ref_genomes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2381,14 +2653,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.sra_datasets" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">sra_datasets</span></code>
+            <span class="doc doc-object-name doc-attribute-name">sra_datasets</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">sra_datasets</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2403,14 +2677,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.root" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">root</span></code>
+            <span class="doc doc-object-name doc-attribute-name">root</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">root</span><span class="p">:</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2425,14 +2701,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.data" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">data</span></code>
+            <span class="doc doc-object-name doc-attribute-name">data</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2447,14 +2725,16 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.path" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">path</span></code>
+            <span class="doc doc-object-name doc-attribute-name">path</span>
+
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">path</span><span class="p">:</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2471,10 +2751,12 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.source_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">source_dir</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">source_dir</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">source_dir</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2489,10 +2771,12 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.processed_data_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">processed_data_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">processed_data_dir</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">processed_data_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2507,10 +2791,12 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.indexes_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">indexes_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">indexes_dir</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">indexes_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2525,10 +2811,12 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.stamp_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">stamp_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">stamp_dir</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">stamp_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2543,10 +2831,12 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.scratch_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">scratch_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">scratch_dir</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">scratch_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2561,10 +2851,12 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.log_file" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">log_file</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">log_file</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">log_file</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2579,10 +2871,12 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.raw_data_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">raw_data_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">raw_data_dir</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">raw_data_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2597,22 +2891,112 @@ SKIMINDEX__REF_GENOMES              (space-separated list)</p>
 
 
 <h4 id="skimindex.config.Config.get" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">get</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">get</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">get</span><span class="p">(</span><span class="n">section</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Get a config value with precedence: env var &gt; TOML &gt; default.</p>
-<p>section may be dotted ("source.ncbi") for prefixed sections.</p>
+        <p>Get a config value with env-var / TOML / default precedence.</p>
 
 
-<p><span class="doc-section-title">Examples:</span></p>
-    <p>config.get("logging", "level")          → "INFO"
-config.get("source.ncbi", "directory")  → "genbank"
-config.get("data.human", "taxon")       → "human"</p>
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>section</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Section path, dotted for prefixed sections
+(e.g. <code>"logging"</code>, <code>"source.ncbi"</code>, <code>"data.human"</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>key</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Key name within the section.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>default</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fallback value when neither env var nor TOML entry exist.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The resolved value as a string.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <pre><code class="language-python">cfg.get(&quot;logging&quot;, &quot;level&quot;)          # &quot;INFO&quot;
+cfg.get(&quot;source.ncbi&quot;, &quot;directory&quot;)  # &quot;genbank&quot;
+cfg.get(&quot;data.human&quot;, &quot;taxon&quot;)       # &quot;human&quot;
+</code></pre>
+</details>
 
     </div>
 
@@ -2622,10 +3006,12 @@ config.get("data.human", "taxon")       → "human"</p>
 
 
 <h4 id="skimindex.config.Config.sections" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">sections</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">sections</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">sections</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2640,16 +3026,42 @@ config.get("data.human", "taxon")       → "human"</p>
 
 
 <h4 id="skimindex.config.Config.env_vars" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">env_vars</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">env_vars</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">env_vars</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Return all SKIMINDEX__ environment variables as a plain dict.</p>
-<p>Does not touch <code>os.environ</code> — suitable for inspection or shell export.
-Derived variables (REF_TAXA, REF_GENOMES) are included.</p>
+        <p>Return all <code>SKIMINDEX__</code> environment variables as a plain dict.</p>
+<p>Does <strong>not</strong> touch <code>os.environ</code> — suitable for inspection, testing,
+or generating a shell export snippet.  Derived special variables
+(<code>SKIMINDEX__REF_TAXA</code>, <code>SKIMINDEX__REF_GENOMES</code>) are included.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Mapping of variable name → serialised string value.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -2660,19 +3072,44 @@ Derived variables (REF_TAXA, REF_GENOMES) are included.</p>
 
 
 <h4 id="skimindex.config.Config.dump_env" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">dump_env</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">dump_env</span>
+
 
 </h4>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">dump_env</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Return a shell snippet that exports all SKIMINDEX__ variables.</p>
-<p>Variables already present in <code>os.environ</code> are skipped (pre-existing
-environment takes priority).  The output is safe to pass to
-<code>eval</code> in bash::</p>
-<pre><code>eval "$(python3 -m skimindex.config)"
+        <p>Return a shell snippet that exports all <code>SKIMINDEX__</code> variables.</p>
+<p>Variables already present in <code>os.environ</code> are skipped so that
+pre-existing environment values take priority.  The output is safe to
+pass directly to <code>eval</code> in bash:</p>
+<pre><code class="language-bash">eval &quot;$(python3 -m skimindex.config)&quot;
 </code></pre>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A newline-separated string of <code>export VAR=value</code> statements.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -2692,10 +3129,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.load" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">load</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">DEFAULT_CONFIG</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">load</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">load</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">DEFAULT_CONFIG</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Config</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2710,10 +3149,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.config" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">config</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">config</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">config</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Config</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2728,10 +3169,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.root" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">root</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">root</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">root</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2746,10 +3189,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.source_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">source_dir</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></code>
+            <span class="doc doc-object-name doc-function-name">source_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">source_dir</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2764,10 +3209,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.processed_data_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">processed_data_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">processed_data_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">processed_data_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2782,10 +3229,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.indexes_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">indexes_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">indexes_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">indexes_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2800,10 +3249,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.stamp_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">stamp_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">stamp_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">stamp_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2818,10 +3269,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.raw_data_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">raw_data_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">raw_data_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">raw_data_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 
@@ -2836,10 +3289,12 @@ environment takes priority).  The output is safe to pass to
 
 
 <h3 id="skimindex.config.scratch_dir" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">scratch_dir</span><span class="p">()</span></code>
+            <span class="doc doc-object-name doc-function-name">scratch_dir</span>
+
 
 </h3>
-
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">scratch_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</code></pre></div>
 
     <div class="doc doc-contents ">
 

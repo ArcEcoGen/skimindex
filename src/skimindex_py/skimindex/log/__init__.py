@@ -1,26 +1,25 @@
 """
-Logging module for skimindex — Pythonic equivalent of __utils_functions.sh
+Logging module for skimindex — Python equivalent of ``__skimindex_log.sh``.
 
-Provides logging functions matching bash implementation:
-  - logdebug(message)
-  - loginfo(message)
-  - logwarning(message)
-  - logerror(message)
-  - setloglevel(level)
-  - openlogfile(path, mirror=False)
-  - closelogfile()
+Provides structured log functions with VT100 colours on terminals, automatic
+colour-stripping in log files, and optional OS-level stderr redirection so
+that all subprocess output is captured alongside skimindex messages.
 
-Log levels: DEBUG, INFO, WARNING, ERROR
-Default level: INFO
-Colors are applied to terminal output; stripped from file output.
+Log format::
+
+    2025-03-25 14:00:00 [INFO   ] hostname.12345 -- message
+
+Default level: ``INFO``.  Precedence: ``ERROR > WARNING > INFO > DEBUG``.
 
 Example:
-    from skimindex.log import loginfo, logwarning, openlogfile
+    ```python
+    from skimindex.log import loginfo, logwarning, openlogfile, closelogfile
 
     loginfo("Starting process")
-    openlogfile("/tmp/process.log", mirror=True)
+    openlogfile("/log/skimindex.log", mirror=True)
     logwarning("This goes to file and screen")
     closelogfile()
+    ```
 """
 
 import os
@@ -98,31 +97,66 @@ def _logwrite(color: str, label: str, *message: str) -> None:
 
 
 def logdebug(*message: str) -> None:
-    """Write debug level log message."""
+    """Emit a DEBUG-level log message.
+
+    No-op when the current log level is above ``DEBUG``.
+    Multiple arguments are joined with a space.
+
+    Args:
+        *message: Message parts to log.
+    """
     if LOG_LEVEL <= LOG_DEBUG_LEVEL:
         _logwrite(_LOG_CYAN, "[DEBUG  ]", *message)
 
 
 def loginfo(*message: str) -> None:
-    """Write info level log message."""
+    """Emit an INFO-level log message.
+
+    No-op when the current log level is above ``INFO``.
+    Multiple arguments are joined with a space.
+
+    Args:
+        *message: Message parts to log.
+    """
     if LOG_LEVEL <= LOG_INFO_LEVEL:
         _logwrite(_LOG_GREEN, "[INFO   ]", *message)
 
 
 def logwarning(*message: str) -> None:
-    """Write warning level log message."""
+    """Emit a WARNING-level log message.
+
+    No-op when the current log level is above ``WARNING``.
+    Multiple arguments are joined with a space.
+
+    Args:
+        *message: Message parts to log.
+    """
     if LOG_LEVEL <= LOG_WARNING_LEVEL:
         _logwrite(_LOG_YELLOW, "[WARNING]", *message)
 
 
 def logerror(*message: str) -> None:
-    """Write error level log message."""
+    """Emit an ERROR-level log message.
+
+    Always emitted regardless of the current log level.
+    Multiple arguments are joined with a space.
+
+    Args:
+        *message: Message parts to log.
+    """
     if LOG_LEVEL <= LOG_ERROR_LEVEL:
         _logwrite(_LOG_RED, "[ERROR  ]", *message)
 
 
 def setloglevel(level: str) -> None:
-    """Set logging level (DEBUG, INFO, WARNING, ERROR)."""
+    """Set the active log level.
+
+    Messages below the new level are silently discarded.
+
+    Args:
+        level: One of ``"DEBUG"``, ``"INFO"``, ``"WARNING"``, ``"ERROR"``
+               (case-insensitive).  Unknown values are ignored with a warning.
+    """
     global LOG_LEVEL
     level_upper = level.upper()
     level_map = {
@@ -139,14 +173,17 @@ def setloglevel(level: str) -> None:
 
 
 def openlogfile(logpath: str, mirror: bool = False, everything: bool = False) -> None:
-    """
-    Open a log file for output.
+    """Open a log file and redirect subsequent log output to it.
+
+    The file is opened in append mode; parent directories are created if
+    missing.  Falls back to stderr-only logging if the path is not writable.
 
     Args:
-        logpath: Path to log file (appends if exists)
-        mirror: If True, also output to stderr
-        everything: If True, redirect process stderr (fd 2) to log file,
-                   capturing all command output and stderr
+        logpath:    Path to the log file.
+        mirror:     If ``True``, also write each log line to stderr.
+        everything: If ``True``, redirect the process's stderr file descriptor
+                    (fd 2) to the log file at the OS level, so all subprocess
+                    output is captured alongside skimindex messages.
     """
     global _logfile, _mirror_to_stderr, _logeverything, _original_stderr
 
