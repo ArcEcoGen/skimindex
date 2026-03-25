@@ -1,0 +1,3 @@
+# skimindex.config
+
+::: skimindex.config

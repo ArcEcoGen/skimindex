@@ -1,0 +1,3 @@
+# skimindex.stamp
+
+::: skimindex.stamp

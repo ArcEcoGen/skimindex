@@ -1,0 +1,3 @@
+# skimindex.datasets
+
+::: skimindex.datasets

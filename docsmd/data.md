@@ -167,8 +167,8 @@ directory = "parts"
 steps     = [...]
 ```
 
-See [Processing Model](processing.md#dataset-binding-and-input-chaining) for
-details on how `role` and `input` interact in processing sections.
+See [Processing Model](processing.md#named-input-parameters) for
+details on how named input parameters and artifact references work in processing sections.
 
 ---
 

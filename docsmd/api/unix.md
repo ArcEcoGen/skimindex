@@ -1,0 +1,3 @@
+# skimindex.unix
+
+::: skimindex.unix

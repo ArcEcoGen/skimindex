@@ -160,7 +160,7 @@ class Config:
         return self.root / key
 
     def source_dir(self, name: str) -> Path:
-        """Return the mount path for a named source (root / sources[name]["directory"])."""
+        """Return the mount path for a named source (root / sources[name][`directory`])."""
         directory = self.sources.get(name, {}).get("directory", name)
         return self._local_dir(directory)
 

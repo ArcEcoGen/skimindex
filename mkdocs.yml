@@ -2,17 +2,56 @@ site_name: skimindex
 docs_dir: docsmd
 site_dir: docs
 
-nav:
-  - Home: index.md
-  - Directory Structure: directory-structure.md
-  - Configuration Format: config-format.md
-  - Environment Variables: environment-variables.md
-  - Data Model: data.md
-  - Processing Model: processing.md
-  - Entry Point (skimindex.sh): entrypoint.md
-  - Pipeline Commands: commands.md
-  - Writing Shell Commands: devshell.md
-  - Tools: tools.md
-
 theme:
-  name: readthedocs
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src/skimindex_py]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_submodules: false
+            members_order: source
+
+nav:
+  - Overview: index.md
+  - User Guide:
+      - Directory Structure: directory-structure.md
+      - Configuration Format: config-format.md
+      - Data Model: data.md
+      - Processing Model: processing.md
+      - Entry Point: entrypoint.md
+      - Pipeline Commands: commands.md
+      - Writing Shell Commands: devshell.md
+      - Included tools: tools.md
+  - Developer Guide:
+      - Developing Commands:
+          - Shell Commands:
+              - Shipping Built-in Commands: dev/shell_builtins.md
+          - Python Commands: []
+      - API Reference:
+          - Shell API:
+              - Overview: api/shell_index.md
+              - Logging system: api/shell_log.md
+              - Stamping artifacts: api/shell_stamp.md
+              - Configuration & env vars: api/shell_config.md
+          - Python API:
+              - Overview: api/index.md
+              - config: api/config.md
+              - config.validate: api/config_validate.md
+              - datasets: api/datasets.md
+              - sources: api/sources.md
+              - processing: api/processing.md
+              - stamp: api/stamp.md
+              - sequences: api/sequences.md
+              - naming: api/naming.md
+              - log: api/log.md
+              - unix: api/unix.md

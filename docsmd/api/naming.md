@@ -1,0 +1,3 @@
+# skimindex.naming
+
+::: skimindex.naming
