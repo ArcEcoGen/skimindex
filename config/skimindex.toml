@@ -109,8 +109,7 @@ directory = "skims"
 # Composite: prepare decontamination reference sequences.
 # Chains split → filter_n_only → distribute atomics.
 [processing.prepare_decontam]
-role      = "decontamination"  # datasets this processing operates on
-directory = "parts"            # output subdirectory under each genome/division dir
+output = "parts@decontamination"   # → processed_data/decontamination/{dataset}/parts/
 steps = [
   {type = "split",         size = 200, overlap = 28},  # obiscript → STDOUT
   {type = "filter_n_only"},                             # obigrep   → STDOUT
@@ -120,9 +119,8 @@ steps = [
 # Atomic: count k-mers in prepared decontamination fragments.
 [processing.count_kmers_decontam]
 type      = "kmercount"
-role      = "decontamination"
-input     = "prepare_decontam"   # reads from parts/ produced by prepare_decontam
-directory = "kmercount"
+output    = "kmercount@decontamination"   # → processed_data/decontamination/{dataset}/kmercount/
+sequence  = "parts@decontamination"       # reads fragments produced by prepare_decontam
 kmer_size = 29
 threads   = 10
 

@@ -11,31 +11,56 @@ must have exactly one of them.
 
 ---
 
+## Artifact references — `dir@[idx:]role`
+
+Both input and output locations are expressed as **artifact references**. An
+artifact reference encodes the subdirectory name and the role tree in a single
+string using the notation:
+
+```
+{dir}@{role}         →  processed_data/{role_dir}/{dataset_subdir}/{dir}/
+{dir}@idx:{role}     →  indexes/{role_dir}/{dataset_subdir}/{dir}/
+@idx:{role}          →  indexes/{role_dir}/   (meta-index, no subdir)
+```
+
+where `{role_dir}` is the `directory` value of `[role.{role}]`.
+
+A dict form is also accepted wherever a string reference is valid:
+
+```toml
+sequence = {role = "decontamination", dir = "parts"}
+output   = {role = "idx:decontamination", dir = ""}
+```
+
+The `{dataset_subdir}` component is supplied automatically at runtime from the
+dataset being processed (e.g. `Human/Homo_sapiens--GCF_…`). The artifact
+reference only names the role and subdirectory within that subtree.
+
+---
+
 ## Atomic processing
 
 An atomic section wraps a single registered operation. The `type` value maps
-to a Python function decorated with `@processing` in the `skimindex.processing`
-module — the set of valid types is therefore determined by the implementation.
+to a Python function decorated with `@processing_type` in the
+`skimindex.processing` module.
 
-| Key         | Type    | Required | Description                                                  |
-|-------------|---------|----------|--------------------------------------------------------------|
-| `type`      | string  | yes      | Registered processing function name                          |
-| `directory` | string  | no       | Output subdirectory. If absent, output is temporary (see [Persistence](#persistence)) |
-| *(others)*  | any     | no       | Operation-specific parameters passed to the function         |
+| Key        | Type   | Required | Description                                                    |
+|------------|--------|----------|----------------------------------------------------------------|
+| `type`     | string | yes      | Registered processing function name                            |
+| `output`   | string | yes*     | Artifact reference for the output. *Required to be runnable    |
+| *(others)* | any    | no       | Operation-specific parameters passed to the function           |
+
+Named input parameters (e.g. `sequence`, `counts`) are operation-specific — see
+each type's documentation. If absent, the input defaults to the raw dataset
+files.
 
 ```toml
-[processing.split_decontam]
-type      = "split"
-directory = "split"     # results saved to this subdirectory
-size      = 200         # fragment size in bp
-overlap   = 28          # overlap = kmer_size - 1
-
-[processing.remove_n]
-type = "remove_n_only"  # no directory → temporary
-
-[processing.distribute_batches]
-type    = "distribute"
-batches = 20            # no directory → temporary
+[processing.count_kmers_decontam]
+type      = "kmercount"
+output    = "kmercount@decontamination"   # → processed_data/decontamination/…/kmercount/
+sequence  = "parts@decontamination"       # reads fragments from parts/
+kmer_size = 29
+threads   = 10
 ```
 
 ---
@@ -45,25 +70,25 @@ batches = 20            # no directory → temporary
 A composite section chains multiple steps in order. Each step is either a
 **named reference** (string) or an **inline atomic** (TOML inline table).
 
-| Key         | Type            | Required | Description                                                          |
-|-------------|-----------------|----------|----------------------------------------------------------------------|
-| `steps`     | array           | yes      | Ordered list of steps (strings or inline tables)                     |
-| `directory` | string          | yes*     | Output subdirectory. *Required when this section is referenced by `run` |
+| Key      | Type   | Required | Description                                                              |
+|----------|--------|----------|--------------------------------------------------------------------------|
+| `steps`  | array  | yes      | Ordered list of steps (strings or inline tables)                         |
+| `output` | string | yes*     | Artifact reference for the composite output. *Required to be runnable    |
 
 Each element of `steps` is one of:
 
 | Form | Example | Parameters |
 |------|---------|-----------|
 | Named reference | `"split_decontam"` | Defined in its own `[processing.X]` section |
-| Inline atomic   | `{type = "remove_n_only"}` | Always temporary, always atomic |
+| Inline atomic   | `{type = "filter_n_only"}` | Always temporary, always atomic |
 
 ```toml
 [processing.prepare_decontam]
-directory = "prepared"                        # required: this section is run by a role
+output = "parts@decontamination"   # → processed_data/decontamination/…/parts/
 steps = [
-  "split_decontam",                           # named reference — saved if it has directory
-  {type = "remove_n_only"},                   # inline — always temporary
-  {type = "distribute", batches = 20},        # inline — always temporary
+  {type = "split",         size = 200, overlap = 28},
+  {type = "filter_n_only"},
+  {type = "distribute",    batches = 20},
 ]
 ```
 
@@ -71,25 +96,25 @@ steps = [
 
 ## Persistence
 
-Whether a step's output is saved to disk depends on whether it declares a
-`directory` key. The **runner** (not the atomic bricks) enforces these rules.
+Whether a step's output is saved to disk depends on whether it declares an
+`output` key. The **runner** (not the atomic bricks) enforces these rules.
 
 ### Who persists what
 
-| Context | `directory` present? | Result |
-|---------|----------------------|--------|
+| Context | `output` present? | Result |
+|---------|-------------------|--------|
 | Top-level `[processing.X]` referenced by `run` | must be present | saved |
-| Named reference inside `steps` | yes | saved to its `directory` |
+| Named reference inside `steps` | yes | saved to its `output` |
 | Named reference inside `steps` | no | temporary (cleaned up after pipeline) |
 | Inline table `{type=...}` inside `steps` | n/a | always temporary |
 
 Only the **composite output directory** carries a stamp. Intermediate steps
-saved to their own `directory` are persisted but not stamped — they will not
+saved to their own `output` are persisted but not stamped — they will not
 trigger a short-circuit on re-run.
 
 ### How the runner persists each OutputKind
 
-#### STREAM output with `directory`, **non-terminal** step
+#### STREAM output with `output`, **non-terminal** step
 
 The runner injects `tee` into the pipe so the byte stream is simultaneously
 written to disk and forwarded to the next step:
@@ -100,7 +125,7 @@ input_cmd | tee(out_file) | next_step
 
 The output file is `step_dir / output_filename` (declared by the type).
 
-#### STREAM output with `directory`, **terminal** step (last in composite)
+#### STREAM output with `output`, **terminal** step (last in composite)
 
 The runner redirects stdout to the output file and executes the pipeline:
 
@@ -110,17 +135,18 @@ The runner redirects stdout to the output file and executes the pipeline:
 
 Execution happens here; the next Data object is `files_data([out_file])`.
 
-#### DIRECTORY or FILE output with `directory`
+#### DIRECTORY or FILE output with `output`
 
-The runner passes `step_dir` as the output directory to the atomic brick:
+The runner passes the resolved `output` path as the output directory to the
+atomic brick:
 
 ```python
-fn(data, step_dir, dry_run=dry_run)
+fn(data, output_dir, dry_run=dry_run)
 ```
 
 The brick creates the directory, writes its files, and returns a `Data` object.
 
-#### Without `directory` (temporary)
+#### Without `output` (temporary)
 
 - **STREAM**: the step is chained without executing (no intermediate file).
 - **DIRECTORY / FILE**: the runner creates a temporary directory via
@@ -159,38 +185,51 @@ role   = "decontamination"
 run    = "prepare_gb_decontam"   # overrides [role.decontamination].run
 ```
 
-**Rule**: the processing section referenced by `run` must have a `directory` key.
+**Rule**: the processing section referenced by `run` must have an `output` key.
 
 ---
 
 ## Full example
 
 ```toml
-# Atomic steps
-[processing.split_decontam]
-type      = "split"
-directory = "split"
-size      = 200
-overlap   = 28
-
-[processing.count_kmers]
-type      = "kmercount"
-directory = "kmercount"
-kmer_size = 29
-
-# Composite pipeline — run by [role.decontamination]
+# Composite pipeline: prepare decontamination reference sequences
 [processing.prepare_decontam]
-directory = "prepared"
+output = "parts@decontamination"   # → processed_data/decontamination/…/parts/
 steps = [
-  "split_decontam",                     # saved to split/
-  {type = "remove_n_only"},             # temporary
-  "count_kmers",                        # saved to kmercount/
+  {type = "split",         size = 200, overlap = 28},
+  {type = "filter_n_only"},
+  {type = "distribute",    batches = 20},
 ]
 
-# Role referencing the pipeline
+# Atomic: count k-mers in prepared fragments
+[processing.count_kmers_decontam]
+type      = "kmercount"
+output    = "kmercount@decontamination"
+sequence  = "parts@decontamination"
+kmer_size = 29
+threads   = 10
+
+# Atomic: build kmindex meta-index from k-mer counts
+[processing.build_decontam_index]
+type      = "build_index"
+output    = "@idx:decontamination"        # → indexes/decontamination/
+sequence  = "parts@decontamination"
+counts    = "kmercount@decontamination"
+kmer_size = 29
+
+# Role referencing the preparation pipeline
 [role.decontamination]
 directory = "decontamination"
 run       = "prepare_decontam"
+```
+
+The resulting chain:
+
+```
+dataset.to_data()
+    → prepare_decontam          → processed_data/decontamination/…/parts/
+    → count_kmers_decontam      → processed_data/decontamination/…/kmercount/
+    → build_decontam_index      → indexes/decontamination/
 ```
 
 ---
@@ -236,24 +275,24 @@ orchestration never sees plumbum objects.
 
 The effective output directory of a processing section is determined as follows:
 
-- **Atomic** with `directory`: its own `directory`.
-- **Atomic** without `directory`: no persistent output (temporary / piped).
-- **Composite** with `directory`: its own `directory` (ignores last step's directory).
-- **Composite** without `directory`: the effective output directory of its **last step**
+- **Atomic** with `output`: resolved via `resolve_artifact(output, dataset_subdir)`.
+- **Atomic** without `output`: no persistent output (temporary / piped).
+- **Composite** with `output`: resolved via `resolve_artifact(output, dataset_subdir)`.
+- **Composite** without `output`: the effective output directory of its **last step**
   (which itself must have one, otherwise the composite has no persistent output).
 
 The output type (STREAM / DIRECTORY / FILE) of a composite is always the output type
-of its **last step**, regardless of whether the composite has its own `directory`.
+of its **last step**, regardless of whether the composite has its own `output`.
 
 ### Output filename for STREAM and FILE types
 
-When a STREAM or FILE output must be persisted to disk (because a `directory` is
+When a STREAM or FILE output must be persisted to disk (because an `output` is
 declared), the filename is determined by the processing **type implementation**, not
 by the TOML config. Each registered processing type declares its `output_filename` in
 code (e.g. `"filtered.fasta.gz"`), because the type knows its own output format.
 
 A type with no declared `output_filename` cannot be persisted and must remain
-temporary; declaring a `directory` for such a type is a validation error.
+temporary; declaring an `output` for such a type is a validation error.
 
 ### Runnability
 
@@ -263,79 +302,31 @@ steps inside a composite.
 
 ---
 
-## Dataset binding and input chaining
+## Named input parameters
 
-### `role` — which datasets a processing operates on
+Processing types that read from a previously produced artefact declare named
+input parameters instead of a generic `input` key. Each type documents which
+parameters it accepts.
 
-A processing section can declare the role of datasets it operates on via the
-optional `role` key. When a pipeline is executed without an explicit dataset
-list, the runner uses `role` to discover the relevant datasets automatically.
+The value of a named input parameter is always an **artifact reference**
+(`dir@[idx:]role` or dict form). At runtime the runner resolves the reference
+to an absolute path using the current `dataset_subdir`.
 
-```toml
-[processing.prepare_decontam]
-role      = "decontamination"  # operates on all datasets with role="decontamination"
-directory = "parts"
-steps = [...]
-```
-
-This makes the processing section self-describing: it knows its own dataset
-scope without any hardcoding in the calling code.
-
-### `input` — where input data comes from
-
-A processing section can declare where its input data comes from via the
-optional `input` key:
-
-| `input` present? | Source of input data |
-|------------------|----------------------|
-| absent | raw dataset files (`dataset.to_data()`) |
-| `input = "X"` | output directory of `[processing.X]` for the same dataset |
+If a named input parameter is absent, the type falls back to the raw dataset
+files supplied by the caller.
 
 ```toml
-[processing.prepare_decontam]
-role      = "decontamination"
-directory = "parts"
-steps = [
-  {type = "split",         size = 200, overlap = 28},
-  {type = "filter_n_only"},
-  {type = "distribute",    batches = 20},
-]
-# no input → reads raw downloaded files
-
 [processing.count_kmers_decontam]
 type      = "kmercount"
-input     = "prepare_decontam"   # reads from parts/ produced by prepare_decontam
-directory = "kmercount"
+output    = "kmercount@decontamination"
+sequence  = "parts@decontamination"   # named input — reads from parts/
 kmer_size = 29
 ```
 
-These two sections implicitly define a chain:
-
-```
-dataset.to_data()
-    → prepare_decontam   (role="decontamination") → parts/
-    → count_kmers_decontam                        → kmercount/
-```
-
-Each section can be run independently: `decontam prepare` starts from raw files,
-`decontam count` starts from `parts/` without re-running `prepare_decontam`.
-
-### Input resolution rules
-
-The rule is recursive and uniform:
-
-**Standalone execution** (referenced by `run` or called directly):
-- no `input` → `dataset.to_data()` (raw source files)
-- `input = "X"` → `directory_data(output_dir_of_X / for_this_dataset)`
-
-**As a step inside a composite**:
-- the step's own `input` key is **silently ignored**
-- first step → receives the composite's resolved input (same rules as standalone)
-- subsequent steps → receive the output of the previous step
-
-The composite resolves its own `input` first, then propagates the result through
-its steps in order. A step's `input` is only meaningful when that section is
-executed as a top-level pipeline.
+Named inputs decouple processing sections from each other: `count_kmers_decontam`
+does not reference `prepare_decontam` by name — it only declares which artefact
+directory it needs. Renaming `prepare_decontam` has no effect as long as its
+`output` remains `"parts@decontamination"`.
 
 ---
 
@@ -344,10 +335,10 @@ executed as a top-level pipeline.
 1. A `[processing.X]` section must have exactly one of `type` or `steps`.
 2. A section with `steps` is composite; all elements must be strings or inline tables with `type`.
 3. Inline tables inside `steps` must not have `steps` (inline steps are always atomic).
-4. Any processing section referenced by a `run` key must have a runnable effective output directory.
+4. Any processing section referenced by a `run` key must have a runnable effective output (`output`).
 5. `type` values must match a registered `@processing_type` function in `skimindex.processing`.
-6. A STREAM/FILE atomic with `directory` must have a declared `output_filename` in its type.
+6. A STREAM/FILE atomic with `output` must have a declared `output_filename` in its type.
 7. Composite sections (`steps`) are **not** registered in the `@processing_type` registry.
    They are structural constructs executed by the pipeline runner, not named operations.
-8. If `input` is present, it must reference an existing `[processing.X]` section that has a `directory`.
-9. If `role` is present, it must be a valid role name declared in a `[role.X]` section.
+8. Artifact references must follow the `dir@[idx:]role` format or be a dict with `role` and `dir`.
+9. The `role` part of an artifact reference must match a `[role.X]` section in the config.

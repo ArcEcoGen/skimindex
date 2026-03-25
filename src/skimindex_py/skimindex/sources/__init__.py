@@ -90,3 +90,49 @@ def dataset_output_dir(dataset_name: str) -> Path:
     role = ds.get("role", "")
     directory = ds.get("directory", dataset_name)
     return output_dir("role", role) / directory
+
+
+def resolve_artifact(
+    value: str | dict,
+    dataset_subdir: "Path | None" = None,
+) -> Path:
+    """Resolve an artifact reference to an absolute path.
+
+    Accepted forms:
+      "parts@decontamination"                    → processed_data/{role_dir}/{dataset_subdir}/parts
+      "parts@idx:decontamination"                → indexes/{role_dir}/{dataset_subdir}/parts
+      "@idx:decontamination"                     → indexes/{role_dir}/  (meta-index, no subdir)
+      {"role": "decontamination", "dir": "parts"} → same as string form
+      {"role": "idx:decontamination", "dir": ""}  → meta-index
+
+    Args:
+        value:          Artifact reference — string or dict.
+        dataset_subdir: Relative subdir within the role tree (e.g. Path("Human/Homo_sapiens--GCF_…")).
+                        If None, the role directory is returned without a dataset level.
+    """
+    cfg = config()
+
+    if isinstance(value, dict):
+        role_spec    = value["role"]
+        artifact_dir = value.get("dir", "")
+    else:
+        if "@" not in value:
+            raise ValueError(
+                f"Invalid artifact reference {value!r}: expected 'dir@[idx:]role' or '@[idx:]role'"
+            )
+        artifact_dir, role_spec = value.split("@", 1)
+
+    if role_spec.startswith("idx:"):
+        role_name = role_spec[4:]
+        root = cfg.indexes_dir()
+    else:
+        role_name = role_spec
+        root = cfg.processed_data_dir()
+
+    role_dir = cfg.roles.get(role_name, {}).get("directory", role_name)
+
+    if not artifact_dir:
+        return root / role_dir
+    if dataset_subdir is not None:
+        return root / role_dir / dataset_subdir / artifact_dir
+    return root / role_dir / artifact_dir

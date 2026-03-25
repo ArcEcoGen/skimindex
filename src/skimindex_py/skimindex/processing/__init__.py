@@ -95,10 +95,10 @@ class ProcessingType:
     def is_runnable(self, params: dict[str, Any]) -> bool:
         """True if this type has an effective output directory with these params.
 
-        A type is runnable when 'directory' is present in params.
+        A type is runnable when 'output' is present in params.
         STREAM/FILE types additionally require output_filename to be set.
         """
-        if "directory" not in params:
+        if "output" not in params:
             return False
         if self.output_kind in (OutputKind.STREAM, OutputKind.FILE):
             return self.output_filename is not None
@@ -242,59 +242,37 @@ __all__ = [
 ]
 
 
-def _resolve_output_dir(processing_name: str, terminal_pt: ProcessingType, data: Data) -> Path:
+def _resolve_output_dir(processing_name: str, data: Data) -> Path:
     """Compute the full output directory for a pipeline run.
 
-    Combines three levels:
-        {root} / {data.subdir} / {processing.directory}
-
-    where root is processed_data_dir() or indexes_dir() depending on
-    terminal_pt.is_indexer, and processing.directory comes from the TOML.
+    Reads 'output' from the processing config and delegates to resolve_artifact().
+    The artifact reference encodes both the role tree (processed_data or indexes)
+    and the subdirectory name via the 'dir@[idx:]role' notation.
     """
     from skimindex.config import config
+    from skimindex.sources import resolve_artifact
     cfg = config()
-    root = cfg.indexes_dir() if terminal_pt.is_indexer else cfg.processed_data_dir()
-    proc_dir = cfg.processing.get(processing_name, {}).get("directory", processing_name)
-    if data.subdir is not None:
-        return root / data.subdir / proc_dir
-    return root / proc_dir
+    output_ref = cfg.processing.get(processing_name, {}).get("output")
+    if not output_ref:
+        raise ValueError(f"[processing.{processing_name}] missing 'output'")
+    return resolve_artifact(output_ref, data.subdir)
 
 
-def _resolve_input(proc_params: dict, input_data: Data) -> Data:
-    """Resolve the actual input Data for a processing section.
+def _step_output_dir(step_params: dict, data: Data) -> Path | None:
+    """Return the output directory for an inline step, or None if not declared.
 
-    If 'input' key is present in proc_params, the input is read from the
-    output directory of the referenced processing section.  The subdir from
-    input_data is preserved so that output path resolution still works.
-
-    If 'input' is absent, input_data is returned unchanged.
+    Inline steps (dict entries in 'steps') use 'directory' for intermediate
+    persistence. Named step references may use 'output' instead.
     """
-    input_ref = proc_params.get("input")
-    if input_ref is None:
-        return input_data
-
-    from skimindex.config import config
-    cfg = config()
-    ref_params = cfg.processing.get(input_ref, {})
-    ref_dir = ref_params.get("directory", input_ref)
-    root = cfg.processed_data_dir()
-
-    if input_data.subdir is not None:
-        path = root / input_data.subdir / ref_dir
-    else:
-        path = root / ref_dir
-
-    return directory_data(path, subdir=input_data.subdir)
-
-
-def _step_output_dir(step_params: dict, is_indexer: bool, data: Data) -> Path | None:
-    """Return the output directory for a step, or None if no 'directory' declared."""
+    if "output" in step_params:
+        from skimindex.sources import resolve_artifact
+        return resolve_artifact(step_params["output"], data.subdir)
     step_dir = step_params.get("directory")
     if not step_dir:
         return None
     from skimindex.config import config
     cfg = config()
-    root = cfg.indexes_dir() if is_indexer else cfg.processed_data_dir()
+    root = cfg.processed_data_dir()
     return (root / data.subdir / step_dir) if data.subdir is not None else (root / step_dir)
 
 
@@ -329,9 +307,9 @@ def make_pipeline(processing_name: str) -> Callable:
         raise ValueError(
             f"[processing.{processing_name}] has no 'steps' — use build() for atomics"
         )
-    if "directory" not in params:
+    if "output" not in params:
         raise ValueError(
-            f"[processing.{processing_name}] composite has no 'directory' — not runnable"
+            f"[processing.{processing_name}] composite has no 'output' — not runnable"
         )
 
     # Resolve each step into (step_params, ProcessingType, callable)
@@ -349,12 +327,10 @@ def make_pipeline(processing_name: str) -> Callable:
         else:
             raise ValueError(f"Invalid step in [processing.{processing_name}]: {step!r}")
 
-    terminal_pt = resolved[-1][1]
-
     def run(input_data: Data, dry_run: bool = False) -> Data:
         """Execute the composite pipeline with persistence and stamp management."""
-        data = _resolve_input(params, input_data)
-        composite_output_dir = _resolve_output_dir(processing_name, terminal_pt, data)
+        data = input_data
+        composite_output_dir = _resolve_output_dir(processing_name, data)
 
         sources = data.paths or ([data.path] if data.path else [])
         if not needs_run(composite_output_dir, *sources, dry_run=dry_run,
@@ -367,7 +343,7 @@ def make_pipeline(processing_name: str) -> Callable:
             n = len(resolved)
             for i, (step_params, pt, fn) in enumerate(resolved):
                 is_last = (i == n - 1)
-                step_dir = _step_output_dir(step_params, terminal_pt.is_indexer, data)
+                step_dir = _step_output_dir(step_params, data)
 
                 if pt.output_kind == OutputKind.STREAM:
                     if step_dir:
@@ -435,8 +411,8 @@ def build(processing_name: str) -> Callable:
 
     def run(input_data: Data, dry_run: bool = False) -> Data:
         """Execute the atomic step with needs_run / stamp management."""
-        data = _resolve_input(params, input_data)
-        output_dir = _resolve_output_dir(processing_name, pt, data)
+        data = input_data
+        output_dir = _resolve_output_dir(processing_name, data)
         sources = data.paths or ([data.path] if data.path else [])
         if not needs_run(output_dir, *sources, dry_run=dry_run,
                          label=processing_name, action=f"run {processing_name}"):

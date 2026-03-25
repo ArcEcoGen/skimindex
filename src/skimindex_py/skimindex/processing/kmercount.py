@@ -23,10 +23,16 @@ from skimindex.unix.ntcard import ntcard_count
 @processing_type(output_kind=OutputKind.DIRECTORY, is_indexer=False)
 def kmercount(params: dict) -> Callable[[Data, Path, bool], Data]:
     """Count k-mers in FASTA fragments using ntcard."""
-    kmer_size = int(params.get("kmer_size", 29))
-    threads   = int(params.get("threads", 1))
+    kmer_size    = int(params.get("kmer_size", 29))
+    threads      = int(params.get("threads", 1))
+    sequence_ref = params.get("sequence")
 
     def run(input_data: Data, output_dir: Path, dry_run: bool = False) -> Data:
+        if sequence_ref is not None:
+            from skimindex.sources import resolve_artifact
+            seq_path    = resolve_artifact(sequence_ref, input_data.subdir)
+            input_data  = directory_data(seq_path, subdir=input_data.subdir)
+
         if input_data.kind == DataKind.FILES:
             input_files = input_data.paths
         elif input_data.kind == DataKind.DIRECTORY:

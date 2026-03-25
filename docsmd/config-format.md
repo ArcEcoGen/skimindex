@@ -212,16 +212,18 @@ For species-organised data (`by_species = true`, default):
 | Stage      | Path                                                                                                           |
 |------------|----------------------------------------------------------------------------------------------------------------|
 | Raw        | `${SKIMINDEX_ROOT}/<[source.X].directory>/<data.directory>/`                                                   |
-| Processed  | `${SKIMINDEX_ROOT}/<[processed_data].directory>/<[role.X].directory>/<data.directory>/<species>/<accession>/<[processing.X].directory>/` |
-| Indexes    | `${SKIMINDEX_ROOT}/<[indexes].directory>/<[role.X].directory>/…`  (to be specified)                           |
+| Processed  | `${SKIMINDEX_ROOT}/<[processed_data].directory>/<[role.X].directory>/<data.directory>/<species>/<accession>/<artifact_dir>/` |
+| Indexes    | `${SKIMINDEX_ROOT}/<[indexes].directory>/<[role.X].directory>/`                                               |
+
+where `<artifact_dir>` is the `dir` component of the processing section's `output` artifact reference.
 
 For non-species-organised data (`by_species = false`):
 
 | Stage      | Path                                                                                                           |
 |------------|----------------------------------------------------------------------------------------------------------------|
 | Raw        | `${SKIMINDEX_ROOT}/<[source.X].directory>/<data.directory>/`                                                   |
-| Processed  | `${SKIMINDEX_ROOT}/<[processed_data].directory>/<[role.X].directory>/<data.directory>/<[processing.X].directory>/` |
-| Indexes    | `${SKIMINDEX_ROOT}/<[indexes].directory>/<[role.X].directory>/…`  (to be specified)                           |
+| Processed  | `${SKIMINDEX_ROOT}/<[processed_data].directory>/<[role.X].directory>/<data.directory>/<artifact_dir>/` |
+| Indexes    | `${SKIMINDEX_ROOT}/<[indexes].directory>/<[role.X].directory>/`                                               |
 
 ### `[role.decontamination]`
 
@@ -277,22 +279,37 @@ Each section is either **atomic** (single operation) or **composite** (ordered
 sequence of steps). See [Processing Model](processing.md) for the full
 specification including persistence rules and worked examples.
 
+### Artifact references
+
+Both the output location and any named input parameters are expressed as
+**artifact references** using the `dir@[idx:]role` notation:
+
+| Form | Resolves to |
+|------|-------------|
+| `"parts@decontamination"` | `processed_data/decontamination/…/parts/` |
+| `"kmercount@decontamination"` | `processed_data/decontamination/…/kmercount/` |
+| `"parts@idx:decontamination"` | `indexes/decontamination/…/parts/` |
+| `"@idx:decontamination"` | `indexes/decontamination/` (meta-index) |
+
+The `…` component is the dataset-specific subpath supplied automatically at runtime.
+
 ### Atomic form
 
-Has `type` (required) — maps to a registered `@processing` Python function.
+Has `type` (required) — maps to a registered `@processing_type` Python function.
 
-| Key         | Type   | Required | Description                                                         |
-|-------------|--------|----------|---------------------------------------------------------------------|
-| `type`      | string | yes      | Registered processing function name                                 |
-| `directory` | string | no       | Output subdirectory. Absent → output is temporary                   |
-| *(others)*  | any    | no       | Operation-specific parameters                                       |
+| Key        | Type   | Required | Description                                                    |
+|------------|--------|----------|----------------------------------------------------------------|
+| `type`     | string | yes      | Registered processing function name                            |
+| `output`   | string | yes*     | Artifact reference for the output. *Required to be runnable    |
+| *(others)* | any    | no       | Operation-specific parameters (including named input refs)     |
 
 ```toml
-[processing.split_decontam]
-type      = "split"
-directory = "split"
-size      = 200
-overlap   = 28
+[processing.count_kmers_decontam]
+type      = "kmercount"
+output    = "kmercount@decontamination"
+sequence  = "parts@decontamination"   # named input — artifact reference
+kmer_size = 29
+threads   = 10
 ```
 
 ### Composite form
@@ -300,18 +317,18 @@ overlap   = 28
 Has `steps` (required) — ordered list of named references (strings) or inline
 atomics (inline tables `{type=...}`).
 
-| Key         | Type  | Required | Description                                                              |
-|-------------|-------|----------|--------------------------------------------------------------------------|
-| `steps`     | array | yes      | Ordered steps: strings (named refs) or inline tables `{type=...}`        |
-| `directory` | string| yes*     | Output subdirectory. *Required when referenced by a `run` key             |
+| Key      | Type   | Required | Description                                                           |
+|----------|--------|----------|-----------------------------------------------------------------------|
+| `steps`  | array  | yes      | Ordered steps: strings (named refs) or inline tables `{type=...}`    |
+| `output` | string | yes*     | Artifact reference for the output. *Required when referenced by `run` |
 
 ```toml
 [processing.prepare_decontam]
-directory = "prepared"
+output = "parts@decontamination"
 steps = [
-  "split_decontam",               # named reference — saved if it has directory
-  {type = "remove_n_only"},       # inline — always temporary
-  "count_kmers_decontam",         # named reference — saved if it has directory
+  {type = "split",         size = 200, overlap = 28},
+  {type = "filter_n_only"},
+  {type = "distribute",    batches = 20},
 ]
 ```
 
@@ -495,6 +512,8 @@ one_per          = "genus"
     pre-processing step that would distribute sequences into per-species files
     using `obidistribute` (not yet implemented).
 11. A `[processing.X]` section must have exactly one of `type` or `steps` (mutually exclusive).
-12. A processing section referenced by a `run` key must have `directory`.
+12. A processing section referenced by a `run` key must have `output`.
 13. Inline steps inside `steps` (`{type=...}`) must not have `steps` themselves (always atomic).
-14. See [Processing Model](processing.md) for the full processing validation rules.
+14. Artifact references (`output`, named inputs) must follow `dir@[idx:]role` or be a dict with `role` and `dir`.
+15. The `role` part of an artifact reference must match a `[role.X]` section in the config.
+16. See [Processing Model](processing.md) for the full processing validation rules.

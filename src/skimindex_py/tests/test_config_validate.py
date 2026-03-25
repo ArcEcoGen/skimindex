@@ -69,13 +69,13 @@ directory = "decontamination"
 run = "prepare_ok"
 
 [processing.split_ok]
-type      = "split"
-directory = "split"
-size      = 200
+type   = "split"
+output = "split@decontamination"
+size   = 200
 
 [processing.prepare_ok]
-directory = "prepared"
-steps     = ["split_ok"]
+output = "prepared@decontamination"
+steps  = ["split_ok"]
 """
 
 VALID_DATA = b"""
@@ -195,7 +195,7 @@ directory = "genbank"
 run = "prepare_ok"
 
 [processing.prepare_ok]
-directory = "prepared"
+output = "prepared@decontamination"
 steps = []
 """
         errors = validate(_cfg(toml, tmp_path))
@@ -254,17 +254,17 @@ class TestProcessingSectionValidation:
         assert _has_error(errors, "processing.bad", "type/steps")
 
     def test_C14_inline_step_must_have_type(self, tmp_path):
-        toml = BASE + b'\n[processing.bad]\ndirectory = "x"\nsteps = [{size = 10}]\n'
+        toml = BASE + b'\n[processing.bad]\noutput = "x@decontamination"\nsteps = [{size = 10}]\n'
         errors = validate(_cfg(toml, tmp_path))
         assert _has_error(errors, "processing.bad", "steps")
 
     def test_C14_inline_step_must_not_have_steps(self, tmp_path):
-        toml = BASE + b'\n[processing.bad]\ndirectory = "x"\nsteps = [{type = "split", steps = []}]\n'
+        toml = BASE + b'\n[processing.bad]\noutput = "x@decontamination"\nsteps = [{type = "split", steps = []}]\n'
         errors = validate(_cfg(toml, tmp_path))
         assert _has_error(errors, "processing.bad", "steps")
 
     def test_C15_named_step_must_exist(self, tmp_path):
-        toml = BASE + b'\n[processing.bad]\ndirectory = "x"\nsteps = ["nonexistent"]\n'
+        toml = BASE + b'\n[processing.bad]\noutput = "x@decontamination"\nsteps = ["nonexistent"]\n'
         errors = validate(_cfg(toml, tmp_path))
         assert _has_error(errors, "processing.bad", "steps")
 
@@ -278,7 +278,7 @@ class TestProcessingSectionValidation:
         errors = validate(_cfg(toml, tmp_path))
         assert not _has_error(errors, "processing.ok2", "type")
 
-    def test_C17_run_target_must_have_directory(self, tmp_path):
+    def test_C17_run_target_must_have_output(self, tmp_path):
         toml = b"""
 [local_directories]
 genbank = "genbank"
@@ -286,71 +286,40 @@ genbank = "genbank"
 [source.ncbi]
 directory = "genbank"
 
-[processing.atomic_no_dir]
+[processing.atomic_no_output]
 type = "split"
 
 [role.decontamination]
 directory = "decontamination"
-run = "atomic_no_dir"
+run = "atomic_no_output"
 """
         errors = validate(_cfg(toml, tmp_path))
-        assert _has_error(errors, "processing.atomic_no_dir", "directory")
+        assert _has_error(errors, "processing.atomic_no_output", "output")
 
-    def test_C18_input_must_reference_existing_processing(self, tmp_path):
-        toml = BASE + b'\n[processing.bad]\ntype = "split"\ninput = "nonexistent"\n'
+    def test_C18_output_must_have_at_sign(self, tmp_path):
+        toml = BASE + b'\n[processing.bad]\ntype = "split"\noutput = "noatsign"\n'
         errors = validate(_cfg(toml, tmp_path))
-        assert _has_error(errors, "processing.bad", "input")
+        assert _has_error(errors, "processing.bad", "output")
 
-    def test_C18_input_must_be_string(self, tmp_path):
-        toml = BASE + b'\n[processing.bad]\ntype = "split"\ninput = 42\n'
+    def test_C18_output_role_must_be_declared(self, tmp_path):
+        toml = BASE + b'\n[processing.bad]\ntype = "split"\noutput = "parts@undeclared_role"\n'
         errors = validate(_cfg(toml, tmp_path))
-        assert _has_error(errors, "processing.bad", "input")
+        assert _has_error(errors, "processing.bad", "output")
 
-    def test_C18_input_target_must_have_directory(self, tmp_path):
-        toml = BASE + b"""
-[processing.no_dir]
-type = "split"
-
-[processing.bad]
-type = "split"
-input = "no_dir"
-"""
+    def test_C18_valid_output_artifact_ref(self, tmp_path):
+        toml = BASE + b'\n[processing.ok]\ntype = "split"\noutput = "parts@decontamination"\n'
         errors = validate(_cfg(toml, tmp_path))
-        assert _has_error(errors, "processing.bad", "input")
+        assert not _has_error(errors, "processing.ok", "output")
 
-    def test_C18_valid_input_reference(self, tmp_path):
-        toml = BASE + b"""
-[processing.source_proc]
-type = "split"
-directory = "parts"
-
-[processing.consumer]
-type = "split"
-input = "source_proc"
-directory = "kmercount"
-"""
+    def test_C18_valid_output_index_ref(self, tmp_path):
+        toml = BASE + b'\n[processing.ok]\ntype = "split"\noutput = "@idx:decontamination"\n'
         errors = validate(_cfg(toml, tmp_path))
-        assert not _has_error(errors, "processing.consumer", "input")
+        assert not _has_error(errors, "processing.ok", "output")
 
-    def test_C19_role_must_be_valid(self, tmp_path):
-        toml = BASE + b'\n[processing.bad]\ntype = "split"\nrole = "unknown_role"\n'
+    def test_C18_output_dict_form_valid(self, tmp_path):
+        toml = BASE + b'\n[processing.ok]\ntype = "split"\n[processing.ok.output]\nrole = "decontamination"\ndir = "parts"\n'
         errors = validate(_cfg(toml, tmp_path))
-        assert _has_error(errors, "processing.bad", "role")
-
-    def test_C19_role_must_be_declared(self, tmp_path):
-        toml = BASE + b'\n[processing.bad]\ntype = "split"\nrole = "genomes"\n'
-        errors = validate(_cfg(toml, tmp_path))
-        assert _has_error(errors, "processing.bad", "role")
-
-    def test_C19_valid_role(self, tmp_path):
-        toml = BASE + b'\n[processing.ok]\ntype = "split"\nrole = "decontamination"\n'
-        errors = validate(_cfg(toml, tmp_path))
-        assert not _has_error(errors, "processing.ok", "role")
-
-    def test_C19_role_must_be_string(self, tmp_path):
-        toml = BASE + b'\n[processing.bad]\ntype = "split"\nrole = 42\n'
-        errors = validate(_cfg(toml, tmp_path))
-        assert _has_error(errors, "processing.bad", "role")
+        assert not _has_error(errors, "processing.ok", "output")
 
 
 # ===========================================================================

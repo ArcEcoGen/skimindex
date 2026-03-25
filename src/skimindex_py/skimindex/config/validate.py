@@ -297,46 +297,17 @@ def _validate_processing_sections(cfg: "Config") -> list[ConfigError]:
                             f"inline table {{type = ...}}"
                         ))
 
-        # C17 — processing referenced by run must have directory
-        if name in run_refs and "directory" not in proc:
+        # C17 — processing referenced by run must have output
+        if name in run_refs and "output" not in proc:
             errors.append(ConfigError(
-                sec, "directory",
+                sec, "output",
                 f"this processing section is referenced by a 'run' key but has no "
-                f"'directory'; a runnable processing section must save its results"
+                f"'output'; a runnable processing section must declare its output artifact"
             ))
 
-        # C19 — role (if present) must be a valid declared role
-        if "role" in proc:
-            role_val = proc["role"]
-            if not isinstance(role_val, str):
-                errors.append(ConfigError(sec, "role", "must be a string (role name)"))
-            elif role_val not in VALID_ROLES:
-                errors.append(ConfigError(
-                    sec, "role",
-                    f"'{role_val}' is not valid; must be one of {sorted(VALID_ROLES)}"
-                ))
-            elif role_val not in cfg.roles:
-                errors.append(ConfigError(
-                    sec, "role",
-                    f"[role.{role_val}] section is not declared in the config"
-                ))
-
-        # C18 — input (if present) must reference a processing section with directory
-        if "input" in proc:
-            input_ref = proc["input"]
-            if not isinstance(input_ref, str):
-                errors.append(ConfigError(sec, "input", "must be a string (processing section name)"))
-            elif input_ref not in all_proc:
-                errors.append(ConfigError(
-                    sec, "input",
-                    f"references processing section \"{input_ref}\" which is not declared"
-                ))
-            elif "directory" not in all_proc[input_ref]:
-                errors.append(ConfigError(
-                    sec, "input",
-                    f"processing section \"{input_ref}\" has no 'directory'; "
-                    f"an input source must save its results"
-                ))
+        # C18 — output (if present) must be a valid artifact reference
+        if "output" in proc:
+            errors += _check_artifact_ref(sec, "output", proc["output"], cfg)
 
     return errors
 
@@ -430,7 +401,7 @@ def _check_run_ref(
     run_value: Any,
     declared_processing: dict[str, dict],
 ) -> list[ConfigError]:
-    """Check that a run= value references an existing processing section with directory."""
+    """Check that a run= value references an existing processing section with output."""
     errors: list[ConfigError] = []
     if not isinstance(run_value, str):
         errors.append(ConfigError(section, key, "must be a string (processing section name)"))
@@ -440,10 +411,45 @@ def _check_run_ref(
             section, key,
             f"references processing section \"{run_value}\" which is not declared"
         ))
-    elif "directory" not in declared_processing[run_value]:
+    elif "output" not in declared_processing[run_value]:
         errors.append(ConfigError(
             section, key,
-            f"processing section \"{run_value}\" has no 'directory'; "
-            f"a runnable processing section must save its results"
+            f"processing section \"{run_value}\" has no 'output'; "
+            f"a runnable processing section must declare its output artifact"
+        ))
+    return errors
+
+
+def _check_artifact_ref(
+    section: str,
+    key: str,
+    value: Any,
+    cfg: "Config",
+) -> list[ConfigError]:
+    """Validate an artifact reference (string or dict form)."""
+    errors: list[ConfigError] = []
+
+    if isinstance(value, dict):
+        role_spec = value.get("role")
+        if not role_spec:
+            errors.append(ConfigError(section, key, "dict artifact reference must have a 'role' key"))
+            return errors
+    elif isinstance(value, str):
+        if "@" not in value:
+            errors.append(ConfigError(
+                section, key,
+                f"artifact reference {value!r} must follow 'dir@[idx:]role' notation"
+            ))
+            return errors
+        _, role_spec = value.split("@", 1)
+    else:
+        errors.append(ConfigError(section, key, "must be a string or dict artifact reference"))
+        return errors
+
+    role_name = role_spec[4:] if role_spec.startswith("idx:") else role_spec
+    if role_name not in cfg.roles:
+        errors.append(ConfigError(
+            section, key,
+            f"artifact reference uses role '{role_name}' which is not declared in [role.{role_name}]"
         ))
     return errors
