@@ -127,9 +127,8 @@ threads   = 10
 # Atomic: build kmindex sub-index for one decontamination dataset.
 [processing.build_index_decontam]
 type      = "buildindex"
-output    = "kmindex@idx:decontamination" # → indexes/decontamination/{dataset}/kmindex/
-sequence  = "parts@decontamination"       # FASTA fragments (output of prepare_decontam)
-histogram = "kmercount@decontamination"   # ntcard histograms (output of count_kmers_decontam)
+output    = "kmindex@decontamination"     # → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
+index     = "@idx:decontamination"        # → indexes/decontamination/  (kmindex meta-index, managed by kmindex)
 kmer_size = 29
 zvalue    = 3      # k-mers required for a positive query result
 fpr       = 1e-3   # target false positive rate

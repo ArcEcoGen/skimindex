@@ -20,7 +20,7 @@ def _list_sections() -> str:
     return ",".join(ds.name for ds in datasets_for_role("decontamination"))
 
 
-def _run_pipeline(processing_name: str, sections: list[str] | None, dry_run: bool) -> int:
+def _run_pipeline(processing_name: str, sections: list[str] | None, dry_run: bool, dataset_level: bool = False) -> int:
     from skimindex.datasets import datasets_for_role, get_dataset
     from skimindex.log import logerror, loginfo, logwarning
     from skimindex.processing import build
@@ -44,7 +44,7 @@ def _run_pipeline(processing_name: str, sections: list[str] | None, dry_run: boo
         loginfo(f">>> {ds.name}")
         count = 0
         try:
-            for data in ds.to_data():
+            for data in ([ds.to_index_data()] if dataset_level else ds.to_data()):
                 count += 1
                 try:
                     result = pipeline(data, dry_run=dry_run)
@@ -145,7 +145,7 @@ _index_cmd = SkimCommand(
 
 @_index_cmd.handler
 def _(sections, args, dry_run):
-    return _run_pipeline("build_index_decontam", sections or None, dry_run)
+    return _run_pipeline("build_index_decontam", sections or None, dry_run, dataset_level=True)
 
 
 # ---------------------------------------------------------------------------

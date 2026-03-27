@@ -84,6 +84,19 @@ class Dataset:
     # Data conversion
     # ------------------------------------------------------------------
 
+    def to_index_data(self) -> "Data":  # noqa: F821
+        """Return a single ``Data`` object representing the full dataset output directory.
+
+        Used by indexers that process all assemblies of a dataset at once.
+
+        Returns:
+            A DIRECTORY ``Data`` with ``subdir`` set to ``Path(self.directory)``
+            and ``path`` pointing to the dataset output directory.
+        """
+        from pathlib import Path
+        from skimindex.processing.data import directory_data
+        return directory_data(self.output_dir, subdir=Path(self.directory))
+
     def to_data(self) -> Iterator["Data"]:  # noqa: F821
         """Yield ``Data`` objects representing this dataset's input files.
 

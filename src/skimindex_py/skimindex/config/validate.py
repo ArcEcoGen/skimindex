@@ -309,8 +309,8 @@ def _validate_processing_sections(cfg: "Config") -> list[ConfigError]:
         if "output" in proc:
             errors += _check_artifact_ref(sec, "output", proc["output"], cfg)
 
-        # C19 — sequence / histogram (if present) must be valid artifact references
-        for artifact_key in ("sequence", "histogram"):
+        # C19 — sequence / histogram / index (if present) must be valid artifact references
+        for artifact_key in ("sequence", "histogram", "index"):
             if artifact_key in proc:
                 errors += _check_artifact_ref(sec, artifact_key, proc[artifact_key], cfg)
 

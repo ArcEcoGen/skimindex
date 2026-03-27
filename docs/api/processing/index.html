@@ -2817,17 +2817,16 @@ need to manage stamps themselves.</p>
         <p>skimindex.processing.buildindex — atomic 'buildindex' processing type.</p>
 <p>Builds a kmindex sub-index from FASTA fragments using <code>kmindex build</code>.
 Output kind: DIRECTORY (is_indexer=True).</p>
-<p>For each dataset, generates a kmtricks FOF file — one sample per subdirectory
-of the parts directory; if parts/ is flat (no subdirectories), one sample named
-after the dataset — then calls <code>kmindex build</code> to register a sub-index in the
-global meta-index.</p>
+<p>Called once per dataset. Scans the dataset output directory recursively for
+all <code>parts/</code> subdirectories (one sample per assembly or division) and all
+<code>kmercount/</code> subdirectories (to compute the max F1 across samples).</p>
 <p>Bloom filter sizing uses a single-hash model:</p>
 <pre><code>fpr = (n / (n + m)) ^ z  →  m = ceil(n * (fpr^(-1/z) - 1))
 </code></pre>
 <p>where:</p>
 <ul>
-<li><code>n</code>   = number of distinct k-mers from the <code>F1</code> line of ntcard histogram files</li>
-<li><code>m</code>   = Bloom filter size in cells (<code>bloom_size</code> parameter to kmindex)</li>
+<li><code>n</code>   = max number of distinct k-mers across all samples (max F1 from ntcard)</li>
+<li><code>m</code>   = Bloom filter size in cells (<code>nb_cell</code> parameter to kmindex)</li>
 <li><code>z</code>   = number of k-mers required for a positive query result (<code>zvalue</code>)</li>
 <li><code>fpr</code> = target false positive rate</li>
 </ul>
@@ -2867,15 +2866,21 @@ global meta-index.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Build a kmindex sub-index from FASTA fragments.</p>
-<p>Reads FASTA parts produced by <code>distribute</code>, optionally computes a
-Bloom filter size from ntcard histograms, and calls <code>kmindex build</code>
-to register a sub-index in the global meta-index.</p>
-<p>Expected <code>output</code> artifact reference: <code>"kmindex@idx:&lt;role&gt;"</code>
-(e.g. <code>"kmindex@idx:decontamination"</code>).</p>
-<p>The global meta-index path is derived as <code>output_dir.parent.parent</code>.
-The sub-index <code>register_as</code> name defaults to <code>data.subdir.name</code>
-(e.g. the dataset directory name such as <code>"Human"</code> or <code>"Fungi"</code>).</p>
+        <p>Build a kmindex sub-index for an entire dataset.</p>
+<p>Called once per dataset. Scans the dataset output directory for all
+<code>parts/</code> subdirectories (one sample per assembly/division), computes
+the Bloom filter size from the maximum F1 across all samples, and calls
+<code>kmindex build</code> to register one sub-index in the global meta-index.</p>
+<p>Parameters (TOML):
+    output:     Artifact ref for the FOF directory and stamp target
+                (e.g. <code>"kmindex@decontamination"</code>).
+    index:      Artifact ref for the kmindex global meta-index
+                (e.g. <code>"@idx:decontamination"</code>).
+    kmer_size:  k-mer length (default 29).
+    zvalue:     k-mers required for a positive query (default 3).
+    fpr:        Target false positive rate (default 1e-3).
+    bloom_size: Explicit Bloom filter size; computed from F1 if omitted.
+    threads:    Number of threads (default 1).</p>
 
 
     </div>

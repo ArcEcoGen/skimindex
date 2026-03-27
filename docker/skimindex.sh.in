@@ -328,19 +328,30 @@ _ski_apptainer_needs_update() {
 _ski_update() {
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     if [[ "$RUNTIME" == "apptainer" ]]; then
-        local sif_dir digest_file
+        local sif_dir digest_file lock_file
         sif_dir="$(dirname "$SIF_FILE")"
         digest_file="${SIF_FILE%.sif}.digest"
+        lock_file="${SIF_FILE%.sif}.lock"
         mkdir -p "$sif_dir"
-        loginfo "Pulling latest SIF from docker://${_SKI_FULL_IMAGE}"
-        loginfo "Destination: $SIF_FILE"
-        apptainer pull --force "$SIF_FILE" "docker://${_SKI_FULL_IMAGE}"
-        # Record the remote digest so future checks can skip unnecessary pulls
-        local remote_digest
-        remote_digest=$(_ski_registry_digest \
-            "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
-        [[ -n "$remote_digest" ]] && printf '%s' "$remote_digest" > "$digest_file"
-        loginfo "SIF updated: $SIF_FILE"
+        # Serialize concurrent SIF rebuilds: wait for any in-progress pull to finish
+        # before checking again whether an update is still needed.
+        (
+            flock 9
+            if _ski_apptainer_needs_update; then
+                loginfo "Pulling latest SIF from docker://${_SKI_FULL_IMAGE}"
+                loginfo "Destination: $SIF_FILE"
+                apptainer pull --force "$SIF_FILE" "docker://${_SKI_FULL_IMAGE}"
+                # Record the remote digest so future checks can skip unnecessary pulls
+                local remote_digest
+                remote_digest=$(_ski_registry_digest \
+                    "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
+                [[ -n "$remote_digest" ]] && printf '%s' "$remote_digest" > "$digest_file"
+                loginfo "SIF updated: $SIF_FILE"
+            else
+                loginfo "SIF already up-to-date (updated by concurrent process): $SIF_FILE"
+            fi
+        ) 9>"$lock_file"
+        return
     else
         loginfo "Pulling latest image: ${_SKI_FULL_IMAGE}"
         "$RUNTIME" pull "$_SKI_FULL_IMAGE"
