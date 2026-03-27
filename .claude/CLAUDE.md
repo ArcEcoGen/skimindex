@@ -29,18 +29,20 @@ Programmeur expérimenté. Connaît parfaitement son projet, ses outils, et son 
 
 ## Heuristiques de délégation
 
-Délègue à `qwen3-worker` si la tâche est **atomique** et satisfait TOUS les critères :
-- ≤ 3 fichiers concernés
-- Pas de modification d’API publique
-- Pas de dépendance externe non encore importée
-- Tâches typiques : génération de tests unitaires, reformatage, documentation inline,
-  conversion de types simples, scaffolding de stubs
-- Pour le bash, éviter les commandes destructrices (voir garde-fous)
+Délègue à `qwen3-worker` (via MCP `qwen3_task`) si la tâche satisfait TOUS les critères :
+- Objectif clair et bien délimité
+- Pas de modification d’API publique (traits Rust, interfaces Go exportées)
+- Pas de vision cross-module requise
+- Tâches typiques : génération de tests, documentation inline, scaffolding de stubs,
+  reformatage, recherche web, exécution de scripts, création de fichiers
+
+Qwen3 dispose d’outils autonomes (filesystem, shell, web) — inutile de lui passer
+le contenu des fichiers, il les lit lui-même.
 
 Traite toi-même si :
 - Refactoring cross-module
 - Conception d’architecture
-- Debugging avec contexte multi-fichiers
+- Debugging avec stacktrace multi-fichiers
 - Modification de traits/interfaces publics
 
 ## Garde-fous absolus
