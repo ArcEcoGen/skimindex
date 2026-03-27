@@ -63,3 +63,4 @@ nav:
                   - ncbi: api/unix_ncbi.md
                   - obitools: api/unix_obitools.md
                   - download: api/unix_download.md
+                  - kmindex: api/unix_kmindex.md
