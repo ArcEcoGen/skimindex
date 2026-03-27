@@ -156,6 +156,7 @@ def buildindex(params: dict) -> Callable[[Data, Path, bool], Data]:
     """
     sequence_ref  = params.get("sequence")
     histogram_ref = params.get("histogram")
+    output_ref    = params.get("output", "")
     kmer_size     = int(params.get("kmer_size", 29))
     zvalue        = int(params.get("zvalue", 3))
     fpr           = float(params.get("fpr", 1e-3))
@@ -188,10 +189,12 @@ def buildindex(params: dict) -> Callable[[Data, Path, bool], Data]:
             n = _read_f1(hist_path)
             effective_bloom_size = _compute_bloom_size(n, zvalue, fpr)
 
-        # Global meta-index = grandparent of per-dataset output_dir
-        # output_dir = indexes/{role}/{dataset_subdir}/kmindex/
-        # global_index = indexes/{role}/
-        global_index = output_dir.parent.parent
+        # Global meta-index: resolve without dataset_subdir to get indexes/{role}/
+        if "@" in output_ref:
+            _, role_spec = output_ref.split("@", 1)
+            global_index = resolve_artifact(f"@{role_spec}")
+        else:
+            global_index = output_dir.parent.parent
         register_as  = (
             input_data.subdir.name if input_data.subdir else output_dir.parent.name
         )

@@ -105,11 +105,11 @@ class Dataset:
             )
 
     def _ncbi_data(self) -> Iterator["Data"]:  # noqa: F821
-        from skimindex.config import config
         from skimindex.naming import scan_species_dir
         from skimindex.processing.data import files_data
+        from skimindex.sources import output_dir as role_output_dir
 
-        base = self.output_dir.relative_to(config().processed_data_dir())
+        base = self.output_dir.relative_to(role_output_dir("role", self.role))
         dl = self.download_dir
         for f, species_subdir in scan_species_dir(dl):
             suffix = "".join(f.suffixes).lstrip(".")
@@ -121,7 +121,8 @@ class Dataset:
         from skimindex.processing.filter_taxid import filter_taxid
         from skimindex.sources.genbank import division_dir, latest_release, release_dir
 
-        base     = self.output_dir.relative_to(config().processed_data_dir())
+        from skimindex.sources import output_dir as role_output_dir
+        base     = self.output_dir.relative_to(role_output_dir("role", self.role))
         taxid    = self._cfg.get("taxid")
         divisions = self._cfg.get("divisions", [])
         release  = self._cfg.get("release") or latest_release()
