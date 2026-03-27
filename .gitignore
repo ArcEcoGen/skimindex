@@ -49,3 +49,4 @@ old_scripts
 src/kmerasm/kmerasm
 
 .mkdocs.pid
+usercmd/index_decontam.sh
