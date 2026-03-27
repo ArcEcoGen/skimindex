@@ -518,15 +518,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#decontam-prepare-decontamination-filter" class="md-nav__link">
+  <a href="#decontam-build-decontamination-k-mer-index" class="md-nav__link">
     <span class="md-ellipsis">
       
-        decontam — Prepare decontamination filter
+        decontam — Build decontamination k-mer index
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="decontam — Prepare decontamination filter">
+    <nav class="md-nav" aria-label="decontam — Build decontamination k-mer index">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -545,6 +545,17 @@
     <span class="md-ellipsis">
       
         decontam count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decontam-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        decontam index
       
     </span>
   </a>
@@ -1747,15 +1758,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#decontam-prepare-decontamination-filter" class="md-nav__link">
+  <a href="#decontam-build-decontamination-k-mer-index" class="md-nav__link">
     <span class="md-ellipsis">
       
-        decontam — Prepare decontamination filter
+        decontam — Build decontamination k-mer index
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="decontam — Prepare decontamination filter">
+    <nav class="md-nav" aria-label="decontam — Build decontamination k-mer index">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1774,6 +1785,17 @@
     <span class="md-ellipsis">
       
         decontam count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decontam-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        decontam index
       
     </span>
   </a>
@@ -1941,15 +1963,35 @@ sections.</p>
 </tbody>
 </table>
 <hr />
-<h2 id="decontam-prepare-decontamination-filter"><code>decontam</code> — Prepare decontamination filter</h2>
-<p>Prepare reference sequences for building the decontamination k-mer filter.</p>
-<pre><code>skimindex decontam                        # run full pipeline (prepare + count)
-skimindex decontam prepare [options]      # split genomes into fragments
-skimindex decontam count   [options]      # count k-mers in fragments
+<h2 id="decontam-build-decontamination-k-mer-index"><code>decontam</code> — Build decontamination k-mer index</h2>
+<p>Builds a <a href="https://tlemane.github.io/kmindex/">kmindex</a> presence/absence index
+from a set of reference sequences representing biological contaminants (e.g.
+human, fungi, bacteria). The resulting index is used at query time to identify
+and remove reads whose k-mer content overlaps with the reference.</p>
+<p>The pipeline runs per dataset declared with <code>role = "decontamination"</code> in
+<code>skimindex.toml</code> and proceeds in three sequential steps:</p>
+<pre><code>skimindex decontam                        # run full pipeline (prepare + count + index)
+skimindex decontam prepare [options]      # step 1 — fragment reference sequences
+skimindex decontam count   [options]      # step 2 — count k-mers (ntcard)
+skimindex decontam index   [options]      # step 3 — build kmindex sub-indexes
 </code></pre>
+<p>Each step is stamped independently. Re-running <code>decontam</code> skips any dataset
+whose output is already stamped.</p>
 <h3 id="decontam-prepare"><code>decontam prepare</code></h3>
-<p>Splits reference genomes into overlapping fragments using the
-<code>[processing.prepare_decontam]</code> pipeline.</p>
+<p>Transforms each reference sequence file into a set of fixed-length overlapping
+fragments, filters out degenerate sequences (N-only), and distributes the result
+into a fixed number of FASTA batch files.</p>
+<p><strong>Processing chain</strong> (configured in <code>[processing.prepare_decontam]</code>):</p>
+<ol>
+<li><strong>split</strong> — slides a window of <code>size</code> bp with <code>overlap</code> bp between consecutive
+   fragments over each input sequence (default: size = 200, overlap = 28).
+   The overlap value should be set to <span class="arithmatex">\(k - 1\)</span> where <span class="arithmatex">\(k\)</span> is the k-mer size used
+   for indexing, so that every k-mer spanning a fragment boundary is represented.</li>
+<li><strong>filter_n_only</strong> — discards fragments composed entirely of N bases.</li>
+<li><strong>distribute</strong> — partitions fragments into <code>batches</code> FASTA files
+   (default: 20) to allow parallel processing downstream.</li>
+</ol>
+<p>Output: <code>processed_data/decontamination/{dataset}/parts/</code></p>
 <table>
 <thead>
 <tr>
@@ -1973,7 +2015,68 @@ skimindex decontam count   [options]      # count k-mers in fragments
 </tbody>
 </table>
 <h3 id="decontam-count"><code>decontam count</code></h3>
-<p>Counts k-mers in prepared fragments using <code>[processing.count_kmers_decontam]</code>.</p>
+<p>Estimates the k-mer frequency spectrum of the prepared fragments using
+<a href="https://github.com/bcgsc/ntCard">ntCard</a>.</p>
+<p>ntCard produces a histogram file <code>{prefix}_k{K}.hist</code> per dataset with the
+frequency distribution of all k-mers of length <span class="arithmatex">\(k\)</span> (<code>kmer_size</code>, default 29).
+The histogram includes two aggregate statistics used by the next step:</p>
+<ul>
+<li><strong>F0</strong> — estimated <em>total</em> k-mer count (including duplicates across fragments).</li>
+<li><strong>F1</strong> — estimated number of <em>distinct</em> k-mers.</li>
+</ul>
+<p>Output: <code>processed_data/decontamination/{dataset}/kmercount/</code></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--dataset NAME</code></td>
+<td>Process a single decontamination dataset.</td>
+</tr>
+<tr>
+<td><code>--list</code></td>
+<td>Print available datasets and exit.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Show what would be processed without executing.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="decontam-index"><code>decontam index</code></h3>
+<p>Builds a kmindex Bloom filter sub-index for each decontamination dataset and
+registers it in the global meta-index at <code>indexes/decontamination/</code>.</p>
+<p><strong>Bloom filter sizing</strong></p>
+<p>kmindex uses a single-hash Bloom filter. For a query requiring <span class="arithmatex">\(z\)</span> consecutive
+k-mer hits to call a positive match, the false positive probability is:</p>
+<div class="arithmatex">\[P_{fpr} = \left(\frac{n}{n + m}\right)^z\]</div>
+<p>where <span class="arithmatex">\(n\)</span> is the number of k-mers inserted into the filter (taken from the <strong>F1</strong>
+line of the ntcard histogram) and <span class="arithmatex">\(m\)</span> is the number of cells in the filter
+(<code>bloom_size</code>). Inverting for <span class="arithmatex">\(m\)</span>:</p>
+<div class="arithmatex">\[m = \left\lceil n \cdot \left(p^{-1/z} - 1\right) \right\rceil\]</div>
+<p>The <code>bloom_size</code> value is computed automatically from the ntcard histograms
+produced by <code>decontam count</code>, using the <code>fpr</code> and <code>zvalue</code> parameters declared
+in <code>[processing.build_index_decontam]</code> (defaults: <span class="arithmatex">\(p = 10^{-3}\)</span>, <span class="arithmatex">\(z = 3\)</span>).</p>
+<p><strong>Index structure</strong></p>
+<p>Each dataset produces a sub-index registered by name in the global meta-index:</p>
+<pre><code>indexes/decontamination/
+├── Human/
+│   └── kmindex/      ← per-dataset sub-index (stamp target)
+├── Fungi/
+│   └── kmindex/
+└── Bacteria/
+    └── kmindex/
+</code></pre>
+<p>The root <code>indexes/decontamination/</code> is the meta-index consumed by
+<code>kmindex query</code> or <code>kmindex query2</code> at decontamination time.</p>
+<p><strong>FOF generation</strong></p>
+<p>Before calling <code>kmindex build</code>, a kmtricks file-of-files (FOF) is generated
+automatically. Each subdirectory of <code>parts/</code> becomes one named sample; if
+<code>parts/</code> is flat, the whole dataset is treated as a single sample.</p>
 <table>
 <thead>
 <tr>
@@ -2085,6 +2188,8 @@ separator) is used as its description in <code>skimindex --help</code>.</p>
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

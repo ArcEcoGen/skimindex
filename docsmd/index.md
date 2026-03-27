@@ -54,4 +54,4 @@ Raw data                 Processed data              Indexes
 
 Sources: `ncbi`, `genbank`, `internal`
 Roles: `decontamination`, `genomes`, `genome_skims`
-Processing steps: `split`, `kmercount`
+Processing steps: `split`, `kmercount`, `buildindex`

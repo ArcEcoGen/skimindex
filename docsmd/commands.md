@@ -56,20 +56,43 @@ sections.
 
 ---
 
-## `decontam` — Prepare decontamination filter
+## `decontam` — Build decontamination k-mer index
 
-Prepare reference sequences for building the decontamination k-mer filter.
+Builds a [kmindex](https://tlemane.github.io/kmindex/) presence/absence index
+from a set of reference sequences representing biological contaminants (e.g.
+human, fungi, bacteria). The resulting index is used at query time to identify
+and remove reads whose k-mer content overlaps with the reference.
+
+The pipeline runs per dataset declared with `role = "decontamination"` in
+`skimindex.toml` and proceeds in three sequential steps:
 
 ```
-skimindex decontam                        # run full pipeline (prepare + count)
-skimindex decontam prepare [options]      # split genomes into fragments
-skimindex decontam count   [options]      # count k-mers in fragments
+skimindex decontam                        # run full pipeline (prepare + count + index)
+skimindex decontam prepare [options]      # step 1 — fragment reference sequences
+skimindex decontam count   [options]      # step 2 — count k-mers (ntcard)
+skimindex decontam index   [options]      # step 3 — build kmindex sub-indexes
 ```
+
+Each step is stamped independently. Re-running `decontam` skips any dataset
+whose output is already stamped.
 
 ### `decontam prepare`
 
-Splits reference genomes into overlapping fragments using the
-`[processing.prepare_decontam]` pipeline.
+Transforms each reference sequence file into a set of fixed-length overlapping
+fragments, filters out degenerate sequences (N-only), and distributes the result
+into a fixed number of FASTA batch files.
+
+**Processing chain** (configured in `[processing.prepare_decontam]`):
+
+1. **split** — slides a window of `size` bp with `overlap` bp between consecutive
+   fragments over each input sequence (default: size = 200, overlap = 28).
+   The overlap value should be set to $k - 1$ where $k$ is the k-mer size used
+   for indexing, so that every k-mer spanning a fragment boundary is represented.
+2. **filter_n_only** — discards fragments composed entirely of N bases.
+3. **distribute** — partitions fragments into `batches` FASTA files
+   (default: 20) to allow parallel processing downstream.
+
+Output: `processed_data/decontamination/{dataset}/parts/`
 
 | Option | Description |
 |--------|-------------|
@@ -79,7 +102,68 @@ Splits reference genomes into overlapping fragments using the
 
 ### `decontam count`
 
-Counts k-mers in prepared fragments using `[processing.count_kmers_decontam]`.
+Estimates the k-mer frequency spectrum of the prepared fragments using
+[ntCard](https://github.com/bcgsc/ntCard).
+
+ntCard produces a histogram file `{prefix}_k{K}.hist` per dataset with the
+frequency distribution of all k-mers of length $k$ (`kmer_size`, default 29).
+The histogram includes two aggregate statistics used by the next step:
+
+- **F0** — estimated *total* k-mer count (including duplicates across fragments).
+- **F1** — estimated number of *distinct* k-mers.
+
+Output: `processed_data/decontamination/{dataset}/kmercount/`
+
+| Option | Description |
+|--------|-------------|
+| `--dataset NAME` | Process a single decontamination dataset. |
+| `--list` | Print available datasets and exit. |
+| `--dry-run` | Show what would be processed without executing. |
+
+### `decontam index`
+
+Builds a kmindex Bloom filter sub-index for each decontamination dataset and
+registers it in the global meta-index at `indexes/decontamination/`.
+
+**Bloom filter sizing**
+
+kmindex uses a single-hash Bloom filter. For a query requiring $z$ consecutive
+k-mer hits to call a positive match, the false positive probability is:
+
+$$P_{fpr} = \left(\frac{n}{n + m}\right)^z$$
+
+where $n$ is the number of k-mers inserted into the filter (taken from the **F1**
+line of the ntcard histogram) and $m$ is the number of cells in the filter
+(`bloom_size`). Inverting for $m$:
+
+$$m = \left\lceil n \cdot \left(p^{-1/z} - 1\right) \right\rceil$$
+
+The `bloom_size` value is computed automatically from the ntcard histograms
+produced by `decontam count`, using the `fpr` and `zvalue` parameters declared
+in `[processing.build_index_decontam]` (defaults: $p = 10^{-3}$, $z = 3$).
+
+**Index structure**
+
+Each dataset produces a sub-index registered by name in the global meta-index:
+
+```
+indexes/decontamination/
+├── Human/
+│   └── kmindex/      ← per-dataset sub-index (stamp target)
+├── Fungi/
+│   └── kmindex/
+└── Bacteria/
+    └── kmindex/
+```
+
+The root `indexes/decontamination/` is the meta-index consumed by
+`kmindex query` or `kmindex query2` at decontamination time.
+
+**FOF generation**
+
+Before calling `kmindex build`, a kmtricks file-of-files (FOF) is generated
+automatically. Each subdirectory of `parts/` becomes one named sample; if
+`parts/` is flat, the whole dataset is treated as a single sample.
 
 | Option | Description |
 |--------|-------------|
