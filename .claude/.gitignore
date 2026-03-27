@@ -1,0 +1,7 @@
+venv/
+logs/
+llm-functions/bin/
+llm-functions/cache/
+__pycache__/
+*.pyc
+.claude
