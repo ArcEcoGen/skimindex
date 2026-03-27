@@ -10,3 +10,15 @@
         - registered_types
         - make_pipeline
         - build
+
+## Built-in processing types
+
+::: skimindex.processing.buildindex
+    options:
+      members:
+        - buildindex
+
+::: skimindex.processing.kmercount
+    options:
+      members:
+        - kmercount

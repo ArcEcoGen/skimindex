@@ -27,6 +27,6 @@ Example:
      obitools.obigrep["-s", "^count>10"]) & FG
 """
 
-from . import base, compress, download, ncbi, ntcard, obitools
+from . import base, compress, download, kmindex, ncbi, ntcard, obitools
 
-__all__ = ["base", "compress", "download", "ncbi", "obitools", "ntcard"]
+__all__ = ["base", "compress", "download", "kmindex", "ncbi", "obitools", "ntcard"]

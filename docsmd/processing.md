@@ -209,13 +209,16 @@ sequence  = "parts@decontamination"
 kmer_size = 29
 threads   = 10
 
-# Atomic: build kmindex meta-index from k-mer counts
-[processing.build_decontam_index]
-type      = "build_index"
-output    = "@idx:decontamination"        # → indexes/decontamination/
+# Atomic: build kmindex sub-index for one decontamination dataset
+[processing.build_index_decontam]
+type      = "buildindex"
+output    = "kmindex@idx:decontamination" # → indexes/decontamination/{dataset}/kmindex/
 sequence  = "parts@decontamination"
-counts    = "kmercount@decontamination"
+histogram = "kmercount@decontamination"
 kmer_size = 29
+zvalue    = 3
+fpr       = 1e-3
+threads   = 10
 
 # Role referencing the preparation pipeline
 [role.decontamination]
@@ -229,8 +232,100 @@ The resulting chain:
 dataset.to_data()
     → prepare_decontam          → processed_data/decontamination/…/parts/
     → count_kmers_decontam      → processed_data/decontamination/…/kmercount/
-    → build_decontam_index      → indexes/decontamination/
+    → build_index_decontam      → indexes/decontamination/{dataset}/kmindex/
+                                   indexes/decontamination/  (global meta-index)
 ```
+
+---
+
+## Decontamination index pipeline
+
+The decontamination pipeline transforms downloaded reference sequences into a
+kmindex meta-index used to filter contaminant k-mers from sequencing reads.
+It runs **per dataset** — each `[data.X]` section with `role = "decontamination"`
+produces one registered sub-index.
+
+### Pipeline steps
+
+```
+[data.human / fungi / bacteria / plants]
+  ↓ download
+  ↓ prepare_decontam        → processed_data/decontamination/{dataset}/parts/
+  ↓ count_kmers_decontam    → processed_data/decontamination/{dataset}/kmercount/
+  ↓ build_index_decontam    → indexes/decontamination/{dataset}/kmindex/
+                               indexes/decontamination/        (global meta-index)
+```
+
+Each step is stamped independently. A dataset whose `parts/` directory is already
+stamped will skip `prepare_decontam` on re-run.
+
+### Bloom filter sizing
+
+`buildindex` uses a **single-hash Bloom filter** model. The probability that a
+query of `z` consecutive k-mers yields a false positive is:
+
+```
+fpr = (n / (n + m)) ^ z
+```
+
+| Symbol | Meaning |
+|--------|---------|
+| $n$    | Number of distinct k-mers inserted into the filter — line `F1` from ntcard histogram |
+| $m$    | Number of cells in the Bloom filter (`bloom_size` passed to `kmindex build`) |
+| $z$    | Number of k-mers required for a positive answer (`zvalue` parameter) |
+| $p$    | Target false positive rate (`fpr` parameter) |
+
+$$
+P_{fpr} = \left(\frac{n}{n + m}\right)^z
+$$
+
+Inverting for $m$:
+
+$$
+m = \left\lceil n \cdot \left(p^{-1/z} - 1\right) \right\rceil
+$$
+
+When `bloom_size` is omitted from the config, it is computed automatically from
+the ntcard histograms produced by `count_kmers_decontam`.
+
+**Example** — $n = 10^9$, $z = 3$, $p = 10^{-3}$:
+
+$$
+m = \left\lceil 10^9 \cdot \left(10^{-3/(-1/3)} - 1\right) \right\rceil
+  = \left\lceil 10^9 \cdot (10 - 1) \right\rceil
+  = 9 \times 10^9 \text{ cells}
+$$
+
+### Global meta-index layout
+
+All per-dataset sub-indexes are registered in the same global meta-index at
+`indexes/decontamination/`. The `output` reference `"kmindex@idx:decontamination"`
+includes a `dir` component so that each dataset gets its own per-dataset stamp path:
+
+```
+indexes/decontamination/
+├── Human/
+│   └── kmindex/      ← stamp target for the Human sub-index
+├── Fungi/
+│   └── kmindex/
+└── Bacteria/
+    └── kmindex/
+```
+
+The root `indexes/decontamination/` is the global meta-index consumed by
+`kmindex query` or `kmindex query2`.
+
+### FOF generation
+
+Before calling `kmindex build`, `buildindex` generates a kmtricks
+**file-of-files** (FOF):
+
+```
+sample_name : /path/file1.fa.gz ; /path/file2.fa.gz
+```
+
+One sample per subdirectory of `parts/`. If `parts/` is flat (no subdirectories),
+a single sample named after the dataset is used.
 
 ---
 

@@ -8,6 +8,13 @@ theme:
     - navigation.sections
     - navigation.expand
 
+extra_javascript:
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+
 plugins:
   - search
   - mkdocstrings:
@@ -63,3 +70,4 @@ nav:
                   - ncbi: api/unix_ncbi.md
                   - obitools: api/unix_obitools.md
                   - download: api/unix_download.md
+                  - kmindex: api/unix_kmindex.md

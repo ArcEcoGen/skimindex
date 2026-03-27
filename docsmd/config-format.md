@@ -288,8 +288,9 @@ Both the output location and any named input parameters are expressed as
 |------|-------------|
 | `"parts@decontamination"` | `processed_data/decontamination/…/parts/` |
 | `"kmercount@decontamination"` | `processed_data/decontamination/…/kmercount/` |
+| `"kmindex@idx:decontamination"` | `indexes/decontamination/…/kmindex/` (per-dataset sub-index) |
 | `"parts@idx:decontamination"` | `indexes/decontamination/…/parts/` |
-| `"@idx:decontamination"` | `indexes/decontamination/` (meta-index) |
+| `"@idx:decontamination"` | `indexes/decontamination/` (global meta-index) |
 
 The `…` component is the dataset-specific subpath supplied automatically at runtime.
 

@@ -9,6 +9,7 @@ dans l'image Docker.  Tous les outils supportent le piping via l'opérateur `|`.
 | [`unix.ncbi`](unix_ncbi.md) | `datasets`, `dataformat` |
 | [`unix.obitools`](unix_obitools.md) | 37 outils OBITools |
 | [`unix.download`](unix_download.md) | `curl` |
+| [`unix.kmindex`](unix_kmindex.md) | `kmindex` — index et requête k-mers |
 
 ::: skimindex.unix
     options:

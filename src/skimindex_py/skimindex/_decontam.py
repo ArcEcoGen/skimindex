@@ -5,6 +5,7 @@ Usage:
   decontam                        Prepare all decontamination datasets
   decontam prepare [options]      Split reference genomes into fragments
   decontam count [options]        Count k-mers in prepared fragments
+  decontam index [options]        Build kmindex sub-indexes
 
 Run 'decontam <subcommand> --help' for subcommand options.
 """
@@ -20,7 +21,6 @@ def _list_sections() -> str:
 
 
 def _run_pipeline(processing_name: str, sections: list[str] | None, dry_run: bool) -> int:
-    from skimindex.config import config
     from skimindex.datasets import datasets_for_role, get_dataset
     from skimindex.log import logerror, loginfo, logwarning
     from skimindex.processing import build
@@ -28,11 +28,7 @@ def _run_pipeline(processing_name: str, sections: list[str] | None, dry_run: boo
     if sections:
         datasets = [get_dataset(name) for name in sections]
     else:
-        role = config().processing.get(processing_name, {}).get("role")
-        if not role:
-            logerror(f"[processing.{processing_name}] has no 'role' key — cannot determine datasets")
-            return 1
-        datasets = datasets_for_role(role)
+        datasets = datasets_for_role("decontamination")
 
     if not datasets:
         logwarning("No decontamination datasets configured")
@@ -128,6 +124,31 @@ def _(sections, args, dry_run):
 
 
 # ---------------------------------------------------------------------------
+# index subcommand
+# ---------------------------------------------------------------------------
+
+_index_cmd = SkimCommand(
+    name="decontam index",
+    description="Build kmindex sub-indexes from k-mer count histograms",
+    list_fn=_list_sections,
+    examples=[
+        "%(prog)s",
+        "%(prog)s --list",
+        "%(prog)s --dataset human",
+        "%(prog)s --dry-run",
+    ],
+    section_arg="dataset",
+    section_metavar="NAME",
+    section_help="Process a single decontamination dataset (e.g. human, fungi)",
+)
+
+
+@_index_cmd.handler
+def _(sections, args, dry_run):
+    return _run_pipeline("build_index_decontam", sections or None, dry_run)
+
+
+# ---------------------------------------------------------------------------
 # decontam — top-level command with subcommands
 # ---------------------------------------------------------------------------
 
@@ -140,6 +161,7 @@ _decontam_cmd = SkimCommand(
         "%(prog)s --dry-run",
         "%(prog)s prepare --dataset human",
         "%(prog)s count --dataset human",
+        "%(prog)s index --dataset human",
     ],
     section_arg="dataset",
     section_metavar="NAME",
@@ -147,6 +169,7 @@ _decontam_cmd = SkimCommand(
 )
 _decontam_cmd.subcommand("prepare", _prepare_cmd)
 _decontam_cmd.subcommand("count",   _count_cmd)
+_decontam_cmd.subcommand("index",   _index_cmd)
 
 
 @_decontam_cmd.handler
