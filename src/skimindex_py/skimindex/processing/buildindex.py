@@ -21,6 +21,7 @@ where:
 """
 
 import math
+import re
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -116,7 +117,8 @@ def _build_fof(base_dir: Path, fof_path: Path) -> None:
         if not parts_dir.is_dir():
             continue
         rel = parts_dir.parent.relative_to(base_dir)
-        sample_name = "--".join(rel.parts) if rel.parts else base_dir.name
+        raw = "--".join(rel.parts) if rel.parts else base_dir.name
+        sample_name = re.sub(r"[^A-Za-z0-9_-]", "_", raw)
         files = sorted(list_sequence_files(parts_dir, mode="absolute", recursive=False))
         if files:
             files_str = " ; ".join(str(f) for f in files)
@@ -163,6 +165,7 @@ def buildindex(params: dict) -> Callable[[Data, Path, bool], Data]:
     if bloom_size is not None:
         bloom_size = int(bloom_size)
     threads = int(params.get("threads", 1))
+    verbose = params.get("verbose")
 
     def run(input_data: Data, output_dir: Path, dry_run: bool = False) -> Data:
         from skimindex.sources import resolve_artifact
@@ -190,7 +193,6 @@ def buildindex(params: dict) -> Callable[[Data, Path, bool], Data]:
             input_data.subdir.parts[0] if input_data.subdir else output_dir.parent.name
         )
 
-        global_index.mkdir(parents=True, exist_ok=True)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         if not dry_run:
@@ -202,11 +204,12 @@ def buildindex(params: dict) -> Callable[[Data, Path, bool], Data]:
             kmindex_build(
                 index=global_index,
                 fof=fof_file,
-                run_dir=register_as,
+                run_dir=sub_index_dir,
                 register_as=register_as,
                 kmer_size=kmer_size,
-                nb_cell=effective_bloom_size,
+                bloom_size=effective_bloom_size,
                 threads=threads,
+                verbose=verbose,
             )()
 
         return directory_data(output_dir, subdir=input_data.subdir)

@@ -133,6 +133,7 @@ kmer_size = 29
 zvalue    = 3      # k-mers required for a positive query result
 fpr       = 1e-3   # target false positive rate
 threads   = 10
+verbose   = "debug"
 
 # -----------------------------------------------------------------------------
 # Data sections

@@ -114,16 +114,16 @@ def kmindex_build(
     Returns:
         A plumbum ``BoundCommand`` ready to execute.
     """
-    args: list[str] = ["build", "-i", str(index), "-f", str(fof),
-                        "-d", str(run_dir), "-r", register_as]
+    args: list[str] = ["build", "--index", str(index), "--fof", str(fof),
+                        "--run-dir", str(run_dir), "--register-as", register_as]
     if from_index is not None:
         args += ["--from", from_index]
     if km_path is not None:
         args += ["--km-path", str(km_path)]
     if kmer_size is not None:
-        args += ["-k", str(kmer_size)]
+        args += ["--kmer-size", str(kmer_size)]
     if minim_size is not None:
-        args += ["-m", str(minim_size)]
+        args += ["--minim-size", str(minim_size)]
     if hard_min is not None:
         args += ["--hard-min", str(hard_min)]
     if nb_partitions is not None:
@@ -135,11 +135,11 @@ def kmindex_build(
     if bitw is not None:
         args += ["--bitw", str(bitw)]
     if threads is not None:
-        args += ["-t", str(threads)]
+        args += ["--threads", str(threads)]
     if cpr:
         args += ["--cpr"]
     if verbose is not None:
-        args += ["-v", verbose]
+        args += ["--verbose", verbose]
     return kmindex(*args)
 
 
