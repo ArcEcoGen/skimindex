@@ -27,7 +27,7 @@ echo "OK"
 echo ""
 echo "=== Construction des outils llm-functions ==="
 if [[ -f "$CLAUDE_DIR/llm-functions/Argcfile.sh" ]]; then
-    argc build --arcgfile "$CLAUDE_DIR/llm-functions/Argcfile.sh"
+    (cd "$CLAUDE_DIR/llm-functions" && argc build)
     echo "OK"
 else
     echo "WARN : llm-functions non trouvé — lance d'abord :"
