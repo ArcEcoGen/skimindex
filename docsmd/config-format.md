@@ -288,9 +288,8 @@ Both the output location and any named input parameters are expressed as
 |------|-------------|
 | `"parts@decontamination"` | `processed_data/decontamination/…/parts/` |
 | `"kmercount@decontamination"` | `processed_data/decontamination/…/kmercount/` |
-| `"kmindex@idx:decontamination"` | `indexes/decontamination/…/kmindex/` (per-dataset sub-index) |
-| `"parts@idx:decontamination"` | `indexes/decontamination/…/parts/` |
-| `"@idx:decontamination"` | `indexes/decontamination/` (global meta-index) |
+| `"kmindex@decontamination"` | `processed_data/decontamination/…/kmindex/` (stamp target + FOF) |
+| `"@idx:decontamination"` | `indexes/decontamination/` (global meta-index, no dataset subpath) |
 
 The `…` component is the dataset-specific subpath supplied automatically at runtime.
 
@@ -331,6 +330,48 @@ steps = [
   {type = "filter_n_only"},
   {type = "distribute",    batches = 20},
 ]
+```
+
+### `type = "buildindex"` — Build a kmindex sub-index
+
+Builds a kmindex presence/absence Bloom filter sub-index for a dataset and
+registers it in a global meta-index. Called **once per dataset** via
+`ds.to_index_data()`.
+
+The `output` artifact reference points to
+`processed_data/…/kmindex/` (stamp target and FOF location). The `index`
+parameter is a separate artifact reference for the global kmindex meta-index
+managed by kmindex itself.
+
+FOF generation scans `parts/` subdirectories recursively — one sample per
+assembly subdirectory. Sample names are sanitized with
+`re.sub(r"[^A-Za-z0-9_-]", "_", "--".join(rel.parts))`. The FOF file is named
+`{register_as}.fof` where `register_as` is the first component of the
+dataset's subdir path (e.g. `"Human"`, `"Plants"`).
+
+| Parameter    | Type    | Required | Description |
+|--------------|---------|----------|-------------|
+| `output`     | string  | yes      | Artifact ref for stamp target + FOF location: `"kmindex@decontamination"` → `processed_data/decontamination/{dataset}/kmindex/` |
+| `index`      | string  | yes      | Artifact ref for the global kmindex meta-index: `"@idx:decontamination"` → `indexes/decontamination/` |
+| `kmer_size`  | integer | yes      | K-mer length (must match `count_kmers_decontam`) |
+| `zvalue`     | integer | yes      | Number of consecutive k-mer hits required for a positive match |
+| `fpr`        | float   | yes      | Target false positive rate (e.g. `1e-3`) |
+| `bloom_size` | integer | no       | Bloom filter size in cells. Computed automatically from max F1 across samples if absent |
+| `hard_min`   | integer | no       | Minimum k-mer count to include (default: `1` — every k-mer counts for reference sequences) |
+| `threads`    | integer | no       | Number of threads (default: 1) |
+| `verbose`    | string  | no       | Verbosity level passed to kmindex (e.g. `"debug"`) |
+
+```toml
+[processing.build_index_decontam]
+type      = "buildindex"
+output    = "kmindex@decontamination"     # → processed_data/decontamination/{dataset}/kmindex/
+index     = "@idx:decontamination"        # → indexes/decontamination/  (kmindex meta-index)
+kmer_size = 29
+zvalue    = 3
+fpr       = 1e-3
+hard_min  = 1
+threads   = 10
+verbose   = "debug"
 ```
 
 ---

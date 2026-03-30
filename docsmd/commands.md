@@ -123,24 +123,47 @@ Output: `processed_data/decontamination/{dataset}/kmercount/`
 ### `decontam index`
 
 Builds a kmindex Bloom filter sub-index for each decontamination dataset and
-registers it in the global meta-index at `indexes/decontamination/`.
+registers it in the global meta-index at `indexes/decontamination/`. Called
+**once per dataset** (not once per assembly).
+
+**FOF generation**
+
+Before calling `kmindex build`, a kmtricks file-of-files (FOF) is generated
+automatically:
+
+- The `parts/` directory of the dataset is scanned recursively for assembly subdirectories.
+- One sample is created per assembly subdirectory of `parts/`.
+- Sample names are derived from the relative path of the subdirectory: `re.sub(r"[^A-Za-z0-9_-]", "_", "--".join(rel.parts))`.
+- `register_as` = first component of the dataset's subdir path (e.g. `"Human"`, `"Plants"`).
+- The FOF file is named `{register_as}.fof` and stored in `processed_data/decontamination/{dataset}/kmindex/`.
+
+FOF example for Plants (62 assemblies, one sample per assembly):
+
+```
+Spermatophyta--GCF_000001735_4 : /path/parts/Spermatophyta/GCF_000001735.4/file1.fa.gz ; /path/parts/Spermatophyta/GCF_000001735.4/file2.fa.gz
+Spermatophyta--GCF_000002775_5 : /path/parts/Spermatophyta/GCF_000002775.5/file1.fa.gz
+...
+```
 
 **Bloom filter sizing**
 
-kmindex uses a single-hash Bloom filter. For a query requiring $z$ consecutive
-k-mer hits to call a positive match, the false positive probability is:
+kmindex uses a single-hash presence/absence Bloom filter (`--bloom-size` flag).
+For a query requiring $z$ consecutive k-mer hits to call a positive match, the
+false positive probability is:
 
 $$P_{fpr} = \left(\frac{n}{n + m}\right)^z$$
 
-where $n$ is the number of k-mers inserted into the filter (taken from the **F1**
-line of the ntcard histogram) and $m$ is the number of cells in the filter
-(`bloom_size`). Inverting for $m$:
+where $n$ is the number of k-mers inserted into the filter (taken from the
+**maximum F1** across all samples in the ntcard histograms — not the sum) and
+$m$ is the number of cells in the filter (`bloom_size`). Inverting for $m$:
 
 $$m = \left\lceil n \cdot \left(p^{-1/z} - 1\right) \right\rceil$$
 
 The `bloom_size` value is computed automatically from the ntcard histograms
 produced by `decontam count`, using the `fpr` and `zvalue` parameters declared
 in `[processing.build_index_decontam]` (defaults: $p = 10^{-3}$, $z = 3$).
+`hard_min = 1` is used because reference sequences are not sequencing data —
+every k-mer occurrence counts.
 
 **Index structure**
 
@@ -148,22 +171,15 @@ Each dataset produces a sub-index registered by name in the global meta-index:
 
 ```
 indexes/decontamination/
-├── Human/
-│   └── kmindex/      ← per-dataset sub-index (stamp target)
+├── Human/       ← sub-index run dir (created by kmindex)
 ├── Fungi/
-│   └── kmindex/
-└── Bacteria/
-    └── kmindex/
+├── Bacteria/
+└── Plants/
 ```
 
 The root `indexes/decontamination/` is the meta-index consumed by
-`kmindex query` or `kmindex query2` at decontamination time.
-
-**FOF generation**
-
-Before calling `kmindex build`, a kmtricks file-of-files (FOF) is generated
-automatically. Each subdirectory of `parts/` becomes one named sample; if
-`parts/` is flat, the whole dataset is treated as a single sample.
+`kmindex query` or `kmindex query2` at decontamination time. The stamp for each
+dataset is written to `processed_data/decontamination/{dataset}/kmindex/`.
 
 | Option | Description |
 |--------|-------------|

@@ -2049,34 +2049,48 @@ The histogram includes two aggregate statistics used by the next step:</p>
 </table>
 <h3 id="decontam-index"><code>decontam index</code></h3>
 <p>Builds a kmindex Bloom filter sub-index for each decontamination dataset and
-registers it in the global meta-index at <code>indexes/decontamination/</code>.</p>
+registers it in the global meta-index at <code>indexes/decontamination/</code>. Called
+<strong>once per dataset</strong> (not once per assembly).</p>
+<p><strong>FOF generation</strong></p>
+<p>Before calling <code>kmindex build</code>, a kmtricks file-of-files (FOF) is generated
+automatically:</p>
+<ul>
+<li>The <code>parts/</code> directory of the dataset is scanned recursively for assembly subdirectories.</li>
+<li>One sample is created per assembly subdirectory of <code>parts/</code>.</li>
+<li>Sample names are derived from the relative path of the subdirectory: <code>re.sub(r"[^A-Za-z0-9_-]", "_", "--".join(rel.parts))</code>.</li>
+<li><code>register_as</code> = first component of the dataset's subdir path (e.g. <code>"Human"</code>, <code>"Plants"</code>).</li>
+<li>The FOF file is named <code>{register_as}.fof</code> and stored in <code>processed_data/decontamination/{dataset}/kmindex/</code>.</li>
+</ul>
+<p>FOF example for Plants (62 assemblies, one sample per assembly):</p>
+<pre><code>Spermatophyta--GCF_000001735_4 : /path/parts/Spermatophyta/GCF_000001735.4/file1.fa.gz ; /path/parts/Spermatophyta/GCF_000001735.4/file2.fa.gz
+Spermatophyta--GCF_000002775_5 : /path/parts/Spermatophyta/GCF_000002775.5/file1.fa.gz
+...
+</code></pre>
 <p><strong>Bloom filter sizing</strong></p>
-<p>kmindex uses a single-hash Bloom filter. For a query requiring <span class="arithmatex">\(z\)</span> consecutive
-k-mer hits to call a positive match, the false positive probability is:</p>
+<p>kmindex uses a single-hash presence/absence Bloom filter (<code>--bloom-size</code> flag).
+For a query requiring <span class="arithmatex">\(z\)</span> consecutive k-mer hits to call a positive match, the
+false positive probability is:</p>
 <div class="arithmatex">\[P_{fpr} = \left(\frac{n}{n + m}\right)^z\]</div>
-<p>where <span class="arithmatex">\(n\)</span> is the number of k-mers inserted into the filter (taken from the <strong>F1</strong>
-line of the ntcard histogram) and <span class="arithmatex">\(m\)</span> is the number of cells in the filter
-(<code>bloom_size</code>). Inverting for <span class="arithmatex">\(m\)</span>:</p>
+<p>where <span class="arithmatex">\(n\)</span> is the number of k-mers inserted into the filter (taken from the
+<strong>maximum F1</strong> across all samples in the ntcard histograms — not the sum) and
+<span class="arithmatex">\(m\)</span> is the number of cells in the filter (<code>bloom_size</code>). Inverting for <span class="arithmatex">\(m\)</span>:</p>
 <div class="arithmatex">\[m = \left\lceil n \cdot \left(p^{-1/z} - 1\right) \right\rceil\]</div>
 <p>The <code>bloom_size</code> value is computed automatically from the ntcard histograms
 produced by <code>decontam count</code>, using the <code>fpr</code> and <code>zvalue</code> parameters declared
-in <code>[processing.build_index_decontam]</code> (defaults: <span class="arithmatex">\(p = 10^{-3}\)</span>, <span class="arithmatex">\(z = 3\)</span>).</p>
+in <code>[processing.build_index_decontam]</code> (defaults: <span class="arithmatex">\(p = 10^{-3}\)</span>, <span class="arithmatex">\(z = 3\)</span>).
+<code>hard_min = 1</code> is used because reference sequences are not sequencing data —
+every k-mer occurrence counts.</p>
 <p><strong>Index structure</strong></p>
 <p>Each dataset produces a sub-index registered by name in the global meta-index:</p>
 <pre><code>indexes/decontamination/
-├── Human/
-│   └── kmindex/      ← per-dataset sub-index (stamp target)
+├── Human/       ← sub-index run dir (created by kmindex)
 ├── Fungi/
-│   └── kmindex/
-└── Bacteria/
-    └── kmindex/
+├── Bacteria/
+└── Plants/
 </code></pre>
 <p>The root <code>indexes/decontamination/</code> is the meta-index consumed by
-<code>kmindex query</code> or <code>kmindex query2</code> at decontamination time.</p>
-<p><strong>FOF generation</strong></p>
-<p>Before calling <code>kmindex build</code>, a kmtricks file-of-files (FOF) is generated
-automatically. Each subdirectory of <code>parts/</code> becomes one named sample; if
-<code>parts/</code> is flat, the whole dataset is treated as a single sample.</p>
+<code>kmindex query</code> or <code>kmindex query2</code> at decontamination time. The stamp for each
+dataset is written to <code>processed_data/decontamination/{dataset}/kmindex/</code>.</p>
 <table>
 <thead>
 <tr>

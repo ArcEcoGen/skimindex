@@ -164,8 +164,9 @@ def buildindex(params: dict) -> Callable[[Data, Path, bool], Data]:
     bloom_size = params.get("bloom_size")
     if bloom_size is not None:
         bloom_size = int(bloom_size)
-    threads = int(params.get("threads", 1))
-    verbose = params.get("verbose")
+    hard_min = int(params.get("hard_min", 1))
+    threads  = int(params.get("threads", 1))
+    verbose  = params.get("verbose")
 
     def run(input_data: Data, output_dir: Path, dry_run: bool = False) -> Data:
         from skimindex.sources import resolve_artifact
@@ -208,6 +209,7 @@ def buildindex(params: dict) -> Callable[[Data, Path, bool], Data]:
                 register_as=register_as,
                 kmer_size=kmer_size,
                 bloom_size=effective_bloom_size,
+                hard_min=hard_min,
                 threads=threads,
                 verbose=verbose,
             )()

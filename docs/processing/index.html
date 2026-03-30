@@ -2478,12 +2478,12 @@ threads   = 10
 # Atomic: build kmindex sub-index for one decontamination dataset
 [processing.build_index_decontam]
 type      = &quot;buildindex&quot;
-output    = &quot;kmindex@idx:decontamination&quot; # → indexes/decontamination/{dataset}/kmindex/
-sequence  = &quot;parts@decontamination&quot;
-histogram = &quot;kmercount@decontamination&quot;
+output    = &quot;kmindex@decontamination&quot;  # → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
+index     = &quot;@idx:decontamination&quot;     # → indexes/decontamination/  (kmindex meta-index, managed by kmindex)
 kmer_size = 29
 zvalue    = 3
 fpr       = 1e-3
+hard_min  = 1     # reference sequences are not sequencing data — every k-mer occurrence counts
 threads   = 10
 
 # Role referencing the preparation pipeline
@@ -2491,12 +2491,12 @@ threads   = 10
 directory = &quot;decontamination&quot;
 run       = &quot;prepare_decontam&quot;
 </code></pre>
-<p>The resulting chain:</p>
-<pre><code>dataset.to_data()
-    → prepare_decontam          → processed_data/decontamination/…/parts/
-    → count_kmers_decontam      → processed_data/decontamination/…/kmercount/
-    → build_index_decontam      → indexes/decontamination/{dataset}/kmindex/
-                                   indexes/decontamination/  (global meta-index)
+<p>The resulting chain (<code>build_index_decontam</code> is called once per dataset):</p>
+<pre><code>dataset.to_index_data()
+    → prepare_decontam          → processed_data/decontamination/{dataset}/parts/
+    → count_kmers_decontam      → processed_data/decontamination/{dataset}/kmercount/
+    → build_index_decontam      → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
+                                   indexes/decontamination/  (global meta-index, managed by kmindex)
 </code></pre>
 <hr />
 <h2 id="decontamination-index-pipeline">Decontamination index pipeline</h2>
@@ -2505,12 +2505,11 @@ kmindex meta-index used to filter contaminant k-mers from sequencing reads.
 It runs <strong>per dataset</strong> — each <code>[data.X]</code> section with <code>role = "decontamination"</code>
 produces one registered sub-index.</p>
 <h3 id="pipeline-steps">Pipeline steps</h3>
-<pre><code>[data.human / fungi / bacteria / plants]
-  ↓ download
-  ↓ prepare_decontam        → processed_data/decontamination/{dataset}/parts/
-  ↓ count_kmers_decontam    → processed_data/decontamination/{dataset}/kmercount/
-  ↓ build_index_decontam    → indexes/decontamination/{dataset}/kmindex/
-                               indexes/decontamination/        (global meta-index)
+<pre><code>dataset.to_index_data()
+    → prepare_decontam          → processed_data/decontamination/{dataset}/parts/
+    → count_kmers_decontam      → processed_data/decontamination/{dataset}/kmercount/
+    → build_index_decontam      → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
+                                   indexes/decontamination/  (global meta-index, managed by kmindex)
 </code></pre>
 <p>Each step is stamped independently. A dataset whose <code>parts/</code> directory is already
 stamped will skip <code>prepare_decontam</code> on re-run.</p>
@@ -2553,7 +2552,9 @@ P_{fpr} = \left(\frac{n}{n + m}\right)^z
 m = \left\lceil n \cdot \left(p^{-1/z} - 1\right) \right\rceil
 \]</div>
 <p>When <code>bloom_size</code> is omitted from the config, it is computed automatically from
-the ntcard histograms produced by <code>count_kmers_decontam</code>.</p>
+the ntcard histograms produced by <code>count_kmers_decontam</code>, using the <strong>maximum F1</strong>
+across all samples (not the sum — since a presence/absence filter only needs to
+represent the largest single sample).</p>
 <p><strong>Example</strong> — <span class="arithmatex">\(n = 10^9\)</span>, <span class="arithmatex">\(z = 3\)</span>, <span class="arithmatex">\(p = 10^{-3}\)</span>:</p>
 <div class="arithmatex">\[
 m = \left\lceil 10^9 \cdot \left(10^{-3/(-1/3)} - 1\right) \right\rceil
@@ -2562,25 +2563,36 @@ m = \left\lceil 10^9 \cdot \left(10^{-3/(-1/3)} - 1\right) \right\rceil
 \]</div>
 <h3 id="global-meta-index-layout">Global meta-index layout</h3>
 <p>All per-dataset sub-indexes are registered in the same global meta-index at
-<code>indexes/decontamination/</code>. The <code>output</code> reference <code>"kmindex@idx:decontamination"</code>
-includes a <code>dir</code> component so that each dataset gets its own per-dataset stamp path:</p>
+<code>indexes/decontamination/</code>. The <code>output</code> reference <code>"kmindex@decontamination"</code>
+resolves to <code>processed_data/decontamination/{dataset}/kmindex/</code> (stamp target and
+FOF location). The <code>index</code> parameter <code>"@idx:decontamination"</code> resolves to
+<code>indexes/decontamination/</code>, the global meta-index managed by kmindex.</p>
 <pre><code>indexes/decontamination/
-├── Human/
-│   └── kmindex/      ← stamp target for the Human sub-index
+├── Human/       ← sub-index run dir (created by kmindex)
 ├── Fungi/
-│   └── kmindex/
-└── Bacteria/
-    └── kmindex/
+├── Bacteria/
+└── Plants/
 </code></pre>
 <p>The root <code>indexes/decontamination/</code> is the global meta-index consumed by
 <code>kmindex query</code> or <code>kmindex query2</code>.</p>
 <h3 id="fof-generation">FOF generation</h3>
 <p>Before calling <code>kmindex build</code>, <code>buildindex</code> generates a kmtricks
 <strong>file-of-files</strong> (FOF):</p>
-<pre><code>sample_name : /path/file1.fa.gz ; /path/file2.fa.gz
+<ul>
+<li>The <code>parts/</code> directory of the dataset is scanned recursively for assembly subdirectories.</li>
+<li>One sample is created per subdirectory of <code>parts/</code>.</li>
+<li>Sample names are derived from the relative path: <code>re.sub(r"[^A-Za-z0-9_-]", "_", "--".join(rel.parts))</code>.</li>
+<li><code>register_as</code> = first component of the dataset's subdir path (e.g. <code>"Human"</code>, <code>"Plants"</code>).</li>
+<li>The FOF file is named <code>{register_as}.fof</code> and stored in <code>output_dir</code> (<code>processed_data/decontamination/{dataset}/kmindex/</code>).</li>
+</ul>
+<p>FOF example for Plants (62 assemblies, one sample per assembly subdirectory):</p>
+<pre><code>Spermatophyta--GCF_000001735_4 : /path/parts/Spermatophyta/GCF_000001735.4/file1.fa.gz ; /path/parts/Spermatophyta/GCF_000001735.4/file2.fa.gz
+Spermatophyta--GCF_000002775_5 : /path/parts/Spermatophyta/GCF_000002775.5/file1.fa.gz
+...
 </code></pre>
-<p>One sample per subdirectory of <code>parts/</code>. If <code>parts/</code> is flat (no subdirectories),
-a single sample named after the dataset is used.</p>
+<p>FOF example for Human (1 assembly):</p>
+<pre><code>Homo_sapiens--GCF_000001405_40 : /path/parts/Homo_sapiens/GCF_000001405.40/file1.fa.gz ; /path/parts/Homo_sapiens/GCF_000001405.40/file2.fa.gz ; ...
+</code></pre>
 <hr />
 <h2 id="data-model">Data model</h2>
 <p>Data flowing between processing steps is represented as a <code>Data</code> object.

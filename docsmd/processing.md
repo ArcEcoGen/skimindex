@@ -212,12 +212,12 @@ threads   = 10
 # Atomic: build kmindex sub-index for one decontamination dataset
 [processing.build_index_decontam]
 type      = "buildindex"
-output    = "kmindex@idx:decontamination" # → indexes/decontamination/{dataset}/kmindex/
-sequence  = "parts@decontamination"
-histogram = "kmercount@decontamination"
+output    = "kmindex@decontamination"  # → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
+index     = "@idx:decontamination"     # → indexes/decontamination/  (kmindex meta-index, managed by kmindex)
 kmer_size = 29
 zvalue    = 3
 fpr       = 1e-3
+hard_min  = 1     # reference sequences are not sequencing data — every k-mer occurrence counts
 threads   = 10
 
 # Role referencing the preparation pipeline
@@ -226,14 +226,14 @@ directory = "decontamination"
 run       = "prepare_decontam"
 ```
 
-The resulting chain:
+The resulting chain (`build_index_decontam` is called once per dataset):
 
 ```
-dataset.to_data()
-    → prepare_decontam          → processed_data/decontamination/…/parts/
-    → count_kmers_decontam      → processed_data/decontamination/…/kmercount/
-    → build_index_decontam      → indexes/decontamination/{dataset}/kmindex/
-                                   indexes/decontamination/  (global meta-index)
+dataset.to_index_data()
+    → prepare_decontam          → processed_data/decontamination/{dataset}/parts/
+    → count_kmers_decontam      → processed_data/decontamination/{dataset}/kmercount/
+    → build_index_decontam      → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
+                                   indexes/decontamination/  (global meta-index, managed by kmindex)
 ```
 
 ---
@@ -248,12 +248,11 @@ produces one registered sub-index.
 ### Pipeline steps
 
 ```
-[data.human / fungi / bacteria / plants]
-  ↓ download
-  ↓ prepare_decontam        → processed_data/decontamination/{dataset}/parts/
-  ↓ count_kmers_decontam    → processed_data/decontamination/{dataset}/kmercount/
-  ↓ build_index_decontam    → indexes/decontamination/{dataset}/kmindex/
-                               indexes/decontamination/        (global meta-index)
+dataset.to_index_data()
+    → prepare_decontam          → processed_data/decontamination/{dataset}/parts/
+    → count_kmers_decontam      → processed_data/decontamination/{dataset}/kmercount/
+    → build_index_decontam      → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
+                                   indexes/decontamination/  (global meta-index, managed by kmindex)
 ```
 
 Each step is stamped independently. A dataset whose `parts/` directory is already
@@ -286,7 +285,9 @@ m = \left\lceil n \cdot \left(p^{-1/z} - 1\right) \right\rceil
 $$
 
 When `bloom_size` is omitted from the config, it is computed automatically from
-the ntcard histograms produced by `count_kmers_decontam`.
+the ntcard histograms produced by `count_kmers_decontam`, using the **maximum F1**
+across all samples (not the sum — since a presence/absence filter only needs to
+represent the largest single sample).
 
 **Example** — $n = 10^9$, $z = 3$, $p = 10^{-3}$:
 
@@ -299,17 +300,17 @@ $$
 ### Global meta-index layout
 
 All per-dataset sub-indexes are registered in the same global meta-index at
-`indexes/decontamination/`. The `output` reference `"kmindex@idx:decontamination"`
-includes a `dir` component so that each dataset gets its own per-dataset stamp path:
+`indexes/decontamination/`. The `output` reference `"kmindex@decontamination"`
+resolves to `processed_data/decontamination/{dataset}/kmindex/` (stamp target and
+FOF location). The `index` parameter `"@idx:decontamination"` resolves to
+`indexes/decontamination/`, the global meta-index managed by kmindex.
 
 ```
 indexes/decontamination/
-├── Human/
-│   └── kmindex/      ← stamp target for the Human sub-index
+├── Human/       ← sub-index run dir (created by kmindex)
 ├── Fungi/
-│   └── kmindex/
-└── Bacteria/
-    └── kmindex/
+├── Bacteria/
+└── Plants/
 ```
 
 The root `indexes/decontamination/` is the global meta-index consumed by
@@ -320,12 +321,25 @@ The root `indexes/decontamination/` is the global meta-index consumed by
 Before calling `kmindex build`, `buildindex` generates a kmtricks
 **file-of-files** (FOF):
 
+- The `parts/` directory of the dataset is scanned recursively for assembly subdirectories.
+- One sample is created per subdirectory of `parts/`.
+- Sample names are derived from the relative path: `re.sub(r"[^A-Za-z0-9_-]", "_", "--".join(rel.parts))`.
+- `register_as` = first component of the dataset's subdir path (e.g. `"Human"`, `"Plants"`).
+- The FOF file is named `{register_as}.fof` and stored in `output_dir` (`processed_data/decontamination/{dataset}/kmindex/`).
+
+FOF example for Plants (62 assemblies, one sample per assembly subdirectory):
+
 ```
-sample_name : /path/file1.fa.gz ; /path/file2.fa.gz
+Spermatophyta--GCF_000001735_4 : /path/parts/Spermatophyta/GCF_000001735.4/file1.fa.gz ; /path/parts/Spermatophyta/GCF_000001735.4/file2.fa.gz
+Spermatophyta--GCF_000002775_5 : /path/parts/Spermatophyta/GCF_000002775.5/file1.fa.gz
+...
 ```
 
-One sample per subdirectory of `parts/`. If `parts/` is flat (no subdirectories),
-a single sample named after the dataset is used.
+FOF example for Human (1 assembly):
+
+```
+Homo_sapiens--GCF_000001405_40 : /path/parts/Homo_sapiens/GCF_000001405.40/file1.fa.gz ; /path/parts/Homo_sapiens/GCF_000001405.40/file2.fa.gz ; ...
+```
 
 ---
 

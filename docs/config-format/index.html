@@ -616,6 +616,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#type-buildindex-build-a-kmindex-sub-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        type = "buildindex" — Build a kmindex sub-index
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2290,6 +2301,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#type-buildindex-build-a-kmindex-sub-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        type = "buildindex" — Build a kmindex sub-index
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2957,16 +2979,12 @@ specification including persistence rules and worked examples.</p>
 <td><code>processed_data/decontamination/…/kmercount/</code></td>
 </tr>
 <tr>
-<td><code>"kmindex@idx:decontamination"</code></td>
-<td><code>indexes/decontamination/…/kmindex/</code> (per-dataset sub-index)</td>
-</tr>
-<tr>
-<td><code>"parts@idx:decontamination"</code></td>
-<td><code>indexes/decontamination/…/parts/</code></td>
+<td><code>"kmindex@decontamination"</code></td>
+<td><code>processed_data/decontamination/…/kmindex/</code> (stamp target + FOF)</td>
 </tr>
 <tr>
 <td><code>"@idx:decontamination"</code></td>
-<td><code>indexes/decontamination/</code> (global meta-index)</td>
+<td><code>indexes/decontamination/</code> (global meta-index, no dataset subpath)</td>
 </tr>
 </tbody>
 </table>
@@ -3044,6 +3062,96 @@ steps = [
   {type = &quot;filter_n_only&quot;},
   {type = &quot;distribute&quot;,    batches = 20},
 ]
+</code></pre>
+<h3 id="type-buildindex-build-a-kmindex-sub-index"><code>type = "buildindex"</code> — Build a kmindex sub-index</h3>
+<p>Builds a kmindex presence/absence Bloom filter sub-index for a dataset and
+registers it in a global meta-index. Called <strong>once per dataset</strong> via
+<code>ds.to_index_data()</code>.</p>
+<p>The <code>output</code> artifact reference points to
+<code>processed_data/…/kmindex/</code> (stamp target and FOF location). The <code>index</code>
+parameter is a separate artifact reference for the global kmindex meta-index
+managed by kmindex itself.</p>
+<p>FOF generation scans <code>parts/</code> subdirectories recursively — one sample per
+assembly subdirectory. Sample names are sanitized with
+<code>re.sub(r"[^A-Za-z0-9_-]", "_", "--".join(rel.parts))</code>. The FOF file is named
+<code>{register_as}.fof</code> where <code>register_as</code> is the first component of the
+dataset's subdir path (e.g. <code>"Human"</code>, <code>"Plants"</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>output</code></td>
+<td>string</td>
+<td>yes</td>
+<td>Artifact ref for stamp target + FOF location: <code>"kmindex@decontamination"</code> → <code>processed_data/decontamination/{dataset}/kmindex/</code></td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td>string</td>
+<td>yes</td>
+<td>Artifact ref for the global kmindex meta-index: <code>"@idx:decontamination"</code> → <code>indexes/decontamination/</code></td>
+</tr>
+<tr>
+<td><code>kmer_size</code></td>
+<td>integer</td>
+<td>yes</td>
+<td>K-mer length (must match <code>count_kmers_decontam</code>)</td>
+</tr>
+<tr>
+<td><code>zvalue</code></td>
+<td>integer</td>
+<td>yes</td>
+<td>Number of consecutive k-mer hits required for a positive match</td>
+</tr>
+<tr>
+<td><code>fpr</code></td>
+<td>float</td>
+<td>yes</td>
+<td>Target false positive rate (e.g. <code>1e-3</code>)</td>
+</tr>
+<tr>
+<td><code>bloom_size</code></td>
+<td>integer</td>
+<td>no</td>
+<td>Bloom filter size in cells. Computed automatically from max F1 across samples if absent</td>
+</tr>
+<tr>
+<td><code>hard_min</code></td>
+<td>integer</td>
+<td>no</td>
+<td>Minimum k-mer count to include (default: <code>1</code> — every k-mer counts for reference sequences)</td>
+</tr>
+<tr>
+<td><code>threads</code></td>
+<td>integer</td>
+<td>no</td>
+<td>Number of threads (default: 1)</td>
+</tr>
+<tr>
+<td><code>verbose</code></td>
+<td>string</td>
+<td>no</td>
+<td>Verbosity level passed to kmindex (e.g. <code>"debug"</code>)</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[processing.build_index_decontam]
+type      = &quot;buildindex&quot;
+output    = &quot;kmindex@decontamination&quot;     # → processed_data/decontamination/{dataset}/kmindex/
+index     = &quot;@idx:decontamination&quot;        # → indexes/decontamination/  (kmindex meta-index)
+kmer_size = 29
+zvalue    = 3
+fpr       = 1e-3
+hard_min  = 1
+threads   = 10
+verbose   = &quot;debug&quot;
 </code></pre>
 <hr />
 <h2 id="data-sections">Data Sections</h2>
