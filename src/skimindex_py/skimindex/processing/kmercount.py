@@ -28,6 +28,8 @@ def kmercount(params: dict) -> Callable[[Data, Path, bool], Data]:
     sequence_ref = params.get("sequence")
 
     def run(input_data: Data, output_dir: Path, dry_run: bool = False) -> Data:
+        per_part = not input_data.per_species
+
         if sequence_ref is not None:
             from skimindex.sources import resolve_artifact
             seq_path    = resolve_artifact(sequence_ref, input_data.subdir)
@@ -44,18 +46,25 @@ def kmercount(params: dict) -> Callable[[Data, Path, bool], Data]:
         if not input_files:
             raise FileNotFoundError(f"No sequence files found in kmercount input")
 
-        # Prefix = last meaningful path component (accession, division, ...)
-        prefix = input_data.subdir.name if input_data.subdir else "kmers"
-
         output_dir.mkdir(parents=True, exist_ok=True)
 
         if not dry_run:
-            ntcard_count(
-                kmer=kmer_size,
-                threads=threads,
-                prefix=output_dir / prefix,
-                files=input_files,
-            )()
+            if per_part:
+                for f in sorted(input_files):
+                    ntcard_count(
+                        kmer=kmer_size,
+                        threads=threads,
+                        prefix=output_dir / f.name.split(".")[0],
+                        files=[f],
+                    )()
+            else:
+                prefix = input_data.subdir.name if input_data.subdir else "kmers"
+                ntcard_count(
+                    kmer=kmer_size,
+                    threads=threads,
+                    prefix=output_dir / prefix,
+                    files=input_files,
+                )()
 
         return directory_data(output_dir, subdir=input_data.subdir)
 

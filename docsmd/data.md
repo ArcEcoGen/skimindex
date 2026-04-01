@@ -104,6 +104,16 @@ data root up to (but not including) the processing output directory. This
 encodes the full dataset/species/accession context so that the pipeline can
 compute output paths without additional parameters.
 
+Each `Data` object also carries a `per_species: bool` flag (default `True`).
+When `False`, processing steps switch to **per-part** mode: k-mer counting and
+index building operate on individual fragment files rather than the whole
+`parts/` directory at once. This flag is set automatically by the dataset source:
+
+| Source | `per_species` | Indexing mode |
+|--------|--------------|---------------|
+| `ncbi` | `True` | one sample per assembly (`parts/` dir) |
+| `genbank` (`by_species = false`) | `False` | one sample per part file (`frg_N`) |
+
 ### Listing and filtering datasets
 
 ```python

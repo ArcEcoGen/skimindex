@@ -2061,6 +2061,31 @@ pipeline. The exact number and kind depends on the source:</p>
 data root up to (but not including) the processing output directory. This
 encodes the full dataset/species/accession context so that the pipeline can
 compute output paths without additional parameters.</p>
+<p>Each <code>Data</code> object also carries a <code>per_species: bool</code> flag (default <code>True</code>).
+When <code>False</code>, processing steps switch to <strong>per-part</strong> mode: k-mer counting and
+index building operate on individual fragment files rather than the whole
+<code>parts/</code> directory at once. This flag is set automatically by the dataset source:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th><code>per_species</code></th>
+<th>Indexing mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ncbi</code></td>
+<td><code>True</code></td>
+<td>one sample per assembly (<code>parts/</code> dir)</td>
+</tr>
+<tr>
+<td><code>genbank</code> (<code>by_species = false</code>)</td>
+<td><code>False</code></td>
+<td>one sample per part file (<code>frg_N</code>)</td>
+</tr>
+</tbody>
+</table>
 <h3 id="listing-and-filtering-datasets">Listing and filtering datasets</h3>
 <pre><code class="language-python">from skimindex.datasets import datasets_for_role, get_dataset, all_datasets
 

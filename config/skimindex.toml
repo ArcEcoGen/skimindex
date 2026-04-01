@@ -113,7 +113,7 @@ output = "parts@decontamination"   # → processed_data/decontamination/{dataset
 steps = [
   {type = "split",         size = 200, overlap = 28},  # obiscript → STDOUT
   {type = "filter_n_only"},                             # obigrep   → STDOUT
-  {type = "distribute",    batches = 20},               # obidistribute → parts/
+  {type = "distribute",    batches = 24},               # obidistribute → parts/
 ]
 
 # Atomic: count k-mers in prepared decontamination fragments.

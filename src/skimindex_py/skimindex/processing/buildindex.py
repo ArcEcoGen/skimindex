@@ -10,13 +10,13 @@ all ``parts/`` subdirectories (one sample per assembly or division) and all
 
 Bloom filter sizing uses a single-hash model:
 
-    fpr = (n / (n + m)) ^ z  →  m = ceil(n * (fpr^(-1/z) - 1))
+    fpr = (n / (n + m)) ^ (z+1)  →  m = ceil(n * (fpr^(-1/(z+1)) - 1))
 
 where:
 
 - ``n``   = max number of distinct k-mers across all samples (max F1 from ntcard)
 - ``m``   = Bloom filter size in cells (``nb_cell`` parameter to kmindex)
-- ``z``   = number of k-mers required for a positive query result (``zvalue``)
+- ``z``   = kmindex ``--zvalue`` parameter (queries use z+1 k-mers for a positive hit)
 - ``fpr`` = target false positive rate
 """
 
@@ -77,34 +77,40 @@ def _read_max_f1(base_dir: Path) -> int:
 def _compute_bloom_size(n: int, z: int, fpr: float) -> int:
     """Compute the Bloom filter cell count from model parameters.
 
-    Formula: ``m = ceil(n * (fpr^(-1/z) - 1))``
+    Formula: ``m = ceil(n * (fpr^(-1/(z+1)) - 1))``
+
+    The ``z`` argument is the kmindex ``--zvalue`` parameter; kmindex uses
+    ``z+1`` k-mers to declare a positive hit (findere algorithm).
 
     Args:
         n:   Number of k-mers to index (max F1 from ntcard).
-        z:   Number of k-mers required for a positive answer.
+        z:   kmindex ``--zvalue`` (effective positivity threshold is z+1).
         fpr: Target false positive rate.
 
     Returns:
         Bloom filter size in number of cells.
     """
-    return math.ceil(n * (fpr ** (-1.0 / z) - 1))
+    return math.ceil(n * (fpr ** (-1.0 / (z + 1)) - 1))
 
 
-def _build_fof(base_dir: Path, fof_path: Path) -> None:
+def _build_fof(base_dir: Path, fof_path: Path, per_part: bool = False) -> None:
     """Generate a kmtricks FOF file by scanning *base_dir* for all ``parts/`` dirs.
 
-    One sample per ``parts/`` directory found recursively under *base_dir*.
-    The sample name is derived from the path components between *base_dir* and
-    the ``parts/`` directory, joined with ``--``.
+    When *per_part* is False (default): one sample per ``parts/`` directory.
+    When *per_part* is True: one sample per file inside each ``parts/`` directory;
+    the sample name is the file stem without any suffixes (e.g. ``frg_0`` for
+    ``frg_0.fasta.gz``).
 
     FOF format::
 
         Homo_sapiens--GCF_000001405.40 : /path/file1.fa.gz ; /path/file2.fa.gz
-        bct : /path/file1.fa.gz ; /path/file2.fa.gz
+        frg_0 : /path/frg_0.fasta.gz
+        frg_1 : /path/frg_1.fasta.gz
 
     Args:
         base_dir: Dataset output directory to scan recursively for ``parts/``.
         fof_path: Destination path for the generated FOF file.
+        per_part: If True, emit one sample per file instead of one per directory.
 
     Raises:
         FileNotFoundError: If no sequence files are found under any ``parts/`` dir.
@@ -116,11 +122,17 @@ def _build_fof(base_dir: Path, fof_path: Path) -> None:
     for parts_dir in sorted(base_dir.rglob("parts")):
         if not parts_dir.is_dir():
             continue
-        rel = parts_dir.parent.relative_to(base_dir)
-        raw = "--".join(rel.parts) if rel.parts else base_dir.name
-        sample_name = re.sub(r"[^A-Za-z0-9_-]", "_", raw)
         files = sorted(list_sequence_files(parts_dir, mode="absolute", recursive=False))
-        if files:
+        if not files:
+            continue
+        if per_part:
+            for f in files:
+                sample_name = f.name.split(".")[0]
+                lines.append(f"{sample_name} : {f}")
+        else:
+            rel = parts_dir.parent.relative_to(base_dir)
+            raw = "--".join(rel.parts) if rel.parts else base_dir.name
+            sample_name = re.sub(r"[^A-Za-z0-9_-]", "_", raw)
             files_str = " ; ".join(str(f) for f in files)
             lines.append(f"{sample_name} : {files_str}")
 
@@ -201,7 +213,7 @@ def buildindex(params: dict) -> Callable[[Data, Path, bool], Data]:
             if sub_index_dir.exists():
                 shutil.rmtree(sub_index_dir)
             fof_file = output_dir / f"{register_as}.fof"
-            _build_fof(dataset_dir, fof_file)
+            _build_fof(dataset_dir, fof_file, per_part=not input_data.per_species)
             kmindex_build(
                 index=global_index,
                 fof=fof_file,
