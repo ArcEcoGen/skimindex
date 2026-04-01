@@ -375,6 +375,8 @@ def make_pipeline(processing_name: str) -> Callable:
                 else:
                     if step_dir:
                         effective_dir = step_dir
+                    elif is_last:
+                        effective_dir = composite_output_dir
                     else:
                         tmpdir = Path(tempfile.mkdtemp())
                         tmpdirs.append(tmpdir)
