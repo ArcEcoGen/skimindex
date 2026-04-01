@@ -130,6 +130,7 @@ type      = "buildindex"
 output    = "kmindex@decontamination"     # → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
 index     = "@idx:decontamination"        # → indexes/decontamination/  (kmindex meta-index, managed by kmindex)
 kmer_size = 29
+hard_min  = 1
 zvalue    = 3      # k-mers required for a positive query result
 fpr       = 1e-3   # target false positive rate
 threads   = 10
