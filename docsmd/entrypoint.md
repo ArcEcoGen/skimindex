@@ -9,7 +9,7 @@ image lifecycle, and subcommand dispatch.
 ## Usage
 
 ```
-skimindex [--project-dir DIR] [--local] <subcommand> [subcommand-options]
+skimindex [--project-dir DIR] [--local] [-c FILE] <subcommand> [subcommand-options]
 skimindex --help
 ```
 
@@ -21,6 +21,7 @@ skimindex --help
 |--------|-------------|
 | `--project-dir DIR` | Project root directory. Defaults to the current working directory. All relative paths in `config/skimindex.toml` are resolved from this directory. |
 | `--local` | Use the locally cached image without checking the registry for updates. |
+| `-c FILE`, `--config FILE` | Use FILE as the pipeline configuration instead of `<project-dir>/config/skimindex.toml`. The bind-mounts are derived from the specified file; the file is made available at `/config/skimindex.toml` inside the container. |
 | `-h`, `--help` | Show help and exit. |
 
 Global options must appear **before** the subcommand. Options after the
@@ -170,5 +171,15 @@ The pipeline configuration file is read from:
 ```
 <project-dir>/config/skimindex.toml
 ```
+
+An alternate file can be specified with `-c FILE` / `--config FILE`:
+
+```bash
+skimindex -c /path/to/other.toml download
+skimindex --project-dir /my/project --config /shared/configs/hpc.toml decontam
+```
+
+The bind-mounts are derived from `[local_directories]` in the specified file.
+The file itself is always presented to the container at `/config/skimindex.toml`.
 
 See [Configuration File Format](config-format.md) for the full specification.

@@ -66,6 +66,7 @@ class Data:
     command: Any | None = field(default=None)
     format: str | None = field(default=None)
     subdir: Path | None = field(default=None)
+    per_species: bool = field(default=True)
 
     @property
     def path(self) -> Path | None:
@@ -89,12 +90,12 @@ class Data:
 # Convenience constructors
 # ---------------------------------------------------------------------------
 
-def stream_data(command: Any, format: str | None = None, subdir: Path | None = None) -> Data:
+def stream_data(command: Any, format: str | None = None, subdir: Path | None = None, per_species: bool = True) -> Data:
     """Create STREAM Data from a plumbum command or pipe."""
-    return Data(kind=DataKind.STREAM, command=command, format=format, subdir=subdir)
+    return Data(kind=DataKind.STREAM, command=command, format=format, subdir=subdir, per_species=per_species)
 
 
-def files_data(paths: list[Path] | Path, format: str | None = None, subdir: Path | None = None) -> Data:
+def files_data(paths: list[Path] | Path, format: str | None = None, subdir: Path | None = None, per_species: bool = True) -> Data:
     """Create FILES Data from one or more paths.
 
     Accepts a single Path or a list. A single file is stored as a
@@ -102,12 +103,12 @@ def files_data(paths: list[Path] | Path, format: str | None = None, subdir: Path
     """
     if isinstance(paths, Path):
         paths = [paths]
-    return Data(kind=DataKind.FILES, paths=list(paths), format=format, subdir=subdir)
+    return Data(kind=DataKind.FILES, paths=list(paths), format=format, subdir=subdir, per_species=per_species)
 
 
-def directory_data(path: Path, subdir: Path | None = None) -> Data:
+def directory_data(path: Path, subdir: Path | None = None, per_species: bool = True) -> Data:
     """Create DIRECTORY Data from a single directory path."""
-    return Data(kind=DataKind.DIRECTORY, paths=[path], subdir=subdir)
+    return Data(kind=DataKind.DIRECTORY, paths=[path], subdir=subdir, per_species=per_species)
 
 
 # ---------------------------------------------------------------------------

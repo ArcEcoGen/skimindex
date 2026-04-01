@@ -12,6 +12,8 @@
 #   --local              Use the locally cached image without checking the
 #                        registry for updates (docker/podman only; apptainer
 #                        always uses the local SIF file).
+#   -c FILE, --config FILE  Use FILE as the pipeline configuration
+#                        (default: <project-dir>/config/skimindex.toml).
 #   -h, --help           Show this help and exit.
 #
 # Subcommands:

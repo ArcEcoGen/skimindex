@@ -260,28 +260,30 @@ stamped will skip `prepare_decontam` on re-run.
 
 ### Bloom filter sizing
 
-`buildindex` uses a **single-hash Bloom filter** model. The probability that a
-query of `z` consecutive k-mers yields a false positive is:
+`buildindex` uses a **single-hash Bloom filter** model with the
+[findere](https://github.com/lrobidou/findere) algorithm. kmindex indexes
+s-mers and queries (s+z)-mers, so a positive hit requires **z+1** consecutive
+k-mers to be present. The false positive probability is therefore:
 
 ```
-fpr = (n / (n + m)) ^ z
+fpr = (n / (n + m)) ^ (z+1)
 ```
 
 | Symbol | Meaning |
 |--------|---------|
 | $n$    | Number of distinct k-mers inserted into the filter — line `F1` from ntcard histogram |
 | $m$    | Number of cells in the Bloom filter (`bloom_size` passed to `kmindex build`) |
-| $z$    | Number of k-mers required for a positive answer (`zvalue` parameter) |
+| $z$    | `--zvalue` parameter passed to kmindex (positive hit requires $z+1$ k-mers) |
 | $p$    | Target false positive rate (`fpr` parameter) |
 
 $$
-P_{fpr} = \left(\frac{n}{n + m}\right)^z
+P_{fpr} = \left(\frac{n}{n + m}\right)^{z+1}
 $$
 
 Inverting for $m$:
 
 $$
-m = \left\lceil n \cdot \left(p^{-1/z} - 1\right) \right\rceil
+m = \left\lceil n \cdot \left(p^{-1/(z+1)} - 1\right) \right\rceil
 $$
 
 When `bloom_size` is omitted from the config, it is computed automatically from
@@ -292,9 +294,9 @@ represent the largest single sample).
 **Example** — $n = 10^9$, $z = 3$, $p = 10^{-3}$:
 
 $$
-m = \left\lceil 10^9 \cdot \left(10^{-3/(-1/3)} - 1\right) \right\rceil
-  = \left\lceil 10^9 \cdot (10 - 1) \right\rceil
-  = 9 \times 10^9 \text{ cells}
+m = \left\lceil 10^9 \cdot \left(10^{-1/4} - 1\right) \right\rceil
+  \approx \left\lceil 10^9 \cdot (5.62 - 1) \right\rceil
+  \approx 4.62 \times 10^9 \text{ cells}
 $$
 
 ### Global meta-index layout
@@ -316,29 +318,62 @@ indexes/decontamination/
 The root `indexes/decontamination/` is the global meta-index consumed by
 `kmindex query` or `kmindex query2`.
 
+### Per-part indexing for bulk sources
+
+Datasets sourced from GenBank flat-files (`by_species = false`) are **bulk
+sources**: all sequences of a division are processed together and distributed
+into `N` batch files (`frg_0.fasta.gz`, …, `frg_{N-1}.fasta.gz`) by
+`obidistribute`. For these datasets, indexing is done **per part**:
+
+- `count_kmers_decontam` runs ntcard on **each part file individually**,
+  producing one histogram per file (`frg_0_k29.hist`, …).
+- `build_index_decontam` registers **one sample per part file** in the FOF.
+- The Bloom filter is sized from the **maximum F1 across individual parts**
+  (≈ total F1 / N), not the total F1 of the entire division.
+
+This reduces the Bloom filter size by a factor of N compared to treating the
+entire division as a single sample.
+
+For NCBI datasets (`source = "ncbi"`), each genome assembly is already its own
+`Data` item and its own `parts/` directory, so the standard per-directory
+sampling applies unchanged.
+
+The `per_species` property on `Dataset` (and on the `Data` objects it yields)
+controls this behaviour automatically — no config parameter is needed.
+
+To maximise kmindex memory efficiency, the number of samples in an index
+should be a multiple of 8. Configure `batches` in `[processing.prepare_decontam]`
+accordingly (e.g. `batches = 24`).
+
 ### FOF generation
 
 Before calling `kmindex build`, `buildindex` generates a kmtricks
-**file-of-files** (FOF):
+**file-of-files** (FOF). The strategy depends on the dataset source:
 
-- The `parts/` directory of the dataset is scanned recursively for assembly subdirectories.
-- One sample is created per subdirectory of `parts/`.
-- Sample names are derived from the relative path: `re.sub(r"[^A-Za-z0-9_-]", "_", "--".join(rel.parts))`.
+**Per-species sources** (`ncbi`): one sample per `parts/` directory, sample
+name derived from the relative path joined by `--`.
+
+**Bulk sources** (`genbank`, `by_species = false`): one sample per file inside
+each `parts/` directory, sample name = file stem without suffixes.
+
 - `register_as` = first component of the dataset's subdir path (e.g. `"Human"`, `"Plants"`).
 - The FOF file is named `{register_as}.fof` and stored in `output_dir` (`processed_data/decontamination/{dataset}/kmindex/`).
 
-FOF example for Plants (62 assemblies, one sample per assembly subdirectory):
+FOF example for Plants (per-species, 62 assemblies):
 
 ```
-Spermatophyta--GCF_000001735_4 : /path/parts/Spermatophyta/GCF_000001735.4/file1.fa.gz ; /path/parts/Spermatophyta/GCF_000001735.4/file2.fa.gz
+Spermatophyta--GCF_000001735_4 : /path/parts/Spermatophyta/GCF_000001735.4/file1.fa.gz ; ...
 Spermatophyta--GCF_000002775_5 : /path/parts/Spermatophyta/GCF_000002775.5/file1.fa.gz
 ...
 ```
 
-FOF example for Human (1 assembly):
+FOF example for Bacteria (bulk, 20 parts):
 
 ```
-Homo_sapiens--GCF_000001405_40 : /path/parts/Homo_sapiens/GCF_000001405.40/file1.fa.gz ; /path/parts/Homo_sapiens/GCF_000001405.40/file2.fa.gz ; ...
+frg_0 : /path/Bacteria/bct/parts/frg_0.fasta.gz
+frg_1 : /path/Bacteria/bct/parts/frg_1.fasta.gz
+...
+frg_19 : /path/Bacteria/bct/parts/frg_19.fasta.gz
 ```
 
 ---

@@ -56,6 +56,10 @@ class Dataset:
         return self._cfg.get("role", "")
 
     @property
+    def per_species(self) -> bool:
+        return bool(self._cfg.get("by_species", self.source == "ncbi"))
+
+    @property
     def directory(self) -> str:
         return self._cfg.get("directory", self.name)
 
@@ -95,7 +99,7 @@ class Dataset:
         """
         from pathlib import Path
         from skimindex.processing.data import directory_data
-        return directory_data(self.output_dir, subdir=Path(self.directory))
+        return directory_data(self.output_dir, subdir=Path(self.directory), per_species=self.per_species)
 
     def to_data(self) -> Iterator["Data"]:  # noqa: F821
         """Yield ``Data`` objects representing this dataset's input files.
@@ -126,7 +130,7 @@ class Dataset:
         dl = self.download_dir
         for f, species_subdir in scan_species_dir(dl):
             suffix = "".join(f.suffixes).lstrip(".")
-            yield files_data(f, format=suffix, subdir=base / species_subdir)
+            yield files_data(f, format=suffix, subdir=base / species_subdir, per_species=True)
 
     def _genbank_data(self) -> Iterator["Data"]:  # noqa: F821
         from skimindex.config import config
@@ -155,7 +159,7 @@ class Dataset:
 
         for label, path in inputs:
             subdir = base / label if label else base
-            data = files_data([path], format="fasta", subdir=subdir)
+            data = files_data([path], format="fasta", subdir=subdir, per_species=self.per_species)
             if taxid_filter is not None:
                 data = taxid_filter(data)
             yield data
