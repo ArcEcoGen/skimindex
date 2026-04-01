@@ -12,6 +12,8 @@
 #   --local              Use the locally cached image without checking the
 #                        registry for updates (docker/podman only; apptainer
 #                        always uses the local SIF file).
+#   -c FILE, --config FILE  Use FILE as the pipeline configuration
+#                        (default: <project-dir>/config/skimindex.toml).
 #   -h, --help           Show this help and exit.
 #
 # Subcommands:
@@ -91,6 +93,7 @@ _ski_help() {
 # Parse global options before the subcommand.
 # Stop option processing at the first non-option argument (the subcommand)
 # so that options belonging to the subcommand (e.g. --help) are not consumed.
+_SKI_CONFIG_OVERRIDE=""
 _remaining_args=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -100,6 +103,11 @@ while [[ $# -gt 0 ]]; do
         --project-dir=*)
             mkdir -p "${1#--project-dir=}"
             PROJECT_ROOT="$(cd "${1#--project-dir=}" && pwd)"; shift ;;
+        -c|--config)
+            _SKI_CONFIG_OVERRIDE="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; shift 2 ;;
+        --config=*)
+            _v="${1#--config=}"
+            _SKI_CONFIG_OVERRIDE="$(cd "$(dirname "$_v")" && pwd)/$(basename "$_v")"; shift ;;
         --local)
             _SKI_LOCAL=1; shift ;;
         -h|--help)
@@ -118,7 +126,11 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${_remaining_args[@]+"${_remaining_args[@]}"}"
 
-CONFIG_FILE="${PROJECT_ROOT}/config/skimindex.toml"
+if [[ -n "$_SKI_CONFIG_OVERRIDE" ]]; then
+    CONFIG_FILE="$_SKI_CONFIG_OVERRIDE"
+else
+    CONFIG_FILE="${PROJECT_ROOT}/config/skimindex.toml"
+fi
 SIF_FILE="${PROJECT_ROOT}/images/${_SKI_IMAGE_NAME}-${_SKI_IMAGE_TAG}.sif"
 
 # =============================================================================
@@ -235,12 +247,14 @@ _ski_run_interactive() {
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_build_bind_array "--bind"
         for _m in "$@"; do BIND+=(--bind "$_m"); done
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(--bind "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml")
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" \
             bash --init-file "$_shell_init"
     else
         _ski_build_bind_array "-v"
         for _m in "$@"; do BIND+=(-v "$_m"); done
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(-v "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml:ro")
         "$RUNTIME" run --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE" \
             bash --init-file "$_shell_init"
     fi
@@ -253,10 +267,12 @@ _ski_run_exec() {
     local BIND=()
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_build_bind_array "--bind"
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(--bind "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml")
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" "$@"
     else
         _ski_build_bind_array "-v"
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(-v "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml:ro")
         "$RUNTIME" run --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
     fi
 }

@@ -1918,7 +1918,7 @@ It handles container runtime detection, bind-mounting project directories,
 image lifecycle, and subcommand dispatch.</p>
 <hr />
 <h2 id="usage">Usage</h2>
-<pre><code>skimindex [--project-dir DIR] [--local] &lt;subcommand&gt; [subcommand-options]
+<pre><code>skimindex [--project-dir DIR] [--local] [-c FILE] &lt;subcommand&gt; [subcommand-options]
 skimindex --help
 </code></pre>
 <hr />
@@ -1938,6 +1938,10 @@ skimindex --help
 <tr>
 <td><code>--local</code></td>
 <td>Use the locally cached image without checking the registry for updates.</td>
+</tr>
+<tr>
+<td><code>-c FILE</code>, <code>--config FILE</code></td>
+<td>Use FILE as the pipeline configuration instead of <code>&lt;project-dir&gt;/config/skimindex.toml</code>. The bind-mounts are derived from the specified file; the file is made available at <code>/config/skimindex.toml</code> inside the container.</td>
 </tr>
 <tr>
 <td><code>-h</code>, <code>--help</code></td>
@@ -2064,6 +2068,12 @@ usercmd        = &quot;usercmd&quot;          # host: &lt;project-dir&gt;/usercm
 <p>The pipeline configuration file is read from:</p>
 <pre><code>&lt;project-dir&gt;/config/skimindex.toml
 </code></pre>
+<p>An alternate file can be specified with <code>-c FILE</code> / <code>--config FILE</code>:</p>
+<pre><code class="language-bash">skimindex -c /path/to/other.toml download
+skimindex --project-dir /my/project --config /shared/configs/hpc.toml decontam
+</code></pre>
+<p>The bind-mounts are derived from <code>[local_directories]</code> in the specified file.
+The file itself is always presented to the container at <code>/config/skimindex.toml</code>.</p>
 <p>See <a href="../config-format/">Configuration File Format</a> for the full specification.</p>
 
 
