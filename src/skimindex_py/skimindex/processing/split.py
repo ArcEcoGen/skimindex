@@ -41,7 +41,7 @@ def split(params: dict) -> Callable[[Data], Data]:
             os.environ["FRAGMENT_SIZE"] = str(frg_size)
             os.environ["OVERLAP"]       = str(overlap)
             fmt = "fasta.gz" if compress else "fasta"
-            return stream_data(cmd | obiscript(*script_args), format=fmt, subdir=input_data.subdir)
+            return stream_data(cmd | obiscript(*script_args), format=fmt, subdir=input_data.subdir, per_species=input_data.per_species)
         finally:
             for key, old in [("FRAGMENT_SIZE", old_frag), ("OVERLAP", old_over)]:
                 if old is None:

@@ -42,6 +42,7 @@ def compress(params: dict) -> Callable[[Data], Data]:
             input_data.command | pigz(f"-{level}", "-p", str(threads), "-c"),
             format="fasta.gz",
             subdir=input_data.subdir,
+            per_species=input_data.per_species,
         )
 
     return run

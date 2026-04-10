@@ -32,5 +32,6 @@ def filter_n_only(params: dict) -> Callable[[Data], Data]:
             pipe_through(input_data, obigrep(*args)),
             format=fmt,
             subdir=input_data.subdir,
+            per_species=input_data.per_species,
         )
     return run

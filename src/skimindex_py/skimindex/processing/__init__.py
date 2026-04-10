@@ -344,8 +344,10 @@ def make_pipeline(processing_name: str) -> Callable:
 
     def run(input_data: Data, dry_run: bool = False) -> Data:
         """Execute the composite pipeline with persistence and stamp management."""
+        from dataclasses import replace as _dc_replace
         data = input_data
         composite_output_dir = _resolve_output_dir(processing_name, data)
+        initial_per_species = data.per_species
 
         sources = data.paths or ([data.path] if data.path else [])
         if not needs_run(composite_output_dir, *sources, dry_run=dry_run,
@@ -367,11 +369,17 @@ def make_pipeline(processing_name: str) -> Callable:
                         if is_last:
                             (data.command > str(out_file))()
                             data = files_data([out_file], format=data.format, subdir=data.subdir)
+                            if data.per_species != initial_per_species:
+                                data = _dc_replace(data, per_species=initial_per_species)
                         else:
                             tee = _local["tee"][str(out_file)]
                             data = stream_data(data.command | tee, format=data.format, subdir=data.subdir)
+                            if data.per_species != initial_per_species:
+                                data = _dc_replace(data, per_species=initial_per_species)
                     else:
                         data = fn(data)
+                        if data.per_species != initial_per_species:
+                            data = _dc_replace(data, per_species=initial_per_species)
                 else:
                     if step_dir:
                         effective_dir = step_dir
@@ -382,6 +390,8 @@ def make_pipeline(processing_name: str) -> Callable:
                         tmpdirs.append(tmpdir)
                         effective_dir = tmpdir
                     data = fn(data, effective_dir, dry_run=dry_run)
+                    if data.per_species != initial_per_species:
+                        data = _dc_replace(data, per_species=initial_per_species)
 
             stamp(composite_output_dir)
             return data

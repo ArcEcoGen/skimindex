@@ -43,6 +43,6 @@ def filter_taxid(params: dict) -> Callable[[Data], Data]:
             base_args.append("-Z")
         cmd = pipe_through(input_data, obigrep(*base_args))
         fmt = "fasta.gz" if compress else "fasta"
-        return stream_data(cmd, format=fmt, subdir=input_data.subdir)
+        return stream_data(cmd, format=fmt, subdir=input_data.subdir, per_species=input_data.per_species)
 
     return run
