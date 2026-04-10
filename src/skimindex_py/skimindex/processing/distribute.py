@@ -35,6 +35,6 @@ def distribute(params: dict) -> Callable[[Data, Path, bool], Data]:
             dist_args.insert(0, "-Z")
         dist = obidistribute(*dist_args)
         pipe_through(input_data, dist)()
-        return directory_data(output_dir)
+        return directory_data(output_dir, subdir=input_data.subdir, per_species=input_data.per_species)
 
     return run

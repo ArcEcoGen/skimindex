@@ -37,6 +37,7 @@ def uncompress(params: dict) -> Callable[[Data], Data]:
             input_data.command | pigz("-d", "-p", str(threads), "-c"),
             format="fasta",
             subdir=input_data.subdir,
+            per_species=input_data.per_species,
         )
 
     return run
