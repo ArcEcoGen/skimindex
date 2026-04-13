@@ -24,7 +24,10 @@ Environment variable schema:
 
 import os
 import shlex
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]  # Python < 3.11
 from pathlib import Path
 from typing import Any
 

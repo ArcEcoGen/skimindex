@@ -47,6 +47,9 @@ sandbox
 test_dir
 old_scripts
 src/kmerasm/kmerasm
+src/skimindex_py/build
+
+log
 
 .mkdocs.pid
 usercmd/index_decontam.sh

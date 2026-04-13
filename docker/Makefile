@@ -24,23 +24,23 @@ PLATFORMS   := linux/amd64,linux/arm64
 # NOT passed as --build-arg (multi-stage FROM lines cannot use global ARGs).
 
 GO_VERSION        := latest
-MINICONDA_VERSION := latest
 
 # =============================================================================
 # Tool versions installed inside the image
 # =============================================================================
 
-OBITOOLS_VERSION  := 4.4.29
+OBITOOLS_VERSION  := 4.4.33
 OBITOOLS_GITHUB_REPO := metabarcoding/obitools4
-OBITOOLS_LATEST_TAG := $(shell curl -s https://api.github.com/repos/$(OBITOOLS_GITHUB_REPO)/releases/latest 2>/dev/null | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": "Release_([0-9.]+)".*/\1/' || echo latest)
 
-NCBI_DATASETS_VERSION  := v18.21.0
+NCBI_DATASETS_VERSION  := v18.23.0
 NCBI_DATASETS_GITHUB_REPO := ncbi/datasets
-NCBI_DATASETS_LATEST_TAG := $(shell curl -s https://api.github.com/repos/$(NCBI_DATASETS_GITHUB_REPO)/releases/latest 2>/dev/null | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": "([^"]+)".*/\1/' || echo latest)
 
 KMINDEX_VERSION   := bioconda::kmindex
-NTCARD_VERSION    := bioconda::ntcard
-SRATOOLS_VERSION  := bioconda::sra-tools
+NTCARD_VERSION    := 1.2.2
+NTCARD_GITHUB_REPO   := BirolLab/ntCard
+
+SRATOOLS_VERSION  := 3.2.1
+SRATOOLS_BIOCONDA_URL := https://conda.anaconda.org/bioconda/linux-64
 OSSUUID_VERSION   := conda-forge::ossuuid
 ASPERA_SDK_VERSION := 1.1.7
 
@@ -124,6 +124,7 @@ BUILD_USER_SCRIPT := $(PROJECT_ROOT)/docker/build_user_script.sh
 .PHONY: all build build-multiplatform build-dev push run run-dev \
         skimindex-script clean clean-builder \
         update-obitools build-obitools build-obitools-multiplatform \
+        update-ntcard update-sratools update-versions \
         venv test docs docs-stop docs-build help
 
 ## all                : Build multi-platform image (with latest OBITools), push to registry, generate skimindex.sh
@@ -151,7 +152,6 @@ $(SKIMINDEX_SH): $(SKIMINDEX_SH_IN) $(BUILD_USER_SCRIPT) \
 $(DOCKERFILE): $(DOCKERFILE_IN)
 	sed \
 		-e 's/@@GO_VERSION@@/$(GO_VERSION)/g' \
-		-e 's/@@ANACONDA_VERSION@@/$(MINICONDA_VERSION)/g' \
 		$< > $@
 
 ## build              : Build for the native platform and load into the local Docker daemon
@@ -160,6 +160,7 @@ build: $(DOCKERFILE)
 		--tag $(FULL_IMAGE) \
 		--file $(DOCKERFILE) \
 		$(BUILD_CONTEXT)
+
 
 ## build-multiplatform: Build for $(PLATFORMS) and export as a local OCI archive ($(OCI_ARCHIVE))
 build-multiplatform: $(DOCKERFILE) .builder-ready
@@ -256,10 +257,17 @@ clean-builder:
 
 ## update-ncbi-datasets : Récupérer la dernière version des outils NCBI datasets/dataformat
 update-ncbi-datasets:
-	@echo "Dernière version NCBI datasets: $(NCBI_DATASETS_LATEST_TAG)"
-	@sed -i.bak 's/^NCBI_DATASETS_VERSION.*:=.*/NCBI_DATASETS_VERSION  := $(NCBI_DATASETS_LATEST_TAG)/' $(firstword $(MAKEFILE_LIST))
-	@rm -f $(firstword $(MAKEFILE_LIST)).bak
-	@echo "NCBI_DATASETS_VERSION mise à jour vers: $(NCBI_DATASETS_LATEST_TAG)"
+	@_tag=$$(curl -s https://api.github.com/repos/$(NCBI_DATASETS_GITHUB_REPO)/releases/latest 2>/dev/null \
+	    | grep '"tag_name"' | head -1 \
+	    | sed -E 's/.*"tag_name": "([^"]+)".*/\1/'); \
+	if [ -z "$$_tag" ]; then \
+	    echo "Impossible de récupérer la version NCBI datasets — version actuelle conservée: $(NCBI_DATASETS_VERSION)"; \
+	else \
+	    echo "Dernière version NCBI datasets: $$_tag"; \
+	    sed -i.bak "s/^NCBI_DATASETS_VERSION.*:=.*/NCBI_DATASETS_VERSION  := $$_tag/" $(firstword $(MAKEFILE_LIST)); \
+	    rm -f $(firstword $(MAKEFILE_LIST)).bak; \
+	    echo "NCBI_DATASETS_VERSION mise à jour vers: $$_tag"; \
+	fi
 
 ## build-ncbi-datasets  : Builder avec la dernière version NCBI datasets
 build-ncbi-datasets:
@@ -268,10 +276,17 @@ build-ncbi-datasets:
 
 ## update-obitools    : Récupérer la dernière version d'OBITools depuis GitHub
 update-obitools:
-	@echo "Dernière version d'OBITools: $(OBITOOLS_LATEST_TAG)"
-	@sed -i.bak 's/^OBITOOLS_VERSION.*:=.*/OBITOOLS_VERSION  := $(OBITOOLS_LATEST_TAG)/' $(firstword $(MAKEFILE_LIST))
-	@rm -f $(firstword $(MAKEFILE_LIST)).bak
-	@echo "OBITOOLS_VERSION mise à jour vers: $(OBITOOLS_LATEST_TAG)"
+	@_tag=$$(curl -s https://api.github.com/repos/$(OBITOOLS_GITHUB_REPO)/releases/latest 2>/dev/null \
+	    | grep '"tag_name"' | head -1 \
+	    | sed -E 's/.*"tag_name": "Release_([0-9.]+)".*/\1/'); \
+	if [ -z "$$_tag" ]; then \
+	    echo "Impossible de récupérer la version d'OBITools — version actuelle conservée: $(OBITOOLS_VERSION)"; \
+	else \
+	    echo "Dernière version d'OBITools: $$_tag"; \
+	    sed -i.bak "s/^OBITOOLS_VERSION.*:=.*/OBITOOLS_VERSION  := $$_tag/" $(firstword $(MAKEFILE_LIST)); \
+	    rm -f $(firstword $(MAKEFILE_LIST)).bak; \
+	    echo "OBITOOLS_VERSION mise à jour vers: $$_tag"; \
+	fi
 
 ## build-obitools      : Builder avec la dernière version d'OBITools (depuis GitHub)
 build-obitools:
@@ -282,6 +297,42 @@ build-obitools:
 build-obitools-multiplatform:
 	@$(MAKE) update-obitools
 	@$(MAKE) build-multiplatform
+
+## update-ntcard      : Récupérer la dernière version de ntCard depuis GitHub
+update-ntcard:
+	@_tag=$$(curl -s https://api.github.com/repos/$(NTCARD_GITHUB_REPO)/releases/latest 2>/dev/null \
+	    | grep '"tag_name"' | head -1 \
+	    | sed -E 's/.*"tag_name": "([^"]+)".*/\1/'); \
+	if [ -z "$$_tag" ]; then \
+	    echo "Impossible de récupérer la version de ntCard — version actuelle conservée: $(NTCARD_VERSION)"; \
+	else \
+	    echo "Dernière version ntCard: $$_tag"; \
+	    sed -i.bak "s/^NTCARD_VERSION.*:=.*/NTCARD_VERSION    := $$_tag/" $(firstword $(MAKEFILE_LIST)); \
+	    rm -f $(firstword $(MAKEFILE_LIST)).bak; \
+	    echo "NTCARD_VERSION mise à jour vers: $$_tag"; \
+	fi
+
+## update-sratools    : Récupérer la dernière version de sra-tools depuis bioconda
+update-sratools:
+	@_tag=$$(curl -s "$(SRATOOLS_BIOCONDA_URL)/" 2>/dev/null \
+	    | grep -o 'sra-tools-[0-9][^"]*\.tar\.bz2' \
+	    | sed -E 's/sra-tools-([0-9]+\.[0-9]+\.[0-9]+)[^0-9].*/\1/' \
+	    | sort -uV | tail -1); \
+	if [ -z "$$_tag" ]; then \
+	    echo "Impossible de récupérer la version de sra-tools — version actuelle conservée: $(SRATOOLS_VERSION)"; \
+	else \
+	    echo "Dernière version sra-tools: $$_tag"; \
+	    sed -i.bak "s/^SRATOOLS_VERSION.*:=.*/SRATOOLS_VERSION  := $$_tag/" $(firstword $(MAKEFILE_LIST)); \
+	    rm -f $(firstword $(MAKEFILE_LIST)).bak; \
+	    echo "SRATOOLS_VERSION mise à jour vers: $$_tag"; \
+	fi
+
+## update-versions    : Mettre à jour toutes les versions (obitools, ncbi-datasets, ntcard, sra-tools)
+update-versions:
+	@$(MAKE) update-obitools
+	@$(MAKE) update-ncbi-datasets
+	@$(MAKE) update-ntcard
+	@$(MAKE) update-sratools
 
 ## help               : Show this help
 help:

@@ -25,8 +25,12 @@
 #   validate                 Validate the skimindex configuration file.
 #
 # shell options:
+#   -h, --help           Show this help and exit.
 #   --mount SRC:DST      Bind-mount SRC (host) to DST (container).
 #                        May be repeated for multiple extra mounts.
+#   --dev                Mount obiluascripts/ from the project directory into
+#                        the container (/app/obiluascripts) for live editing
+#                        without rebuilding the image.
 #
 # Configuration:
 #   <project-dir>/config/skimindex.toml
@@ -213,6 +217,7 @@ _ski_help() {
 # Parse global options before the subcommand.
 # Stop option processing at the first non-option argument (the subcommand)
 # so that options belonging to the subcommand (e.g. --help) are not consumed.
+_SKI_CONFIG_OVERRIDE=""
 _remaining_args=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -222,6 +227,11 @@ while [[ $# -gt 0 ]]; do
         --project-dir=*)
             mkdir -p "${1#--project-dir=}"
             PROJECT_ROOT="$(cd "${1#--project-dir=}" && pwd)"; shift ;;
+        -c|--config)
+            _SKI_CONFIG_OVERRIDE="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; shift 2 ;;
+        --config=*)
+            _v="${1#--config=}"
+            _SKI_CONFIG_OVERRIDE="$(cd "$(dirname "$_v")" && pwd)/$(basename "$_v")"; shift ;;
         --local)
             _SKI_LOCAL=1; shift ;;
         -h|--help)
@@ -240,7 +250,11 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${_remaining_args[@]+"${_remaining_args[@]}"}"
 
-CONFIG_FILE="${PROJECT_ROOT}/config/skimindex.toml"
+if [[ -n "$_SKI_CONFIG_OVERRIDE" ]]; then
+    CONFIG_FILE="$_SKI_CONFIG_OVERRIDE"
+else
+    CONFIG_FILE="${PROJECT_ROOT}/config/skimindex.toml"
+fi
 SIF_FILE="${PROJECT_ROOT}/images/${_SKI_IMAGE_NAME}-${_SKI_IMAGE_TAG}.sif"
 
 # =============================================================================
@@ -346,6 +360,22 @@ _ski_ensure_current() {
     return 0
 }
 
+# _ski_abs_mount "src:dst[:opts]"
+#   Resolve src to an absolute path so Docker/podman treats it as a bind-mount
+#   rather than a named volume.  dst and optional opts are passed through unchanged.
+_ski_abs_mount() {
+    local _spec="$1"
+    local _src="${_spec%%:*}"
+    local _rest="${_spec#*:}"
+    # Already absolute → nothing to do
+    [[ "$_src" == /* ]] && { printf '%s' "$_spec"; return; }
+    # Resolve relative path from PROJECT_ROOT
+    local _abs
+    _abs="$(cd "${PROJECT_ROOT}/${_src}" 2>/dev/null && pwd)" \
+        || _abs="${PROJECT_ROOT}/${_src}"
+    printf '%s' "${_abs}:${_rest}"
+}
+
 # _ski_run_interactive [extra_mount ...]
 #   extra_mount: "src:dst" pairs added on top of the config-driven mounts.
 _ski_run_interactive() {
@@ -356,13 +386,15 @@ _ski_run_interactive() {
     local _shell_init=/app/scripts/__ski_shell_init.sh
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_build_bind_array "--bind"
-        for _m in "$@"; do BIND+=(--bind "$_m"); done
+        for _m in "$@"; do BIND+=(--bind "$(_ski_abs_mount "$_m")"); done
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(--bind "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml")
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" \
             bash --init-file "$_shell_init"
     else
         _ski_build_bind_array "-v"
-        for _m in "$@"; do BIND+=(-v "$_m"); done
+        for _m in "$@"; do BIND+=(-v "$(_ski_abs_mount "$_m")"); done
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(-v "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml:ro")
         "$RUNTIME" run --rm -it "${BIND[@]}" "$_SKI_FULL_IMAGE" \
             bash --init-file "$_shell_init"
     fi
@@ -375,10 +407,12 @@ _ski_run_exec() {
     local BIND=()
     if [[ "$RUNTIME" == "apptainer" ]]; then
         _ski_build_bind_array "--bind"
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(--bind "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml")
         APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
         apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" "$@"
     else
         _ski_build_bind_array "-v"
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(-v "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml:ro")
         "$RUNTIME" run --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" "$@"
     fi
 }
@@ -450,19 +484,30 @@ _ski_apptainer_needs_update() {
 _ski_update() {
     local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
     if [[ "$RUNTIME" == "apptainer" ]]; then
-        local sif_dir digest_file
+        local sif_dir digest_file lock_file
         sif_dir="$(dirname "$SIF_FILE")"
         digest_file="${SIF_FILE%.sif}.digest"
+        lock_file="${SIF_FILE%.sif}.lock"
         mkdir -p "$sif_dir"
-        loginfo "Pulling latest SIF from docker://${_SKI_FULL_IMAGE}"
-        loginfo "Destination: $SIF_FILE"
-        apptainer pull --force "$SIF_FILE" "docker://${_SKI_FULL_IMAGE}"
-        # Record the remote digest so future checks can skip unnecessary pulls
-        local remote_digest
-        remote_digest=$(_ski_registry_digest \
-            "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
-        [[ -n "$remote_digest" ]] && printf '%s' "$remote_digest" > "$digest_file"
-        loginfo "SIF updated: $SIF_FILE"
+        # Serialize concurrent SIF rebuilds: wait for any in-progress pull to finish
+        # before checking again whether an update is still needed.
+        (
+            flock 9
+            if _ski_apptainer_needs_update; then
+                loginfo "Pulling latest SIF from docker://${_SKI_FULL_IMAGE}"
+                loginfo "Destination: $SIF_FILE"
+                apptainer pull --force "$SIF_FILE" "docker://${_SKI_FULL_IMAGE}"
+                # Record the remote digest so future checks can skip unnecessary pulls
+                local remote_digest
+                remote_digest=$(_ski_registry_digest \
+                    "$_SKI_IMAGE_REGISTRY" "$_SKI_IMAGE_NAME" "$_SKI_IMAGE_TAG")
+                [[ -n "$remote_digest" ]] && printf '%s' "$remote_digest" > "$digest_file"
+                loginfo "SIF updated: $SIF_FILE"
+            else
+                loginfo "SIF already up-to-date (updated by concurrent process): $SIF_FILE"
+            fi
+        ) 9>"$lock_file"
+        return
     else
         loginfo "Pulling latest image: ${_SKI_FULL_IMAGE}"
         "$RUNTIME" pull "$_SKI_FULL_IMAGE"
@@ -534,13 +579,22 @@ case "$SUBCMD" in
         ;;
     shell)
         if [[ "$RUNTIME" == "none" ]]; then
-
             logerror "No container runtime found (apptainer, docker or podman required)."
             exit 1
         fi
         _shell_mounts=()
         while [[ $# -gt 0 ]]; do
             case "$1" in
+                -h|--help)
+                    awk '
+                        /^# shell options:/ { p=1 }
+                        p && /^# [A-Z]/ && !/^# shell/ { exit }
+                        p { sub(/^# ?/, ""); print }
+                    ' "$0"
+                    exit 0 ;;
+                --dev)
+                    _shell_mounts+=("${PROJECT_ROOT}/obiluascripts:/app/obiluascripts")
+                    shift ;;
                 --mount)     _shell_mounts+=("$2"); shift 2 ;;
                 --mount=*)   _shell_mounts+=("${1#--mount=}"); shift ;;
                 --)          shift; break ;;

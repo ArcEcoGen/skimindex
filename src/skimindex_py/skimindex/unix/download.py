@@ -19,7 +19,7 @@ def curl(*args: str) -> LoggedBoundCommand:
     Returns:
         Command: plumbum Command object to be executed with ()
     """
-    return local["curl"][*args]
+    return local["curl"][args]
 
 
 def curl_download(url: str, *extra_args: str) -> LoggedBoundCommand:

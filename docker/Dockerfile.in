@@ -1,13 +1,12 @@
 # builder runs for each target platform so OBITools4 binaries match the target architecture
 # Uses the official golang image — no Go download needed inside the container
-# Base image versions are substituted by the Makefile (GO_VERSION / ANACONDA_VERSION)
+# Base image versions are substituted by the Makefile (GO_VERSION)
 FROM golang:@@GO_VERSION@@ AS builder
 
 ARG OBITOOLS_VERSION=latest
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
-RUN apt-get -y install \
+RUN apt-get update && apt-get -y install \
     build-essential \
     ca-certificates \
     curl \
@@ -32,25 +31,27 @@ RUN for dir in /tmp/src/*/; do \
         fi; \
     done
 
-FROM continuumio/miniconda3:@@ANACONDA_VERSION@@ AS skimindex
+FROM registry.metabarcoding.org/arcecogen/kmindex:latest AS skimindex
 
-ARG KMINDEX_VERSION=bioconda::kmindex
-ARG NTCARD_VERSION=bioconda::ntcard
-ARG SRATOOLS_VERSION=bioconda::sra-tools
-ARG OSSUUID_VERSION=conda-forge::ossuuid
+ARG TARGETARCH
 ARG ASPERA_SDK_VERSION=1.1.7
+ARG SRATOOLS_VERSION=3.2.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl make unzip less jq pigz sudo python3-plumbum \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends \
+        bzip2 ca-certificates curl make unzip less jq pigz sudo \
+        python3 python3-pip python3-setuptools python3-wheel \
+        libuuid1 \
+        lua5.1 luarocks \
+    && rm -rf /var/lib/apt/lists/* \
+    && luarocks install dkjson
 
 # Install NCBI datasets CLI tools from GitHub Releases (architecture-aware).
 # Pin NCBI_DATASETS_VERSION to a specific tag (e.g. v18.21.0) for reproducible builds.
 # Run `make update-ncbi-datasets` to update the pinned version.
 ARG NCBI_DATASETS_VERSION=v18.21.0
-ARG TARGETARCH
 RUN mkdir -p /usr/local/bin \
     && curl -fsSL "https://github.com/ncbi/datasets/releases/download/${NCBI_DATASETS_VERSION}/linux-${TARGETARCH}.cli.package.zip" \
         -o /tmp/ncbi_datasets.zip \
@@ -58,13 +59,51 @@ RUN mkdir -p /usr/local/bin \
     && chmod 755 /usr/local/bin/datasets /usr/local/bin/dataformat \
     && rm /tmp/ncbi_datasets.zip
 
-RUN conda install --yes ${KMINDEX_VERSION} ${NTCARD_VERSION} ${OSSUUID_VERSION} ${SRATOOLS_VERSION} \
-    && conda clean --all --yes
+# Install ntCard from bioconda (both amd64 and arm64).
+# Binary links only against standard system libs (libz, libstdc++, libgomp) — no bundled libs.
+# amd64 → linux-64 ; arm64 → linux-aarch64
+ARG NTCARD_VERSION=1.2.2
+RUN case "${TARGETARCH}" in \
+        amd64) _conda_arch="linux-64"       ;; \
+        arm64) _conda_arch="linux-aarch64"  ;; \
+        *)     echo "Unsupported arch: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && _pkg=$(curl -fsSL "https://conda.anaconda.org/bioconda/${_conda_arch}/" \
+        | grep -o "ntcard-${NTCARD_VERSION}-[^\"]*\.tar\.bz2" \
+        | sort -V | tail -1) \
+    && { [ -n "${_pkg}" ] || { echo "ntcard ${NTCARD_VERSION} not found for ${_conda_arch}" >&2; exit 1; }; } \
+    && echo "Installing ntCard from: ${_pkg}" \
+    && curl -fsSL "https://conda.anaconda.org/bioconda/${_conda_arch}/${_pkg}" \
+        | tar -xjf - -C /tmp bin \
+    && cp -a /tmp/bin/ntcard /usr/local/bin/ntcard \
+    && cp -a /tmp/bin/nthll  /usr/local/bin/nthll \
+    && rm -rf /tmp/bin
+
+# Install sra-tools from bioconda (both amd64 and arm64).
+# Extracts bin/ + lib/ from the conda package — no conda installation needed.
+# Symlinks (fastq-dump → sratools.X.Y.Z) are preserved via cp -a.
+# RPATH in sratools binary is $ORIGIN/../lib → resolves to /usr/local/lib/. ✓
+# amd64 → linux-64 ; arm64 → linux-aarch64
+RUN case "${TARGETARCH}" in \
+        amd64) _conda_arch="linux-64"       ;; \
+        arm64) _conda_arch="linux-aarch64"  ;; \
+        *)     echo "Unsupported arch: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && _pkg=$(curl -fsSL "https://conda.anaconda.org/bioconda/${_conda_arch}/" \
+        | grep -o "sra-tools-${SRATOOLS_VERSION}-[^\"]*\.tar\.bz2" \
+        | sort -V | tail -1) \
+    && { [ -n "${_pkg}" ] || { echo "sra-tools ${SRATOOLS_VERSION} not found for ${_conda_arch}" >&2; exit 1; }; } \
+    && echo "Installing sra-tools from: ${_pkg}" \
+    && curl -fsSL "https://conda.anaconda.org/bioconda/${_conda_arch}/${_pkg}" \
+        | tar -xjf - -C /tmp bin lib \
+    && cp -a /tmp/bin/. /usr/local/bin/ \
+    && cp -a /tmp/lib/. /usr/local/lib/ \
+    && ldconfig \
+    && rm -rf /tmp/bin /tmp/lib
 
 # Install IBM Aspera Transfer SDK (provides ascp) — architecture-aware.
 # amd64 → linux-amd64 ; arm64 → linux-aarch64
 # Pin ASPERA_SDK_VERSION for reproducible builds.
-ARG ASPERA_SDK_VERSION=1.1.7
 RUN case "${TARGETARCH}" in \
         amd64) _ascp_arch="amd64"   ;; \
         arm64) _ascp_arch="aarch64" ;; \
@@ -97,14 +136,14 @@ COPY genbank/Makefile /genbank/Makefile
 COPY obiluascripts/ /app/obiluascripts/
 COPY scripts/ /app/scripts/
 COPY config/ /config/
-COPY src/skimindex_py/ /tmp/skimindex_py/
+COPY src/skimindex_py/skimindex/ /usr/lib/python3/dist-packages/skimindex/
 
 RUN chmod +x /usr/local/bin/obi* \
     && find /app/scripts -maxdepth 1 -name '*.sh' -exec chmod +x {} \; \
     && find /tmp/src-built -maxdepth 2 -type f -executable -exec cp {} /app/bin/ \; \
     && rm -rf /tmp/src-built \
-    && pip install --no-build-isolation /tmp/skimindex_py \
-    && rm -rf /tmp/skimindex_py
+    && /usr/bin/python3 -m pip install --break-system-packages --no-cache-dir plumbum \
+    && /usr/bin/python3 -c "import skimindex"
 
 # Create an unprivileged user with a home directory and sudo access
 RUN groupadd -r skimindex \
@@ -131,6 +170,9 @@ LABEL org.opencontainers.image.title="skimindex" \
       org.opencontainers.image.revision="${OCI_REVISION}"
 
 ENV PATH="/app/bin:/app/scripts:${PATH}"
+
+ENTRYPOINT []
+CMD ["/bin/bash"]
 
 WORKDIR /app
 

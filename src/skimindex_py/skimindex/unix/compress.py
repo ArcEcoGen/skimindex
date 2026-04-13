@@ -44,7 +44,7 @@ def pigz(*args) -> LoggedBoundCommand:
 
     Full documentation: pigz --help
     """
-    return local["pigz"][*args]
+    return local["pigz"][args]
 
 
 def pigz_compress(*args) -> LoggedBoundCommand:
@@ -81,7 +81,7 @@ def unzip(*args) -> LoggedBoundCommand:
 
     Full documentation: unzip --help
     """
-    return local["unzip"][*args]
+    return local["unzip"][args]
 
 
 def unzip_list(*args) -> LoggedBoundCommand:
