@@ -44,9 +44,7 @@ RUN apt-get update \
         bzip2 ca-certificates curl make unzip less jq pigz sudo \
         python3 python3-pip python3-setuptools python3-wheel \
         libuuid1 \
-        lua5.1 luarocks \
-    && rm -rf /var/lib/apt/lists/* \
-    && luarocks install dkjson
+    && rm -rf /var/lib/apt/lists/*
 
 # Install NCBI datasets CLI tools from GitHub Releases (architecture-aware).
 # Pin NCBI_DATASETS_VERSION to a specific tag (e.g. v18.21.0) for reproducible builds.

@@ -21,8 +21,16 @@
 --   KMINDEX_CONTAM_OK_LIBS      Libraries that are NOT contamination (override).
 --                     Default: (none)
 --   KMINDEX_LIBRARIES Explicit libraries list (optional, overrides auto-union).
---   KMINDEX_THREADS   Max parallel connections for kmindex-server.
---                     Default: nproc
+--   KMINDEX_THREADS      Max threads for kmindex-server.
+--                        Default: nproc×2
+--   KMINDEX_CONCURRENCY    Max simultaneous HTTP requests from obiscript.
+--                          Default: nproc
+--   KMINDEX_RETRY_MAX      Max retry attempts on HTTP error.
+--                          Default: 3
+--   KMINDEX_RETRY_DELAY_MS Initial retry delay in ms (doubles each attempt).
+--                          Default: 500
+--   KMINDEX_TIMEOUT_MS     HTTP request timeout in ms.
+--                          Default: 300000
 --   KMINDEX_MANAGE_SERVER  Set to "false" to skip server start/stop.
 --                     Default: server is managed by the script
 --
@@ -42,7 +50,7 @@
 --   obiscript -S /app/obiluascripts/kmquery.lua <input.fasta.gz>
 -- ============================================================
 
-local json        = require("dkjson")
+-- json is a global provided by OBITools4 (native Go module, no require needed)
 
 local DEBUG       = os.getenv("KMINDEX_DEBUG") ~= nil
 
@@ -88,18 +96,20 @@ end
 local function start_server()
     local index_dir = os.getenv("KMINDEX_INDEX_DIR") or "/indexes/decontamination"
     local log_dir   = os.getenv("KMINDEX_LOG_DIR") or "/log"
-    local _nproc    = (io.popen("nproc"):read("*n") or 1) * 2
-    local threads   = tonumber(os.getenv("KMINDEX_THREADS")) or _nproc
-    local cmd       = string.format(
+    local _h        = io.popen("nproc")
+    local _nproc    = (_h:read("*n") or 1) * 2
+    _h:close()
+    local threads = tonumber(os.getenv("KMINDEX_THREADS")) or _nproc
+    local cmd     = string.format(
         "%s -i %s -d %s --threads %s > /dev/null 2>&1 &",
         SERVER_PATH, index_dir, log_dir, threads
     )
     os.execute(cmd)
 
-    -- Poll until the server responds (max 30s)
-    local probe = json.encode({ index = LIBRARIES, id = "probe", seq = { "A" }, z = 0, format = "json", r = 0.0 })
+    -- Poll until the server responds (max 30s, 500ms timeout per probe)
+    local probe = json.encode({ index = LIBRARIES, id = { "probe" }, seq = { "A" }, z = 0, format = "json", r = 0.0 })
     for _ = 1, 300 do
-        local resp, err = http.post(URL, probe)
+        local resp, err = http.post(URL, probe, 500)
         if resp and not err then
             return
         end
@@ -112,43 +122,67 @@ local function stop_server()
     os.execute("pkill -f 'kmindex-server'")
 end
 
-local function query_server(seq_id, sequence)
+local RETRY_MAX    = tonumber(os.getenv("KMINDEX_RETRY_MAX")) or 3
+local RETRY_DELAY  = tonumber(os.getenv("KMINDEX_RETRY_DELAY_MS")) or 500
+local HTTP_TIMEOUT = tonumber(os.getenv("KMINDEX_TIMEOUT_MS")) or 300000
+
+-- Query kmindex-server with a batch of sequences.
+-- ids and seqs are arrays of the same length.
+-- Retries up to RETRY_MAX times with exponential backoff on error.
+-- Returns the raw JSON response string, or nil if all retries fail.
+local function query_server(ids, seqs)
     local payload = json.encode({
         index  = LIBRARIES,
-        id     = seq_id,
-        seq    = { sequence },
+        id     = ids,
+        seq    = seqs,
         z      = KMINDEX_Z,
         format = "json",
         r      = KMINDEX_R,
     })
-    local response, err = http.post(URL, payload)
-    if err then
-        return nil
+    if DEBUG then
+        local started   = obicontext.inc("req_started")
+        local in_flight = started - obicontext.item("req_done")
+        io.stderr:write(string.format(
+            "[kmquery] batch=%d  req_in_flight=%d\n", #ids, in_flight))
     end
-    return response
+
+    local response, err
+    local delay = RETRY_DELAY
+    for attempt = 1, RETRY_MAX + 1 do
+        response, err = http.post(URL, payload, HTTP_TIMEOUT)
+        if response and not err then
+            if DEBUG then obicontext.inc("req_done") end
+            return response
+        end
+        obicontext.inc("req_errors")
+        if attempt <= RETRY_MAX then
+            io.stderr:write(string.format(
+                "[kmquery] attempt %d/%d failed: %s — retrying in %dms\n",
+                attempt, RETRY_MAX + 1, err, delay))
+            os.execute(string.format("sleep %.3f", delay / 1000.0))
+            delay = delay * 2 -- exponential backoff
+        else
+            io.stderr:write(string.format(
+                "[kmquery] all %d attempts failed for batch of %d sequences: %s\n",
+                RETRY_MAX + 1, #ids, err))
+        end
+    end
+    if DEBUG then obicontext.inc("req_done") end
+    return nil
 end
 
--- Returns:
---   matched_libs      set of all libraries with at least one hit
---   best_not_ok_lib   NOT_OK library with the highest score (nil if none)
---   best_not_ok_score max score across NOT_OK libraries (0 if none)
-local function parse_response(response)
-    if not response then
-        return {}, nil, 0
-    end
-    local data = json.decode(response)
-    if not data then
-        return {}, nil, 0
-    end
-
+-- Annotate a single sequence from the decoded response data.
+-- data is the full json.decode() result (keyed by library → seq_id → hits).
+local function annotate(sequence, seq_id, data)
     local matched_libs      = {}
     local best_not_ok_lib   = nil
     local best_not_ok_score = 0
 
-    for _, lib in ipairs(LIBRARIES) do
-        local lib_data = data[lib]
-        if lib_data then
-            for _, hits in pairs(lib_data) do
+    if data then
+        for _, lib in ipairs(LIBRARIES) do
+            local lib_data = data[lib]
+            if lib_data then
+                local hits = lib_data[seq_id]
                 if type(hits) == "table" then
                     for _, score in pairs(hits) do
                         if type(score) == "number" and score > 0 then
@@ -164,29 +198,8 @@ local function parse_response(response)
         end
     end
 
-    return matched_libs, best_not_ok_lib, best_not_ok_score
-end
-
-function begin()
-    local manage_server = os.getenv("KMINDEX_MANAGE_SERVER")
-    if manage_server ~= "false" then
-        obicontext.item("manage_server", true)
-        start_server()
-    else
-        obicontext.item("manage_server", false)
-    end
-end
-
-function worker(sequence)
-    local seq_id                               = sequence:id()
-    local seq                                  = sequence:sequence()
-
-    local response                             = query_server(seq_id, seq)
-    local matched_libs, best_lib, not_ok_score = parse_response(response)
-
-    local in_not_ok                            = false
-    local in_ok                                = false
-    local all_matched, not_ok_matched          = {}, {}
+    local in_not_ok, in_ok = false, false
+    local all_matched, not_ok_matched = {}, {}
     for lib in pairs(matched_libs) do
         table.insert(all_matched, lib)
         if CONTAM_NOT_OK_LIBS[lib] then
@@ -199,26 +212,70 @@ function worker(sequence)
 
     local contamination = in_not_ok and not in_ok
 
-    sequence:attribute("kmindex_score",            not_ok_score)
-    sequence:attribute("contamination",            contamination)
+    sequence:attribute("kmindex_score", best_not_ok_score)
+    sequence:attribute("contamination", contamination)
     sequence:attribute("kmindex_contam_libraries", not_ok_matched)
     sequence:attribute("kmindex_matched_libraries", all_matched)
     if contamination then
-        sequence:attribute("kmindex_best_match",   best_lib)
+        sequence:attribute("kmindex_best_match", best_not_ok_lib)
     end
 
     if DEBUG then
         io.stderr:write(string.format(
-            "[kmquery] %s  contam=%s  score=%.4f  contam_libs=[%s]  matched=[%s]\n%s\n",
-            seq_id, tostring(contamination), not_ok_score,
-            table.concat(not_ok_matched, ","), table.concat(all_matched, ","),
-            sequence:string("obi")
+            "[kmquery] %s  contam=%s  score=%.4f  contam_libs=[%s]  matched=[%s]\n",
+            seq_id, tostring(contamination), best_not_ok_score,
+            table.concat(not_ok_matched, ","), table.concat(all_matched, ",")
         ))
     end
-    return sequence
+end
+
+function begin()
+    obicontext.item("req_started", 0)
+    obicontext.item("req_done", 0)
+    obicontext.item("req_errors", 0)
+    local manage_server = os.getenv("KMINDEX_MANAGE_SERVER")
+    if manage_server ~= "false" then
+        obicontext.item("manage_server", true)
+        start_server()
+    else
+        obicontext.item("manage_server", false)
+    end
+    -- Limit concurrent HTTP requests to avoid overwhelming kmindex-server.
+    -- Default: same value as --threads (nproc×2); override with KMINDEX_CONCURRENCY.
+    local _h     = io.popen("nproc")
+    local _nproc = (_h:read("*n") or 1)
+    _h:close()
+    local concurrency = tonumber(os.getenv("KMINDEX_CONCURRENCY")) or _nproc
+    http.set_concurrency(concurrency)
+end
+
+function slice_worker(slice)
+    local n    = slice:len()
+    local ids  = {}
+    local seqs = {}
+    for i = 0, n - 1 do
+        local s     = slice:sequence(i)
+        ids[i + 1]  = s:id()
+        seqs[i + 1] = s:sequence()
+    end
+
+    local response = query_server(ids, seqs)
+    local data     = response and json.decode(response) or nil
+
+    for i = 0, n - 1 do
+        local s = slice:sequence(i)
+        annotate(s, ids[i + 1], data)
+    end
+
+    return slice
 end
 
 function finish()
+    local errors = obicontext.item("req_errors")
+    if errors > 0 then
+        io.stderr:write(string.format(
+            "[kmquery] WARNING: %d HTTP request attempts failed (after retries)\n", errors))
+    end
     if obicontext.item("manage_server") then
         stop_server()
     end
