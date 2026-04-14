@@ -168,15 +168,15 @@ local function query_server(ids, seqs)
         end
     end
     if DEBUG then obicontext.inc("req_done") end
-    return nil
+    return nil, err
 end
 
 -- Annotate a single sequence from the decoded response data.
 -- data is the full json.decode() result (keyed by library → seq_id → hits).
 local function annotate(sequence, seq_id, data)
-    local matched_libs      = {}
-    local best_not_ok_lib   = nil
-    local best_not_ok_score = 0
+    local matched_libs = {}
+    local best_lib     = nil
+    local best_score   = 0
 
     if data then
         for _, lib in ipairs(LIBRARIES) do
@@ -187,9 +187,9 @@ local function annotate(sequence, seq_id, data)
                     for _, score in pairs(hits) do
                         if type(score) == "number" and score > 0 then
                             matched_libs[lib] = true
-                            if CONTAM_NOT_OK_LIBS[lib] and score > best_not_ok_score then
-                                best_not_ok_score = score
-                                best_not_ok_lib   = lib
+                            if score > best_score then
+                                best_score = score
+                                best_lib   = lib
                             end
                         end
                     end
@@ -212,18 +212,17 @@ local function annotate(sequence, seq_id, data)
 
     local contamination = in_not_ok and not in_ok
 
-    sequence:attribute("kmindex_score", best_not_ok_score)
+    sequence:attribute("kmindex_score", best_score)
     sequence:attribute("contamination", contamination)
     sequence:attribute("kmindex_contam_libraries", not_ok_matched)
     sequence:attribute("kmindex_matched_libraries", all_matched)
-    if contamination then
-        sequence:attribute("kmindex_best_match", best_not_ok_lib)
-    end
+    sequence:attribute("kmindex_best_match", best_lib)
+
 
     if DEBUG then
         io.stderr:write(string.format(
             "[kmquery] %s  contam=%s  score=%.4f  contam_libs=[%s]  matched=[%s]\n",
-            seq_id, tostring(contamination), best_not_ok_score,
+            seq_id, tostring(contamination), best_score,
             table.concat(not_ok_matched, ","), table.concat(all_matched, ",")
         ))
     end
@@ -259,12 +258,18 @@ function slice_worker(slice)
         seqs[i + 1] = s:sequence()
     end
 
-    local response = query_server(ids, seqs)
-    local data     = response and json.decode(response) or nil
+    local response, query_err = query_server(ids, seqs)
 
-    for i = 0, n - 1 do
-        local s = slice:sequence(i)
-        annotate(s, ids[i + 1], data)
+    if not response then
+        for i = 0, n - 1 do
+            slice:sequence(i):attribute("kmindex_error", query_err or "unknown error")
+        end
+    else
+        local data = json.decode(response)
+        for i = 0, n - 1 do
+            local s = slice:sequence(i)
+            annotate(s, ids[i + 1], data)
+        end
     end
 
     return slice

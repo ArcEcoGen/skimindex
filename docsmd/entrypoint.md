@@ -64,18 +64,21 @@ Start an interactive bash session inside the container with all project
 directories bind-mounted.
 
 ```bash
-skimindex shell [--mount SRC:DST] …
+skimindex shell [options]
+skimindex shell --help
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--mount SRC:DST` | Add an extra bind-mount on top of the config-driven ones. May be repeated. |
+| `--mount SRC:DST` | Add an extra bind-mount on top of the config-driven ones. May be repeated. Source path may be relative to the project directory. |
+| `--dev` | Mount `<project-dir>/obiluascripts/` into the container at `/app/obiluascripts`, overriding the image's bundled scripts. Useful for live editing without rebuilding. |
+| `-h`, `--help` | Show shell subcommand help and exit. |
 
 The shell automatically loads `config/skimindex.toml` on startup and exports
 all values as `SKIMINDEX__*` environment variables.
 
 Use `--mount` to make additional host directories available inside the
-container. The source path may be relative to the current working directory:
+container. The source path may be relative to the project directory:
 
 ```bash
 skimindex shell --mount ./sandbox:/sandbox
@@ -86,6 +89,44 @@ mounts can be stacked:
 
 ```bash
 skimindex shell --mount ./sandbox:/sandbox --mount /data/ref:/ref
+```
+
+Use `--dev` during Lua script development to avoid rebuilding the image on
+every change:
+
+```bash
+skimindex shell --dev --mount ./sandbox:/sandbox
+```
+
+### `script`
+
+Run a host-side bash script non-interactively inside the container. The script
+executes in the same environment as the interactive `shell` — same bind-mounts,
+same `SKIMINDEX__*` variables, same `PATH`.
+
+```bash
+skimindex script [options] SCRIPT [ARGS...]
+skimindex script --help
+```
+
+| Option | Description |
+|--------|-------------|
+| `--mount SRC:DST` | Add an extra bind-mount. May be repeated. Source path may be relative to the project directory. |
+| `--dev` | Mount `<project-dir>/obiluascripts/` into the container at `/app/obiluascripts`. |
+| `-h`, `--help` | Show script subcommand help and exit. |
+
+The script file is mounted read-only inside the container and executed with
+`bash`. Additional arguments are forwarded to the script.
+
+```bash
+# Run a local script inside the container
+skimindex script ./my_analysis.sh
+
+# With extra mounts and arguments
+skimindex script --mount ./sandbox:/sandbox ./process.sh --input /sandbox/data.fa
+
+# With live Lua scripts
+skimindex script --dev ./run_decontam.sh
 ```
 
 #### `reload_config`

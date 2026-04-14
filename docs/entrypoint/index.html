@@ -515,7 +515,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="shell">
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        script
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="script">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1816,7 +1827,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="shell">
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        script
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="script">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1975,7 +1997,8 @@ run unless <code>--local</code> is set.</p>
 <h3 id="shell"><code>shell</code></h3>
 <p>Start an interactive bash session inside the container with all project
 directories bind-mounted.</p>
-<pre><code class="language-bash">skimindex shell [--mount SRC:DST] …
+<pre><code class="language-bash">skimindex shell [options]
+skimindex shell --help
 </code></pre>
 <table>
 <thead>
@@ -1987,19 +2010,71 @@ directories bind-mounted.</p>
 <tbody>
 <tr>
 <td><code>--mount SRC:DST</code></td>
-<td>Add an extra bind-mount on top of the config-driven ones. May be repeated.</td>
+<td>Add an extra bind-mount on top of the config-driven ones. May be repeated. Source path may be relative to the project directory.</td>
+</tr>
+<tr>
+<td><code>--dev</code></td>
+<td>Mount <code>&lt;project-dir&gt;/obiluascripts/</code> into the container at <code>/app/obiluascripts</code>, overriding the image's bundled scripts. Useful for live editing without rebuilding.</td>
+</tr>
+<tr>
+<td><code>-h</code>, <code>--help</code></td>
+<td>Show shell subcommand help and exit.</td>
 </tr>
 </tbody>
 </table>
 <p>The shell automatically loads <code>config/skimindex.toml</code> on startup and exports
 all values as <code>SKIMINDEX__*</code> environment variables.</p>
 <p>Use <code>--mount</code> to make additional host directories available inside the
-container. The source path may be relative to the current working directory:</p>
+container. The source path may be relative to the project directory:</p>
 <pre><code class="language-bash">skimindex shell --mount ./sandbox:/sandbox
 </code></pre>
 <p>Inside the container, the directory is then accessible at <code>/sandbox</code>. Multiple
 mounts can be stacked:</p>
 <pre><code class="language-bash">skimindex shell --mount ./sandbox:/sandbox --mount /data/ref:/ref
+</code></pre>
+<p>Use <code>--dev</code> during Lua script development to avoid rebuilding the image on
+every change:</p>
+<pre><code class="language-bash">skimindex shell --dev --mount ./sandbox:/sandbox
+</code></pre>
+<h3 id="script"><code>script</code></h3>
+<p>Run a host-side bash script non-interactively inside the container. The script
+executes in the same environment as the interactive <code>shell</code> — same bind-mounts,
+same <code>SKIMINDEX__*</code> variables, same <code>PATH</code>.</p>
+<pre><code class="language-bash">skimindex script [options] SCRIPT [ARGS...]
+skimindex script --help
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--mount SRC:DST</code></td>
+<td>Add an extra bind-mount. May be repeated. Source path may be relative to the project directory.</td>
+</tr>
+<tr>
+<td><code>--dev</code></td>
+<td>Mount <code>&lt;project-dir&gt;/obiluascripts/</code> into the container at <code>/app/obiluascripts</code>.</td>
+</tr>
+<tr>
+<td><code>-h</code>, <code>--help</code></td>
+<td>Show script subcommand help and exit.</td>
+</tr>
+</tbody>
+</table>
+<p>The script file is mounted read-only inside the container and executed with
+<code>bash</code>. Additional arguments are forwarded to the script.</p>
+<pre><code class="language-bash"># Run a local script inside the container
+skimindex script ./my_analysis.sh
+
+# With extra mounts and arguments
+skimindex script --mount ./sandbox:/sandbox ./process.sh --input /sandbox/data.fa
+
+# With live Lua scripts
+skimindex script --dev ./run_decontam.sh
 </code></pre>
 <h4 id="reload_config"><code>reload_config</code></h4>
 <p>A <code>reload_config</code> function is available in the shell to re-read the

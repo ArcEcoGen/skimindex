@@ -27,6 +27,13 @@
 #                        the container (/app/obiluascripts) for live editing
 #                        without rebuilding the image.
 #
+# script options:
+#   -h, --help           Show this help and exit.
+#   --mount SRC:DST      Bind-mount SRC (host) to DST (container).
+#                        May be repeated for multiple extra mounts.
+#   --dev                Same as shell --dev.
+#   SCRIPT [ARGS...]     Path to the bash script to run (and its arguments).
+#
 # Configuration:
 #   <project-dir>/config/skimindex.toml
 #       Pipeline configuration.  The [local_directories] section maps each
@@ -280,6 +287,45 @@ _ski_run_interactive() {
     fi
 }
 
+# _ski_run_script extra_mounts_count script [args...]
+#   Runs a host bash script inside the container with the same mounts as
+#   _ski_run_interactive, but non-interactively.
+#   $1        = number of extra mounts that follow
+#   $2..N     = extra mount specs
+#   remaining = script path + args
+_ski_run_script() {
+    local _nmounts="$1"; shift
+    local _extra_mounts=()
+    for (( _i=0; _i<_nmounts; _i++ )); do
+        _extra_mounts+=("$1"); shift
+    done
+    local _script="$1"; shift
+    local _script_abs
+    _script_abs="$(cd "$(dirname "$_script")" && pwd)/$(basename "$_script")"
+
+    _ski_ensure_dirs
+    _ski_ensure_current
+    local _SKI_FULL_IMAGE="${_SKI_IMAGE_REGISTRY}/${_SKI_IMAGE_NAME}:${_SKI_IMAGE_TAG}"
+    local BIND=()
+    local _shell_init=/app/scripts/__ski_shell_init.sh
+    if [[ "$RUNTIME" == "apptainer" ]]; then
+        _ski_build_bind_array "--bind"
+        for _m in "${_extra_mounts[@]}"; do BIND+=(--bind "$(_ski_abs_mount "$_m")"); done
+        BIND+=(--bind "${_script_abs}:/tmp/__ski_script.sh:ro")
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(--bind "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml")
+        APPTAINERENV_PREPEND_PATH=/app/bin:/app/scripts \
+        apptainer exec --pwd /app "${BIND[@]}" "$SIF_FILE" \
+            bash --init-file "$_shell_init" /tmp/__ski_script.sh "$@"
+    else
+        _ski_build_bind_array "-v"
+        for _m in "${_extra_mounts[@]}"; do BIND+=(-v "$(_ski_abs_mount "$_m")"); done
+        BIND+=(-v "${_script_abs}:/tmp/__ski_script.sh:ro")
+        [[ -n "$_SKI_CONFIG_OVERRIDE" ]] && BIND+=(-v "${_SKI_CONFIG_OVERRIDE}:/config/skimindex.toml:ro")
+        "$RUNTIME" run --rm "${BIND[@]}" "$_SKI_FULL_IMAGE" \
+            bash --init-file "$_shell_init" /tmp/__ski_script.sh "$@"
+    fi
+}
+
 _ski_run_exec() {
     _ski_ensure_dirs
     _ski_ensure_current
@@ -483,6 +529,39 @@ case "$SUBCMD" in
             esac
         done
         _ski_run_interactive "${_shell_mounts[@]}"
+        exit 0
+        ;;
+    script)
+        if [[ "$RUNTIME" == "none" ]]; then
+            logerror "No container runtime found (apptainer, docker or podman required)."
+            exit 1
+        fi
+        _script_mounts=()
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                -h|--help)
+                    awk '
+                        /^# script options:/ { p=1 }
+                        p && /^# [A-Z]/ && !/^# script/ { exit }
+                        p { sub(/^# ?/, ""); print }
+                    ' "$0"
+                    exit 0 ;;
+                --dev)
+                    _script_mounts+=("${PROJECT_ROOT}/obiluascripts:/app/obiluascripts")
+                    shift ;;
+                --mount)     _script_mounts+=("$2"); shift 2 ;;
+                --mount=*)   _script_mounts+=("${1#--mount=}"); shift ;;
+                --)          shift; break ;;
+                -*)          logerror "Unknown script option: $1"; exit 1 ;;
+                *)           break ;;
+            esac
+        done
+        if [[ $# -eq 0 ]]; then
+            logerror "script: missing script path."
+            logerror "Run '$(basename "$0") script --help' for usage."
+            exit 1
+        fi
+        _ski_run_script "${#_script_mounts[@]}" "${_script_mounts[@]+"${_script_mounts[@]}"}" "$@"
         exit 0
         ;;
 esac
