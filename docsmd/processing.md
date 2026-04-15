@@ -238,6 +238,48 @@ dataset.to_index_data()
 
 ---
 
+## Decontamination cleaning pipeline
+
+The cleaning pipeline decontaminates genome and genome-skim reads against the
+contamination k-mer index. It operates on all datasets with
+`role = "genomes"` or `role = "genome_skims"`, one individual at a time.
+
+### Pipeline steps (per individual)
+
+```
+dataset.to_data()   (one Data per individual — FILES with 1 or 2 paths)
+    → obiscript kmquery.lua --fasta-output -Z   → tmp/{sample}_R1_annotated.fasta.gz
+    → obiscript kmquery.lua --fasta-output -Z   → tmp/{sample}_R2_annotated.fasta.gz  (paired only)
+    → obigrep -p "annotations.contamination && annotations.kmindex_score >= min_score"
+              -Z --fasta-output
+              --save-discarded {sample}_good.fasta.gz
+              --out             {sample}_discarded.fasta.gz
+```
+
+The contaminating and counter-example library names (`not_ok_libs`, `ok_libs`)
+are auto-derived from `role = "decontamination"` datasets: `example = true` →
+NOT_OK, `example = false` → OK. They can be overridden via the processing
+section parameters or the environment variables `KMINDEX_CONTAM_NOT_OK_LIBS` /
+`KMINDEX_CONTAM_OK_LIBS`.
+
+### Per-individual targeting
+
+Because decontaminating one individual can take ~12 hours, `decontam clean`
+supports per-individual targeting:
+
+```bash
+# List all available dataset/species/individual combinations
+skimindex decontam clean --list
+
+# Clean one species across all individuals
+skimindex decontam clean --dataset species_15x --species Betula_nana
+
+# Clean a single individual
+skimindex decontam clean --dataset species_15x --species Betula_nana --individual IGA-24-34
+```
+
+---
+
 ## Decontamination index pipeline
 
 The decontamination pipeline transforms downloaded reference sequences into a

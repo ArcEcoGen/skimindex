@@ -562,6 +562,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#decontam-clean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        decontam clean
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1802,6 +1813,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#decontam-clean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        decontam clean
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1974,6 +1996,7 @@ and remove reads whose k-mer content overlaps with the reference.</p>
 skimindex decontam prepare [options]      # step 1 — fragment reference sequences
 skimindex decontam count   [options]      # step 2 — count k-mers (ntcard)
 skimindex decontam index   [options]      # step 3 — build kmindex sub-indexes
+skimindex decontam clean   [options]      # step 4 — decontaminate genome/skim datasets
 </code></pre>
 <p>Each step is stamped independently. Re-running <code>decontam</code> skips any dataset
 whose output is already stamped.</p>
@@ -2113,6 +2136,66 @@ dataset is written to <code>processed_data/decontamination/{dataset}/kmindex/</c
 </tr>
 </tbody>
 </table>
+<h3 id="decontam-clean"><code>decontam clean</code></h3>
+<p>Decontaminates genome and genome-skim datasets against the contamination k-mer
+index built by the three steps above. Operates on all datasets with
+<code>role = "genomes"</code> or <code>role = "genome_skims"</code>.</p>
+<p>For each individual, the pipeline:</p>
+<ol>
+<li>Annotates each read file with <code>kmquery.lua</code> via <code>obiscript</code>, outputting
+   compressed FASTA with <code>kmindex_score</code> and <code>contamination</code> annotations.</li>
+<li>Filters with <code>obigrep</code> using the predicate
+   <code>annotations.contamination &amp;&amp; annotations.kmindex_score &gt;= min_score</code>.
+   Paired-end reads are filtered with <code>--paired-mode or</code> (a pair is discarded
+   when <strong>either</strong> read is contaminated).</li>
+</ol>
+<p>Output per individual (always gzip-compressed FASTA):</p>
+<pre><code>processed_data/{role_dir}/{dataset}/{species}/{individual}/cleaned/
+    {sample}_good.fasta.gz       — sequences that pass (not contaminated)
+    {sample}_discarded.fasta.gz  — sequences that fail (contaminated)
+</code></pre>
+<pre><code>skimindex decontam clean                             # clean all datasets
+skimindex decontam clean --dataset species_15x       # one dataset
+skimindex decontam clean --dataset species_15x --species Betula_nana
+skimindex decontam clean --dataset species_15x --species Betula_nana --individual IGA-24-34
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--dataset NAME</code></td>
+<td>Process a single genomes/genome_skims dataset.</td>
+</tr>
+<tr>
+<td><code>--species NAME</code></td>
+<td>Restrict to a single species (as listed by <code>--list</code>).</td>
+</tr>
+<tr>
+<td><code>--individual NAME</code></td>
+<td>Restrict to a single individual (requires <code>--species</code>).</td>
+</tr>
+<tr>
+<td><code>--list</code></td>
+<td>Print available dataset/species/individual combinations as CSV and exit.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Show what would be processed without executing.</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>--list</code> output is a multi-column CSV:</p>
+<pre><code>dataset,species,individual
+species_15x,Betula_exilis,IGA-24-33
+species_15x,Betula_nana,IGA-24-34
+vaccinium_skims,Vaccinium_myrtillus,SAMEA9098823
+…
+</code></pre>
 <hr />
 <h2 id="validate-validate-configuration"><code>validate</code> — Validate configuration</h2>
 <p>Loads <code>config/skimindex.toml</code>, runs all validation rules, and reports errors.</p>

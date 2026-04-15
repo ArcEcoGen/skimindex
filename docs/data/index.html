@@ -450,6 +450,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#sra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sra
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1824,6 +1835,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#sra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sra
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2017,8 +2039,30 @@ at pipeline time using <code>obigrep</code> with:
 - a <strong>division filter</strong> (<code>divisions</code> key) — selects flat-files by GenBank division
 - an optional <strong>taxid filter</strong> (<code>taxid</code> key) — keeps only sequences in a given taxon</p>
 <h3 id="internal"><code>internal</code></h3>
-<p>In-house sequencing data. No download step — files must be placed manually
-in the source directory. No additional convention is imposed.</p>
+<p>In-house sequencing data. No download step — files must be placed manually in
+the source directory. The expected layout is a level-2 species-organised tree:</p>
+<pre><code>{source.internal.directory}/{data.directory}/
+  {Species}/
+    {individual}/
+      {sample}_R1_001.fastq.gz   ← Illumina paired-end R1
+      {sample}_R2_001.fastq.gz   ← Illumina paired-end R2
+      {sample}.fasta.gz           ← or single-end / Nanopore (any OBITools format)
+</code></pre>
+<p>Pairing is detected automatically: two files in the same individual directory
+are considered a pair if and only if they are identical in length and differ in
+exactly one character (<code>'1'</code> vs <code>'2'</code>). Nanopore or single-file samples (no R1/R2
+pattern) are yielded as single-end <code>Data</code> items.</p>
+<h3 id="sra"><code>sra</code></h3>
+<p>Raw reads downloaded from NCBI SRA via <code>fasterq-dump</code>. EBI (ERR/ERS/SAMEA) and
+DDBJ accessions are mirrored at NCBI and supported transparently.</p>
+<p>The download layout follows the same level-2 species-organised structure:</p>
+<pre><code>{source.sra.directory}/{data.directory}/
+  {organism}/
+    {biosample}/
+      {run}_1.fastq.gz
+      {run}_2.fastq.gz
+</code></pre>
+<p>Pairing uses the same <code>'1'</code>/<code>'2'</code> detection as <code>internal</code> data.</p>
 <hr />
 <h2 id="datasets">Datasets</h2>
 <p>A dataset (<code>[data.X]</code>) is a named collection of sequences that:
@@ -2052,8 +2096,13 @@ pipeline. The exact number and kind depends on the source:</p>
 </tr>
 <tr>
 <td><code>internal</code></td>
-<td><em>not yet implemented</em></td>
-<td>—</td>
+<td><code>FILES</code></td>
+<td>individual — paired-end (R1+R2) or single-end, any OBITools format</td>
+</tr>
+<tr>
+<td><code>sra</code></td>
+<td><code>FILES</code></td>
+<td>run — paired-end (R1+R2) downloaded by fasterq-dump</td>
 </tr>
 </tbody>
 </table>

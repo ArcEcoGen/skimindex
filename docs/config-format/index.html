@@ -617,6 +617,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#type-decontam_clean-decontaminate-genome-or-skim-sequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        type = "decontam_clean" — Decontaminate genome or skim sequences
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#type-buildindex-build-a-kmindex-sub-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2302,6 +2313,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#type-decontam_clean-decontaminate-genome-or-skim-sequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        type = "decontam_clean" — Decontaminate genome or skim sequences
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#type-buildindex-build-a-kmindex-sub-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2924,7 +2946,7 @@ run       = &quot;prepare_decontam&quot;
 </tbody>
 </table>
 <pre><code class="language-toml">[role.genomes]
-directory = &quot;genomes_15x&quot;
+directory = &quot;genomes&quot;
 kmer_size = 31
 </code></pre>
 <h3 id="rolegenome_skims"><code>[role.genome_skims]</code></h3>
@@ -3063,6 +3085,72 @@ steps = [
   {type = &quot;distribute&quot;,    batches = 20},
 ]
 </code></pre>
+<h3 id="type-decontam_clean-decontaminate-genome-or-skim-sequences"><code>type = "decontam_clean"</code> — Decontaminate genome or skim sequences</h3>
+<p>Decontaminates genome or genome-skim reads against the contamination k-mer index
+produced by <code>buildindex</code>. Accepts single-end (FASTA or FASTQ, including Nanopore)
+or paired-end (Illumina R1 + R2) input. Output is always gzip-compressed FASTA.</p>
+<p>For paired-end input, a pair is discarded when <strong>either</strong> read is contaminated
+(<code>--paired-mode or</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>output</code></td>
+<td>string</td>
+<td>yes</td>
+<td>Artifact ref for the cleaned output: <code>"cleaned@genomes"</code> or <code>"cleaned@genome_skims"</code></td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>integer</td>
+<td>no</td>
+<td><code>--batch-size-max</code> passed to <code>obiscript</code> (default: 50)</td>
+</tr>
+<tr>
+<td><code>min_score</code></td>
+<td>float</td>
+<td>no</td>
+<td>Minimum <code>kmindex_score</code> to call contamination (default: 0.03)</td>
+</tr>
+<tr>
+<td><code>not_ok_libs</code></td>
+<td>string</td>
+<td>no</td>
+<td>Comma-separated contaminating library names. Default: auto-derived from <code>role = "decontamination"</code> datasets where <code>example = true</code>.</td>
+</tr>
+<tr>
+<td><code>ok_libs</code></td>
+<td>string</td>
+<td>no</td>
+<td>Comma-separated counter-example library names. Default: auto-derived from datasets where <code>example = false</code>.</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-toml">[processing.clean_genomes]
+type       = &quot;decontam_clean&quot;
+output     = &quot;cleaned@genomes&quot;
+batch_size = 50
+min_score  = 0.03
+
+[processing.clean_genome_skims]
+type       = &quot;decontam_clean&quot;
+output     = &quot;cleaned@genome_skims&quot;
+batch_size = 50
+min_score  = 0.03
+</code></pre>
+<p>Output per individual:</p>
+<pre><code>processed_data/{role_dir}/{dataset}/{species}/{individual}/cleaned/
+    {sample}_good.fasta.gz       — sequences that pass (not contaminated)
+    {sample}_discarded.fasta.gz  — sequences that fail (contaminated)
+</code></pre>
+<hr />
 <h3 id="type-buildindex-build-a-kmindex-sub-index"><code>type = "buildindex"</code> — Build a kmindex sub-index</h3>
 <p>Builds a kmindex presence/absence Bloom filter sub-index for a dataset and
 registers it in a global meta-index. Called <strong>once per dataset</strong> via
@@ -3419,6 +3507,21 @@ reference        = false
 assembly_level   = &quot;complete&quot;
 assembly_version = &quot;latest&quot;
 one_per          = &quot;genus&quot;
+
+# Internal genome skims — Illumina paired-end, level-2 layout under raw_data/
+[data.species_15x]
+source    = &quot;internal&quot;
+role      = &quot;genomes&quot;
+directory = &quot;genomes_15x/species&quot;   # → raw_data/genomes_15x/species/{Species}/{individual}/
+
+# SRA genome skims — downloaded via fasterq-dump
+[data.vaccinium_skims]
+source     = &quot;sra&quot;
+role       = &quot;genome_skims&quot;
+directory  = &quot;Vaccinum&quot;
+accessions = [&quot;ERR7254753&quot;]
+biosamples = [&quot;SAMEA10885714&quot;]
+threads    = 4
 </code></pre>
 <h3 id="future-data-sections-not-yet-active">Future data sections (not yet active)</h3>
 <pre><code class="language-toml"># Complete reference genome downloaded from NCBI
@@ -3428,12 +3531,6 @@ one_per          = &quot;genus&quot;
 # taxon            = &quot;Arabidopsis thaliana&quot;
 # assembly_level   = &quot;chromosome&quot;
 # assembly_version = &quot;latest&quot;
-
-# Internal skim-sequenced genome
-# [data.betula_nana]
-# source    = &quot;internal&quot;
-# role      = &quot;genome_skims&quot;
-# directory = &quot;Betula_nana&quot;
 </code></pre>
 <hr />
 <h2 id="validation-rules">Validation Rules</h2>

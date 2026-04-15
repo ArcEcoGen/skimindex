@@ -2322,7 +2322,7 @@ for ds in datasets_for_role("decontamination"):
             </td>
             <td>
               <div class="doc-md-description">
-                <p>or one <code>Data</code> per GenBank division for <code>genbank</code> sources</p>
+                <p>one <code>Data</code> per GenBank division for <code>genbank</code> sources (<code>STREAM</code></p>
               </div>
             </td>
           </tr>
@@ -2332,7 +2332,17 @@ for ds in datasets_for_role("decontamination"):
             </td>
             <td>
               <div class="doc-md-description">
-                <p>(<code>STREAM</code> kind, optionally filtered by taxid).</p>
+                <p>kind), or one <code>Data</code> per R1/R2 pair for <code>sra</code> / <code>internal</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="Data">Data</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>sources (<code>FILES</code> kind with 1 or 2 paths).</p>
               </div>
             </td>
           </tr>

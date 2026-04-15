@@ -71,6 +71,7 @@ skimindex decontam                        # run full pipeline (prepare + count +
 skimindex decontam prepare [options]      # step 1 — fragment reference sequences
 skimindex decontam count   [options]      # step 2 — count k-mers (ntcard)
 skimindex decontam index   [options]      # step 3 — build kmindex sub-indexes
+skimindex decontam clean   [options]      # step 4 — decontaminate genome/skim datasets
 ```
 
 Each step is stamped independently. Re-running `decontam` skips any dataset
@@ -186,6 +187,54 @@ dataset is written to `processed_data/decontamination/{dataset}/kmindex/`.
 | `--dataset NAME` | Process a single decontamination dataset. |
 | `--list` | Print available datasets and exit. |
 | `--dry-run` | Show what would be processed without executing. |
+
+### `decontam clean`
+
+Decontaminates genome and genome-skim datasets against the contamination k-mer
+index built by the three steps above. Operates on all datasets with
+`role = "genomes"` or `role = "genome_skims"`.
+
+For each individual, the pipeline:
+
+1. Annotates each read file with `kmquery.lua` via `obiscript`, outputting
+   compressed FASTA with `kmindex_score` and `contamination` annotations.
+2. Filters with `obigrep` using the predicate
+   `annotations.contamination && annotations.kmindex_score >= min_score`.
+   Paired-end reads are filtered with `--paired-mode or` (a pair is discarded
+   when **either** read is contaminated).
+
+Output per individual (always gzip-compressed FASTA):
+
+```
+processed_data/{role_dir}/{dataset}/{species}/{individual}/cleaned/
+    {sample}_good.fasta.gz       — sequences that pass (not contaminated)
+    {sample}_discarded.fasta.gz  — sequences that fail (contaminated)
+```
+
+```
+skimindex decontam clean                             # clean all datasets
+skimindex decontam clean --dataset species_15x       # one dataset
+skimindex decontam clean --dataset species_15x --species Betula_nana
+skimindex decontam clean --dataset species_15x --species Betula_nana --individual IGA-24-34
+```
+
+| Option | Description |
+|--------|-------------|
+| `--dataset NAME` | Process a single genomes/genome_skims dataset. |
+| `--species NAME` | Restrict to a single species (as listed by `--list`). |
+| `--individual NAME` | Restrict to a single individual (requires `--species`). |
+| `--list` | Print available dataset/species/individual combinations as CSV and exit. |
+| `--dry-run` | Show what would be processed without executing. |
+
+The `--list` output is a multi-column CSV:
+
+```
+dataset,species,individual
+species_15x,Betula_exilis,IGA-24-33
+species_15x,Betula_nana,IGA-24-34
+vaccinium_skims,Vaccinium_myrtillus,SAMEA9098823
+…
+```
 
 ---
 

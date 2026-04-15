@@ -589,6 +589,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#decontamination-cleaning-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decontamination cleaning pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decontamination cleaning pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-steps-per-individual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline steps (per individual)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-individual-targeting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-individual targeting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#decontamination-index-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2095,6 +2134,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#decontamination-cleaning-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decontamination cleaning pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decontamination cleaning pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-steps-per-individual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline steps (per individual)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-individual-targeting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-individual targeting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#decontamination-index-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2519,6 +2597,37 @@ run       = &quot;prepare_decontam&quot;
     → count_kmers_decontam      → processed_data/decontamination/{dataset}/kmercount/
     → build_index_decontam      → processed_data/decontamination/{dataset}/kmindex/  (FOF + stamp)
                                    indexes/decontamination/  (global meta-index, managed by kmindex)
+</code></pre>
+<hr />
+<h2 id="decontamination-cleaning-pipeline">Decontamination cleaning pipeline</h2>
+<p>The cleaning pipeline decontaminates genome and genome-skim reads against the
+contamination k-mer index. It operates on all datasets with
+<code>role = "genomes"</code> or <code>role = "genome_skims"</code>, one individual at a time.</p>
+<h3 id="pipeline-steps-per-individual">Pipeline steps (per individual)</h3>
+<pre><code>dataset.to_data()   (one Data per individual — FILES with 1 or 2 paths)
+    → obiscript kmquery.lua --fasta-output -Z   → tmp/{sample}_R1_annotated.fasta.gz
+    → obiscript kmquery.lua --fasta-output -Z   → tmp/{sample}_R2_annotated.fasta.gz  (paired only)
+    → obigrep -p &quot;annotations.contamination &amp;&amp; annotations.kmindex_score &gt;= min_score&quot;
+              -Z --fasta-output
+              --save-discarded {sample}_good.fasta.gz
+              --out             {sample}_discarded.fasta.gz
+</code></pre>
+<p>The contaminating and counter-example library names (<code>not_ok_libs</code>, <code>ok_libs</code>)
+are auto-derived from <code>role = "decontamination"</code> datasets: <code>example = true</code> →
+NOT_OK, <code>example = false</code> → OK. They can be overridden via the processing
+section parameters or the environment variables <code>KMINDEX_CONTAM_NOT_OK_LIBS</code> /
+<code>KMINDEX_CONTAM_OK_LIBS</code>.</p>
+<h3 id="per-individual-targeting">Per-individual targeting</h3>
+<p>Because decontaminating one individual can take ~12 hours, <code>decontam clean</code>
+supports per-individual targeting:</p>
+<pre><code class="language-bash"># List all available dataset/species/individual combinations
+skimindex decontam clean --list
+
+# Clean one species across all individuals
+skimindex decontam clean --dataset species_15x --species Betula_nana
+
+# Clean a single individual
+skimindex decontam clean --dataset species_15x --species Betula_nana --individual IGA-24-34
 </code></pre>
 <hr />
 <h2 id="decontamination-index-pipeline">Decontamination index pipeline</h2>

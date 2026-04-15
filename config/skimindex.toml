@@ -94,7 +94,7 @@ run       = "prepare_decontam" # references [processing.prepare_decontam]
 
 # Parameters for the complete reference genomes role.
 [role.genomes]
-directory = "genomes_15x"
+directory = "genomes"
 kmer_size = 31
 
 # Parameters for the low-coverage skim-sequenced genomes role.
@@ -135,6 +135,20 @@ zvalue    = 3      # k-mers required for a positive query result
 fpr       = 1e-3   # target false positive rate
 threads   = 10
 verbose   = "debug"
+
+# Atomic: decontaminate complete reference genomes (FASTA, single-end).
+[processing.clean_genomes]
+type       = "decontam_clean"
+output     = "cleaned@genomes"
+batch_size = 50
+min_score  = 0.03
+
+# Atomic: decontaminate genome skim reads (FASTQ, paired-end).
+[processing.clean_genome_skims]
+type       = "decontam_clean"
+output     = "cleaned@genome_skims"
+batch_size = 50
+min_score  = 0.03
 
 # -----------------------------------------------------------------------------
 # Data sections
@@ -192,6 +206,11 @@ directory  = "Vaccinum"
 accessions = ["ERR7254753", "ERX6824156"]           # SRR/ERR/DRR run accessions
 biosamples = ["SAMEA10885714" , "ERS8536882"]         # SAMEA/ERS/SRS biosample IDs → all associated runs fetched
 threads    = 4                        # fasterq-dump parallelism
+
+[data.species_15x]
+source           = "internal"
+role             = "genomes"
+directory        = "genomes_15x/species"
 
 # -----------------------------------------------------------------------------
 # Future data sections (not yet active)

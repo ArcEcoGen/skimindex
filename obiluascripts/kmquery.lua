@@ -216,7 +216,9 @@ local function annotate(sequence, seq_id, data)
     sequence:attribute("contamination", contamination)
     sequence:attribute("kmindex_contam_libraries", not_ok_matched)
     sequence:attribute("kmindex_matched_libraries", all_matched)
-    sequence:attribute("kmindex_best_match", best_lib)
+    if best_lib ~= nil then
+        sequence:attribute("kmindex_best_match", best_lib)
+    end
 
 
     if DEBUG then
