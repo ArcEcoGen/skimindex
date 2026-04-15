@@ -20,6 +20,21 @@ from typing import Any
 
 from skimindex.config import config
 
+# ---------------------------------------------------------------------------
+# Paired-end detection helper
+# ---------------------------------------------------------------------------
+
+def _are_pair(a: str, b: str) -> bool:
+    """True if filenames a and b form a paired-end pair.
+
+    They must have the same length, differ in exactly one character,
+    and that character must be '1' in a and '2' in b.
+    """
+    if len(a) != len(b):
+        return False
+    diffs = [(ca, cb) for ca, cb in zip(a, b) if ca != cb]
+    return len(diffs) == 1 and diffs[0] == ("1", "2")
+
 
 # ---------------------------------------------------------------------------
 # Dataset
@@ -106,8 +121,9 @@ class Dataset:
 
         Yields:
             One ``Data`` per genome file for ``ncbi`` sources (``FILES`` kind),
-            or one ``Data`` per GenBank division for ``genbank`` sources
-            (``STREAM`` kind, optionally filtered by taxid).
+            one ``Data`` per GenBank division for ``genbank`` sources (``STREAM``
+            kind), or one ``Data`` per R1/R2 pair for ``sra`` / ``internal``
+            sources (``FILES`` kind with 1 or 2 paths).
 
         Raises:
             ValueError: If ``source`` is not a supported value.
@@ -116,6 +132,10 @@ class Dataset:
             yield from self._ncbi_data()
         elif self.source == "genbank":
             yield from self._genbank_data()
+        elif self.source == "sra":
+            yield from self._sra_data()
+        elif self.source == "internal":
+            yield from self._internal_data()
         else:
             raise ValueError(
                 f"Dataset [{self.name}]: unsupported source {self.source!r}"
@@ -163,6 +183,78 @@ class Dataset:
             if taxid_filter is not None:
                 data = taxid_filter(data)
             yield data
+
+    def _sra_data(self) -> Iterator["Data"]:  # noqa: F821
+        """Yield FILES Data for SRA FASTQ runs.
+
+        SRA download layout (level-2):
+            {download_dir}/{organism}/{biosample}/{run}_1.fastq.gz
+            {download_dir}/{organism}/{biosample}/{run}_2.fastq.gz
+        """
+        from collections import defaultdict
+        from skimindex.naming import scan_species_dir
+        from skimindex.processing.data import files_data
+        from skimindex.sources import output_dir as role_output_dir
+
+        base = self.output_dir.relative_to(role_output_dir("role", self.role))
+        dl = self.download_dir
+
+        if not dl.exists():
+            return
+
+        groups: dict[Path, list[Path]] = defaultdict(list)
+        for f, subdir in scan_species_dir(dl):
+            groups[subdir].append(f)
+
+        for subdir, files in sorted(groups.items()):
+            files = sorted(files, key=lambda f: f.name)
+            if len(files) >= 2 and _are_pair(files[0].name, files[1].name):
+                r1, r2 = files[0], files[1]
+                fmt = "".join(r1.suffixes).lstrip(".")
+                yield files_data([r1, r2], format=fmt, subdir=base / subdir,
+                                 per_species=False)
+            else:
+                for f in files:
+                    fmt = "".join(f.suffixes).lstrip(".")
+                    yield files_data([f], format=fmt, subdir=base / subdir,
+                                     per_species=False)
+
+    def _internal_data(self) -> Iterator["Data"]:  # noqa: F821
+        """Yield FILES Data for internal sequencing data.
+
+        Uses scan_species_dir to enumerate files grouped by Species/individual subdir.
+        Detects R1/R2 paired-end (Illumina) and single-file (Nanopore, FASTA, …) layouts.
+
+        Layout expected under download_dir:
+            {Species}/{individual}/{files}   (level-2)
+        """
+        from collections import defaultdict
+        from skimindex.naming import scan_species_dir
+        from skimindex.processing.data import files_data
+        from skimindex.sources import output_dir as role_output_dir
+
+        base = self.output_dir.relative_to(role_output_dir("role", self.role))
+        dl = self.download_dir
+
+        if not dl.exists():
+            return
+
+        groups: dict[Path, list[Path]] = defaultdict(list)
+        for f, subdir in scan_species_dir(dl):
+            groups[subdir].append(f)
+
+        for subdir, files in sorted(groups.items()):
+            files = sorted(files, key=lambda f: f.name)
+            if len(files) >= 2 and _are_pair(files[0].name, files[1].name):
+                r1, r2 = files[0], files[1]
+                fmt = "".join(r1.suffixes).lstrip(".")
+                yield files_data([r1, r2], format=fmt, subdir=base / subdir,
+                                 per_species=self.per_species)
+            else:
+                for f in files:
+                    fmt = "".join(f.suffixes).lstrip(".")
+                    yield files_data([f], format=fmt, subdir=base / subdir,
+                                     per_species=self.per_species)
 
     def __repr__(self) -> str:
         return f"Dataset({self.name!r}, source={self.source!r}, role={self.role!r})"

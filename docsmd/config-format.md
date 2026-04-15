@@ -252,7 +252,7 @@ Parameters for the complete reference genomes role.
 
 ```toml
 [role.genomes]
-directory = "genomes_15x"
+directory = "genomes"
 kmer_size = 31
 ```
 
@@ -331,6 +331,47 @@ steps = [
   {type = "distribute",    batches = 20},
 ]
 ```
+
+### `type = "decontam_clean"` — Decontaminate genome or skim sequences
+
+Decontaminates genome or genome-skim reads against the contamination k-mer index
+produced by `buildindex`. Accepts single-end (FASTA or FASTQ, including Nanopore)
+or paired-end (Illumina R1 + R2) input. Output is always gzip-compressed FASTA.
+
+For paired-end input, a pair is discarded when **either** read is contaminated
+(`--paired-mode or`).
+
+| Parameter     | Type    | Required | Description |
+|---------------|---------|----------|-------------|
+| `output`      | string  | yes      | Artifact ref for the cleaned output: `"cleaned@genomes"` or `"cleaned@genome_skims"` |
+| `batch_size`  | integer | no       | `--batch-size-max` passed to `obiscript` (default: 50) |
+| `min_score`   | float   | no       | Minimum `kmindex_score` to call contamination (default: 0.03) |
+| `not_ok_libs` | string  | no       | Comma-separated contaminating library names. Default: auto-derived from `role = "decontamination"` datasets where `example = true`. |
+| `ok_libs`     | string  | no       | Comma-separated counter-example library names. Default: auto-derived from datasets where `example = false`. |
+
+```toml
+[processing.clean_genomes]
+type       = "decontam_clean"
+output     = "cleaned@genomes"
+batch_size = 50
+min_score  = 0.03
+
+[processing.clean_genome_skims]
+type       = "decontam_clean"
+output     = "cleaned@genome_skims"
+batch_size = 50
+min_score  = 0.03
+```
+
+Output per individual:
+
+```
+processed_data/{role_dir}/{dataset}/{species}/{individual}/cleaned/
+    {sample}_good.fasta.gz       — sequences that pass (not contaminated)
+    {sample}_discarded.fasta.gz  — sequences that fail (contaminated)
+```
+
+---
 
 ### `type = "buildindex"` — Build a kmindex sub-index
 
@@ -514,6 +555,21 @@ reference        = false
 assembly_level   = "complete"
 assembly_version = "latest"
 one_per          = "genus"
+
+# Internal genome skims — Illumina paired-end, level-2 layout under raw_data/
+[data.species_15x]
+source    = "internal"
+role      = "genomes"
+directory = "genomes_15x/species"   # → raw_data/genomes_15x/species/{Species}/{individual}/
+
+# SRA genome skims — downloaded via fasterq-dump
+[data.vaccinium_skims]
+source     = "sra"
+role       = "genome_skims"
+directory  = "Vaccinum"
+accessions = ["ERR7254753"]
+biosamples = ["SAMEA10885714"]
+threads    = 4
 ```
 
 ### Future data sections (not yet active)
@@ -526,12 +582,6 @@ one_per          = "genus"
 # taxon            = "Arabidopsis thaliana"
 # assembly_level   = "chromosome"
 # assembly_version = "latest"
-
-# Internal skim-sequenced genome
-# [data.betula_nana]
-# source    = "internal"
-# role      = "genome_skims"
-# directory = "Betula_nana"
 ```
 
 ---

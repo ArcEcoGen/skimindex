@@ -9,7 +9,7 @@ All pipeline commands share a common set of flags inherited from the
 
 | Flag | Description |
 |------|-------------|
-| `--list` | Print available sections (datasets or divisions) as CSV and exit. |
+| `--list` | Print available sections (datasets or divisions) as multi-line CSV with header and exit. |
 | `--dry-run` | Show what would be done without executing anything. |
 | `--help` | Show command help and exit. |
 
@@ -33,8 +33,16 @@ Downloads GenBank flat-file divisions declared in `[source.genbank]`.
 |--------|-------------|
 | `--division DIV` | Process a single GenBank division (e.g. `pln`, `bct`). |
 | `--status` | Show download status without downloading. |
-| `--list` | Print available divisions and exit. |
+| `--list` | Print available divisions as multi-line CSV and exit. |
 | `--dry-run` | Show what would be downloaded without executing. |
+
+`--list` output example:
+
+```
+division
+bct
+pln
+```
 
 ### `download ncbi`
 
@@ -51,8 +59,16 @@ sections.
 | `--assembly-version VERSION` | Filter by assembly version (e.g. `latest`). |
 | `--reference` | Filter to reference assemblies only. |
 | `--status` | Show download status without downloading. |
-| `--list` | Print available datasets and exit. |
+| `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be downloaded without executing. |
+
+`--list` output example:
+
+```
+dataset
+human
+plants
+```
 
 ---
 
@@ -71,6 +87,7 @@ skimindex decontam                        # run full pipeline (prepare + count +
 skimindex decontam prepare [options]      # step 1 — fragment reference sequences
 skimindex decontam count   [options]      # step 2 — count k-mers (ntcard)
 skimindex decontam index   [options]      # step 3 — build kmindex sub-indexes
+skimindex decontam clean   [options]      # step 4 — decontaminate genome/skim datasets
 ```
 
 Each step is stamped independently. Re-running `decontam` skips any dataset
@@ -97,8 +114,18 @@ Output: `processed_data/decontamination/{dataset}/parts/`
 | Option | Description |
 |--------|-------------|
 | `--dataset NAME` | Process a single decontamination dataset (e.g. `human`, `fungi`). |
-| `--list` | Print available datasets and exit. |
+| `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be processed without executing. |
+
+`--list` output example:
+
+```
+dataset
+human
+fungi
+bacteria
+plants
+```
 
 ### `decontam count`
 
@@ -117,7 +144,7 @@ Output: `processed_data/decontamination/{dataset}/kmercount/`
 | Option | Description |
 |--------|-------------|
 | `--dataset NAME` | Process a single decontamination dataset. |
-| `--list` | Print available datasets and exit. |
+| `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be processed without executing. |
 
 ### `decontam index`
@@ -184,8 +211,56 @@ dataset is written to `processed_data/decontamination/{dataset}/kmindex/`.
 | Option | Description |
 |--------|-------------|
 | `--dataset NAME` | Process a single decontamination dataset. |
-| `--list` | Print available datasets and exit. |
+| `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be processed without executing. |
+
+### `decontam clean`
+
+Decontaminates genome and genome-skim datasets against the contamination k-mer
+index built by the three steps above. Operates on all datasets with
+`role = "genomes"` or `role = "genome_skims"`.
+
+For each individual, the pipeline:
+
+1. Annotates each read file with `kmquery.lua` via `obiscript`, outputting
+   compressed FASTA with `kmindex_score` and `contamination` annotations.
+2. Filters with `obigrep` using the predicate
+   `annotations.contamination && annotations.kmindex_score >= min_score`.
+   Paired-end reads are filtered with `--paired-mode or` (a pair is discarded
+   when **either** read is contaminated).
+
+Output per individual (always gzip-compressed FASTA):
+
+```
+processed_data/{role_dir}/{dataset}/{species}/{individual}/cleaned/
+    {sample}_good.fasta.gz       — sequences that pass (not contaminated)
+    {sample}_discarded.fasta.gz  — sequences that fail (contaminated)
+```
+
+```
+skimindex decontam clean                             # clean all datasets
+skimindex decontam clean --dataset species_15x       # one dataset
+skimindex decontam clean --dataset species_15x --species Betula_nana
+skimindex decontam clean --dataset species_15x --species Betula_nana --individual IGA-24-34
+```
+
+| Option | Description |
+|--------|-------------|
+| `--dataset NAME` | Process a single genomes/genome_skims dataset. |
+| `--species NAME` | Restrict to a single species (as listed by `--list`). |
+| `--individual NAME` | Restrict to a single individual (requires `--species`). |
+| `--list` | Print available dataset/species/individual combinations as multi-line CSV and exit. |
+| `--dry-run` | Show what would be processed without executing. |
+
+The `--list` output is a multi-column CSV:
+
+```
+dataset,species,individual
+species_15x,Betula_exilis,IGA-24-33
+species_15x,Betula_nana,IGA-24-34
+vaccinium_skims,Vaccinium_myrtillus,SAMEA9098823
+…
+```
 
 ---
 

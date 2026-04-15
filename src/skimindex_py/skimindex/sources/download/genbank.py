@@ -32,9 +32,9 @@ TAXOURL = f"https://{FTPNCBI}/pub/taxonomy/taxdump.tar.gz"
 
 
 def list_divisions() -> str:
-    """List available GenBank divisions as CSV from config."""
+    """List available GenBank divisions as multi-line CSV from config."""
     divisions = config().sources.get("genbank", {}).get("divisions", [])
-    return ",".join(divisions) if divisions else ""
+    return "\n".join(["division"] + list(divisions))
 
 
 @lru_cache(maxsize=1)

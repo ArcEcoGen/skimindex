@@ -70,8 +70,39 @@ at pipeline time using `obigrep` with:
 
 ### `internal`
 
-In-house sequencing data. No download step — files must be placed manually
-in the source directory. No additional convention is imposed.
+In-house sequencing data. No download step — files must be placed manually in
+the source directory. The expected layout is a level-2 species-organised tree:
+
+```
+{source.internal.directory}/{data.directory}/
+  {Species}/
+    {individual}/
+      {sample}_R1_001.fastq.gz   ← Illumina paired-end R1
+      {sample}_R2_001.fastq.gz   ← Illumina paired-end R2
+      {sample}.fasta.gz           ← or single-end / Nanopore (any OBITools format)
+```
+
+Pairing is detected automatically: two files in the same individual directory
+are considered a pair if and only if they are identical in length and differ in
+exactly one character (`'1'` vs `'2'`). Nanopore or single-file samples (no R1/R2
+pattern) are yielded as single-end `Data` items.
+
+### `sra`
+
+Raw reads downloaded from NCBI SRA via `fasterq-dump`. EBI (ERR/ERS/SAMEA) and
+DDBJ accessions are mirrored at NCBI and supported transparently.
+
+The download layout follows the same level-2 species-organised structure:
+
+```
+{source.sra.directory}/{data.directory}/
+  {organism}/
+    {biosample}/
+      {run}_1.fastq.gz
+      {run}_2.fastq.gz
+```
+
+Pairing uses the same `'1'`/`'2'` detection as `internal` data.
 
 ---
 
@@ -97,7 +128,8 @@ pipeline. The exact number and kind depends on the source:
 |-----------|--------|----------------|
 | `ncbi`    | `FILES` | genome assembly file (recursive scan of download dir) |
 | `genbank` | `FILES` or `STREAM` | division (after optional taxid filtering) |
-| `internal`| *not yet implemented* | — |
+| `internal`| `FILES` | individual — paired-end (R1+R2) or single-end, any OBITools format |
+| `sra`     | `FILES` | run — paired-end (R1+R2) downloaded by fasterq-dump |
 
 Each `Data` object carries a `subdir` — the relative path from the processed
 data root up to (but not including) the processing output directory. This

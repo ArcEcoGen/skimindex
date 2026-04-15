@@ -28,9 +28,9 @@ from skimindex.unix.ncbi import datasets, datasets_summary_genome
 
 
 def list_datasets() -> str:
-    """List NCBI dataset names as CSV from config."""
+    """List NCBI dataset names as multi-line CSV from config."""
     names = datasets_for_source("ncbi")
-    return ",".join(names) if names else ""
+    return "\n".join(["dataset"] + list(names))
 
 
 def list_assemblies(
