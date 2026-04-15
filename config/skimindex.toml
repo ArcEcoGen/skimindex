@@ -24,7 +24,8 @@
 # skimindex.sh.  Inside the container the path is always /<k>.
 [local_directories]
 genbank        = "genbank"
-indexes        = "indexes"
+indexes        = "/hoyt/PROJECTS/pr-phyloalps/coissac/G15x/indexes"
+#indexes        = "indexes"
 raw_data       = "raw_data"
 processed_data = "processed_data"
 sra            = "sra"            # raw sequencing reads from NCBI SRA
