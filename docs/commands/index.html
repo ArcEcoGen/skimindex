@@ -1884,7 +1884,7 @@ configuration see <a href="../entrypoint/">Entry Point</a>.</p>
 <tbody>
 <tr>
 <td><code>--list</code></td>
-<td>Print available sections (datasets or divisions) as CSV and exit.</td>
+<td>Print available sections (datasets or divisions) as multi-line CSV with header and exit.</td>
 </tr>
 <tr>
 <td><code>--dry-run</code></td>
@@ -1923,7 +1923,7 @@ skimindex download ncbi    [options]      # NCBI genome assemblies only
 </tr>
 <tr>
 <td><code>--list</code></td>
-<td>Print available divisions and exit.</td>
+<td>Print available divisions as multi-line CSV and exit.</td>
 </tr>
 <tr>
 <td><code>--dry-run</code></td>
@@ -1931,6 +1931,11 @@ skimindex download ncbi    [options]      # NCBI genome assemblies only
 </tr>
 </tbody>
 </table>
+<p><code>--list</code> output example:</p>
+<pre><code>division
+bct
+pln
+</code></pre>
 <h3 id="download-ncbi"><code>download ncbi</code></h3>
 <p>Downloads NCBI reference genome assemblies declared as <code>source = "ncbi"</code> data
 sections.</p>
@@ -1976,7 +1981,7 @@ sections.</p>
 </tr>
 <tr>
 <td><code>--list</code></td>
-<td>Print available datasets and exit.</td>
+<td>Print available datasets as multi-line CSV and exit.</td>
 </tr>
 <tr>
 <td><code>--dry-run</code></td>
@@ -1984,6 +1989,11 @@ sections.</p>
 </tr>
 </tbody>
 </table>
+<p><code>--list</code> output example:</p>
+<pre><code>dataset
+human
+plants
+</code></pre>
 <hr />
 <h2 id="decontam-build-decontamination-k-mer-index"><code>decontam</code> — Build decontamination k-mer index</h2>
 <p>Builds a <a href="https://tlemane.github.io/kmindex/">kmindex</a> presence/absence index
@@ -2029,7 +2039,7 @@ into a fixed number of FASTA batch files.</p>
 </tr>
 <tr>
 <td><code>--list</code></td>
-<td>Print available datasets and exit.</td>
+<td>Print available datasets as multi-line CSV and exit.</td>
 </tr>
 <tr>
 <td><code>--dry-run</code></td>
@@ -2037,6 +2047,13 @@ into a fixed number of FASTA batch files.</p>
 </tr>
 </tbody>
 </table>
+<p><code>--list</code> output example:</p>
+<pre><code>dataset
+human
+fungi
+bacteria
+plants
+</code></pre>
 <h3 id="decontam-count"><code>decontam count</code></h3>
 <p>Estimates the k-mer frequency spectrum of the prepared fragments using
 <a href="https://github.com/bcgsc/ntCard">ntCard</a>.</p>
@@ -2062,7 +2079,7 @@ The histogram includes two aggregate statistics used by the next step:</p>
 </tr>
 <tr>
 <td><code>--list</code></td>
-<td>Print available datasets and exit.</td>
+<td>Print available datasets as multi-line CSV and exit.</td>
 </tr>
 <tr>
 <td><code>--dry-run</code></td>
@@ -2128,7 +2145,7 @@ dataset is written to <code>processed_data/decontamination/{dataset}/kmindex/</c
 </tr>
 <tr>
 <td><code>--list</code></td>
-<td>Print available datasets and exit.</td>
+<td>Print available datasets as multi-line CSV and exit.</td>
 </tr>
 <tr>
 <td><code>--dry-run</code></td>
@@ -2181,7 +2198,7 @@ skimindex decontam clean --dataset species_15x --species Betula_nana --individua
 </tr>
 <tr>
 <td><code>--list</code></td>
-<td>Print available dataset/species/individual combinations as CSV and exit.</td>
+<td>Print available dataset/species/individual combinations as multi-line CSV and exit.</td>
 </tr>
 <tr>
 <td><code>--dry-run</code></td>

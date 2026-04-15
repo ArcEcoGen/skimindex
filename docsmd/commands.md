@@ -9,7 +9,7 @@ All pipeline commands share a common set of flags inherited from the
 
 | Flag | Description |
 |------|-------------|
-| `--list` | Print available sections (datasets or divisions) as CSV and exit. |
+| `--list` | Print available sections (datasets or divisions) as multi-line CSV with header and exit. |
 | `--dry-run` | Show what would be done without executing anything. |
 | `--help` | Show command help and exit. |
 
@@ -33,8 +33,16 @@ Downloads GenBank flat-file divisions declared in `[source.genbank]`.
 |--------|-------------|
 | `--division DIV` | Process a single GenBank division (e.g. `pln`, `bct`). |
 | `--status` | Show download status without downloading. |
-| `--list` | Print available divisions and exit. |
+| `--list` | Print available divisions as multi-line CSV and exit. |
 | `--dry-run` | Show what would be downloaded without executing. |
+
+`--list` output example:
+
+```
+division
+bct
+pln
+```
 
 ### `download ncbi`
 
@@ -51,8 +59,16 @@ sections.
 | `--assembly-version VERSION` | Filter by assembly version (e.g. `latest`). |
 | `--reference` | Filter to reference assemblies only. |
 | `--status` | Show download status without downloading. |
-| `--list` | Print available datasets and exit. |
+| `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be downloaded without executing. |
+
+`--list` output example:
+
+```
+dataset
+human
+plants
+```
 
 ---
 
@@ -98,8 +114,18 @@ Output: `processed_data/decontamination/{dataset}/parts/`
 | Option | Description |
 |--------|-------------|
 | `--dataset NAME` | Process a single decontamination dataset (e.g. `human`, `fungi`). |
-| `--list` | Print available datasets and exit. |
+| `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be processed without executing. |
+
+`--list` output example:
+
+```
+dataset
+human
+fungi
+bacteria
+plants
+```
 
 ### `decontam count`
 
@@ -118,7 +144,7 @@ Output: `processed_data/decontamination/{dataset}/kmercount/`
 | Option | Description |
 |--------|-------------|
 | `--dataset NAME` | Process a single decontamination dataset. |
-| `--list` | Print available datasets and exit. |
+| `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be processed without executing. |
 
 ### `decontam index`
@@ -185,7 +211,7 @@ dataset is written to `processed_data/decontamination/{dataset}/kmindex/`.
 | Option | Description |
 |--------|-------------|
 | `--dataset NAME` | Process a single decontamination dataset. |
-| `--list` | Print available datasets and exit. |
+| `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be processed without executing. |
 
 ### `decontam clean`
@@ -223,7 +249,7 @@ skimindex decontam clean --dataset species_15x --species Betula_nana --individua
 | `--dataset NAME` | Process a single genomes/genome_skims dataset. |
 | `--species NAME` | Restrict to a single species (as listed by `--list`). |
 | `--individual NAME` | Restrict to a single individual (requires `--species`). |
-| `--list` | Print available dataset/species/individual combinations as CSV and exit. |
+| `--list` | Print available dataset/species/individual combinations as multi-line CSV and exit. |
 | `--dry-run` | Show what would be processed without executing. |
 
 The `--list` output is a multi-column CSV:

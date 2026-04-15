@@ -366,9 +366,9 @@ def process_sra_dataset(
 
 
 def list_datasets() -> str:
-    """List SRA dataset names as CSV from config."""
+    """List SRA dataset names as multi-line CSV from config."""
     names = datasets_for_source("sra")
-    return ",".join(names) if names else ""
+    return "\n".join(["dataset"] + list(names))
 
 
 def process_sra(

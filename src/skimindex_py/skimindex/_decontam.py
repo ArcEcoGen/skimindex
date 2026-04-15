@@ -18,7 +18,8 @@ from skimindex.cli import SkimCommand
 
 def _list_sections() -> str:
     from skimindex.datasets import datasets_for_role
-    return ",".join(ds.name for ds in datasets_for_role("decontamination"))
+    names = [ds.name for ds in datasets_for_role("decontamination")]
+    return "\n".join(["dataset"] + names)
 
 
 def _run_pipeline(processing_name: str, sections: list[str] | None, dry_run: bool, dataset_level: bool = False) -> int:
