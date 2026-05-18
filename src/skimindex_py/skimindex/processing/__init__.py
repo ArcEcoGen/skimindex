@@ -228,6 +228,7 @@ from skimindex.processing.compress import compress               # noqa: F401, E
 from skimindex.processing.uncompress import uncompress           # noqa: F401, E402
 from skimindex.processing.buildindex import buildindex           # noqa: F401, E402
 from skimindex.processing.decontam_clean import decontam_clean  # noqa: F401, E402
+from skimindex.processing.lowmask import lowmask                # noqa: F401, E402
 
 __all__ = [
     "OutputKind", "ProcessingType",
@@ -244,6 +245,7 @@ __all__ = [
     "uncompress",
     "buildindex",
     "decontam_clean",
+    "lowmask",
 ]
 
 

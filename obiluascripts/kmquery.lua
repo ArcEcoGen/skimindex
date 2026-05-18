@@ -93,6 +93,12 @@ else
     LIBRARIES = split_csv(NOT_OK_STR)
 end
 
+local function probe_server(url)
+    local p    = json.encode({ index = LIBRARIES, id = { "probe" }, seq = { "A" }, z = 0, format = "json", r = 0.0 })
+    local resp, err = http.post(url, p, 500)
+    return resp and not err
+end
+
 local function start_server()
     local index_dir = os.getenv("KMINDEX_INDEX_DIR") or "/indexes/decontamination"
     local log_dir   = os.getenv("KMINDEX_LOG_DIR") or "/log"
@@ -100,26 +106,28 @@ local function start_server()
     local _nproc    = (_h:read("*n") or 1) * 2
     _h:close()
     local threads = tonumber(os.getenv("KMINDEX_THREADS")) or _nproc
+    local port    = SERVER_PORT
     local cmd     = string.format(
-        "%s -i %s -d %s --threads %s > /dev/null 2>&1 &",
-        SERVER_PATH, index_dir, log_dir, threads
+        "%s -i %s -d %s --threads %s --port %d > /dev/null 2>&1 &",
+        SERVER_PATH, index_dir, log_dir, threads, port
     )
     os.execute(cmd)
 
     -- Poll until the server responds (max 30s, 500ms timeout per probe)
-    local probe = json.encode({ index = LIBRARIES, id = { "probe" }, seq = { "A" }, z = 0, format = "json", r = 0.0 })
     for _ = 1, 300 do
-        local resp, err = http.post(URL, probe, 500)
-        if resp and not err then
-            return
-        end
+        if probe_server(URL) then return end
         os.execute("sleep 0.1")
     end
-    error("kmindex-server did not become ready within 30 seconds")
+    error(string.format("kmindex-server did not become ready within 30 seconds (port %d)", port))
 end
 
 local function stop_server()
-    os.execute("pkill -f 'kmindex-server'")
+    os.execute("pkill -f 'kmindex-server' 2>/dev/null")
+    for _ = 1, 100 do
+        if not probe_server(URL) then return end
+        os.execute("sleep 0.1")
+    end
+    io.stderr:write(string.format("[kmquery] WARNING: kmindex-server still responding after 10s — port will be incremented on next run\n"))
 end
 
 local RETRY_MAX    = tonumber(os.getenv("KMINDEX_RETRY_MAX")) or 3

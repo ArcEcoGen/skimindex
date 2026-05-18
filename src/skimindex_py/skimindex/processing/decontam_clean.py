@@ -10,16 +10,77 @@ Output kind: DIRECTORY.
   {output_dir}/{sample}_discarded.fasta.gz — sequences that fail (contaminated)
 """
 
+import json as _json
+import multiprocessing
 import os
+import socket
+import subprocess
 import tempfile
+import time
+import urllib.request
 from collections.abc import Callable
+from contextlib import contextmanager
 from pathlib import Path
 
 from skimindex.processing import OutputKind, processing_type
 from skimindex.processing.data import Data, directory_data
 from skimindex.unix.obitools import obigrep, obiscript
 
-KMQUERY_LUA = "/app/obiluascripts/kmquery.lua"
+KMQUERY_LUA    = "/app/obiluascripts/kmquery.lua"
+KMINDEX_SERVER = os.environ.get("KMINDEX_SERVER", "kmindex-server")
+KMINDEX_HOST   = os.environ.get("KMINDEX_HOST", "127.0.0.1")
+
+
+def _find_free_port(start: int = 8080) -> int:
+    for port in range(start, start + 1000):
+        with socket.socket() as s:
+            try:
+                s.bind(("", port))
+                return port
+            except OSError:
+                continue
+    raise RuntimeError(f"No free port found in range {start}–{start + 999}")
+
+
+def _probe_server(host: str, port: int) -> bool:
+    url   = f"http://{host}:{port}/kmindex/query"
+    probe = _json.dumps({"index": [], "id": ["probe"], "seq": ["A"], "z": 0, "format": "json", "r": 0.0}).encode()
+    try:
+        req = urllib.request.Request(url, data=probe, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=0.5)
+        return True
+    except Exception:
+        return False
+
+
+@contextmanager
+def _kmindex_server_ctx():
+    index_dir = os.environ.get("KMINDEX_INDEX_DIR", "/indexes/decontamination")
+    log_dir   = os.environ.get("KMINDEX_LOG_DIR", "/log")
+    threads   = int(os.environ.get("KMINDEX_THREADS", multiprocessing.cpu_count() * 2))
+    port      = _find_free_port()
+
+    proc = subprocess.Popen(
+        [KMINDEX_SERVER, "-i", index_dir, "-d", log_dir, "--threads", str(threads), "--port", str(port)],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    try:
+        for _ in range(300):
+            if proc.poll() is not None:
+                raise RuntimeError(f"kmindex-server crashed on startup (exit {proc.returncode}, port {port})")
+            if _probe_server(KMINDEX_HOST, port):
+                break
+            time.sleep(0.1)
+        else:
+            proc.terminate()
+            raise RuntimeError(f"kmindex-server did not become ready within 30 seconds (port {port})")
+        yield port
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 _STEM_SUFFIXES = (
     "_1.fastq.gz", "_2.fastq.gz",
@@ -117,54 +178,45 @@ def decontam_clean(params: dict) -> Callable[[Data, Path, bool], Data]:
             return directory_data(output_dir, subdir=input_data.subdir,
                                   per_species=input_data.per_species)
 
-        # Set env vars for kmquery.lua, restore on exit
-        _saved: dict[str, str | None] = {}
-        for var, val in [("KMINDEX_CONTAM_NOT_OK_LIBS", not_ok),
-                         ("KMINDEX_CONTAM_OK_LIBS",     ok)]:
-            if val:
-                _saved[var] = os.environ.get(var)
-                os.environ[var] = val
+        with _kmindex_server_ctx() as port:
+                from plumbum import local as _local
+                env_kwargs: dict[str, str] = {"KMINDEX_MANAGE_SERVER": "false", "KMINDEX_PORT": str(port)}
+                if not_ok:
+                    env_kwargs["KMINDEX_CONTAM_NOT_OK_LIBS"] = not_ok
+                if ok:
+                    env_kwargs["KMINDEX_CONTAM_OK_LIBS"] = ok
+                with _local.env(**env_kwargs), tempfile.TemporaryDirectory() as tmpdir:
+                    tmp_r1 = Path(tmpdir) / f"{sample}_R1_annotated.fasta.gz"
+                    tmp_r2 = (Path(tmpdir) / f"{sample}_R2_annotated.fasta.gz") if paired else None
 
-        try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                tmp_r1 = Path(tmpdir) / f"{sample}_R1_annotated.fasta.gz"
-                tmp_r2 = (Path(tmpdir) / f"{sample}_R2_annotated.fasta.gz") if paired else None
-
-                loginfo("Annotating R1...")
-                (obiscript(KMQUERY_LUA, "--fasta-output", "-Z",
-                           "--batch-size-max", str(batch_size),
-                           str(r1)) > str(tmp_r1))()
-
-                if paired:
-                    loginfo("Annotating R2...")
+                    loginfo("Annotating R1...")
                     (obiscript(KMQUERY_LUA, "--fasta-output", "-Z",
                                "--batch-size-max", str(batch_size),
-                               str(r2)) > str(tmp_r2))()
+                               str(r1)) > str(tmp_r1))()
 
-                loginfo("Filtering contaminated reads...")
-                filter_expr = (
-                    f"annotations.contamination && "
-                    f"annotations.kmindex_score >= {min_score}"
-                )
-                grep_args = [
-                    "-p", filter_expr,
-                    "-Z",
-                    "--fasta-output",
-                    "--save-discarded", str(good_out),
-                    "--out", str(discarded_out),
-                ]
-                if paired:
-                    grep_args += ["--paired-with", str(tmp_r2), "--paired-mode", "or"]
-                grep_args.append(str(tmp_r1))
+                    if paired:
+                        loginfo("Annotating R2...")
+                        (obiscript(KMQUERY_LUA, "--fasta-output", "-Z",
+                                   "--batch-size-max", str(batch_size),
+                                   str(r2)) > str(tmp_r2))()
 
-                obigrep(*grep_args)()
+                    loginfo("Filtering contaminated reads...")
+                    filter_expr = (
+                        f"annotations.contamination && "
+                        f"annotations.kmindex_score >= {min_score}"
+                    )
+                    grep_args = [
+                        "-p", filter_expr,
+                        "-Z",
+                        "--fasta-output",
+                        "--save-discarded", str(good_out),
+                        "--out", str(discarded_out),
+                    ]
+                    if paired:
+                        grep_args += ["--paired-with", str(tmp_r2), "--paired-mode", "or"]
+                    grep_args.append(str(tmp_r1))
 
-        finally:
-            for var, old in _saved.items():
-                if old is None:
-                    os.environ.pop(var, None)
-                else:
-                    os.environ[var] = old
+                    obigrep(*grep_args)()
 
         loginfo(f"Clean reads    : {good_out}")
         loginfo(f"Discarded reads: {discarded_out}")
