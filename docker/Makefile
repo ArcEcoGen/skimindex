@@ -29,7 +29,7 @@ GO_VERSION        := latest
 # Tool versions installed inside the image
 # =============================================================================
 
-OBITOOLS_VERSION  := 4.4.41
+OBITOOLS_VERSION  := 4.4.42
 OBITOOLS_GITHUB_REPO := metabarcoding/obitools4
 
 NCBI_DATASETS_VERSION  := v18.23.0

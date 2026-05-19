@@ -22,6 +22,7 @@
 #   shell                    Start an interactive shell inside the container.
 #   decontam                 Prepare decontamination filter data.
 #   download                 Download GenBank and reference genome data.
+#   genomes                  Manage genome datasets.
 #   validate                 Validate the skimindex configuration file.
 #
 # shell options:
@@ -698,6 +699,9 @@ case "$SUBCMD" in
         ;;
     download)
         _ski_run_exec download "$@"
+        ;;
+    genomes)
+        _ski_run_exec genomes "$@"
         ;;
     validate)
         _ski_run_exec validate "$@"

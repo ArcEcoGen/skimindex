@@ -139,10 +139,13 @@ threads   = 10
 verbose   = "debug"
 
 # Composite: prepare genome reads after decontamination.
-# Optionally filters low-complexity sequences, then distributes into parts/.
+# Step 1: split on non-ACGT characters (eliminates N/ambiguity runs).
+# Step 2: filter low-complexity sequences with obik lowmask (optional — comment out to skip).
+# Step 3: distribute into parts/ for parallel k-mer counting.
 [processing.prepare_genomes]
 output = "parts@genomes"
 steps = [
+  {type = "cleanacgt"},
   {type = "lowmask", kmer_size = 15, entropy_size = 15, threshold = 0.7},
   {type = "distribute", batches = 24},
 ]
