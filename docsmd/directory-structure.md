@@ -221,8 +221,16 @@ scratch/
 
 Stores all pipeline outputs. Layout depends on whether the data section is
 species-organised (`by_species`). The `{processing.directory}` level names
-the processing step (e.g. `split`, `kmercount`).
+the processing step (e.g. `parts`, `cleaned`, `kmercount`).
 Mounted read-write at `${SKIMINDEX_ROOT}/processed_data/`.
+
+For the genomes pipeline, a typical individual produces:
+
+```
+processed_data/genomes/{data.directory}/{Species}/{individual}/
+    cleaned/       — decontaminated reads (genomes clean)
+    parts/         — ACGT-cleaned, low-complexity-filtered fragments (genomes prepare)
+```
 
 **Species-organised** (`by_species = true`):
 

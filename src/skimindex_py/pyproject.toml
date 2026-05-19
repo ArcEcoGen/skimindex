@@ -29,4 +29,5 @@ testpaths = ["tests"]
 [project.scripts]
 download  = "skimindex._download:main"
 decontam  = "skimindex._decontam:main"
+genomes   = "skimindex._genomes:main"
 validate  = "skimindex._validate:main"

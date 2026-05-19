@@ -24,8 +24,8 @@
 # skimindex.sh.  Inside the container the path is always /<k>.
 [local_directories]
 genbank        = "genbank"
-indexes        = "/hoyt/PROJECTS/pr-phyloalps/coissac/G15x/indexes"
-#indexes        = "indexes"
+#indexes        = "/hoyt/PROJECTS/pr-phyloalps/coissac/G15x/indexes"
+indexes        = "indexes"
 raw_data       = "raw_data"
 processed_data = "processed_data"
 sra            = "sra"            # raw sequencing reads from NCBI SRA
@@ -97,6 +97,7 @@ run       = "prepare_decontam" # references [processing.prepare_decontam]
 [role.genomes]
 directory = "genomes"
 kmer_size = 31
+run       = "prepare_genomes"
 
 # Parameters for the low-coverage skim-sequenced genomes role.
 [role.genome_skims]
@@ -136,6 +137,18 @@ zvalue    = 3      # k-mers required for a positive query result
 fpr       = 1e-3   # target false positive rate
 threads   = 10
 verbose   = "debug"
+
+# Composite: prepare genome reads after decontamination.
+# Step 1: split on non-ACGT characters (eliminates N/ambiguity runs).
+# Step 2: filter low-complexity sequences with obik lowmask (optional — comment out to skip).
+# Step 3: distribute into parts/ for parallel k-mer counting.
+[processing.prepare_genomes]
+output = "parts@genomes"
+steps = [
+  {type = "cleanacgt"},
+  {type = "lowmask", kmer_size = 15, entropy_size = 15, threshold = 0.7},
+  {type = "distribute", batches = 24},
+]
 
 # Atomic: decontaminate complete reference genomes (FASTA, single-end).
 [processing.clean_genomes]

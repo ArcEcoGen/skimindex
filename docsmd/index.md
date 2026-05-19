@@ -27,7 +27,7 @@ Results produced by the pipeline should not be considered correct or reliable at
   OBITools4, kmindex, ntCard, SRA Toolkit, NCBI Datasets CLI, IBM Aspera,
   with versions, binary locations, and bibliographic references
 
-- [Pipeline Commands](commands.md) — reference for `download`, `decontam`, and `validate` subcommands — `skimindex.sh` usage, global options, built-in
+- [Pipeline Commands](commands.md) — reference for `download`, `decontam`, `genomes`, and `validate` subcommands — `skimindex.sh` usage, global options, built-in
   subcommands, container runtime detection, and bind-mount mechanism — how processing sections work: atomic vs
   composite, Data abstraction, input chaining, output resolution
 
@@ -52,6 +52,6 @@ Raw data                 Processed data              Indexes
                                      *.fasta.gz
 ```
 
-Sources: `ncbi`, `genbank`, `internal`
+Sources: `ncbi`, `genbank`, `internal`, `sra`
 Roles: `decontamination`, `genomes`, `genome_skims`
-Processing steps: `split`, `kmercount`, `buildindex`
+Processing steps: `split`, `filter_n_only`, `distribute`, `cleanacgt`, `lowmask`, `kmercount`, `buildindex`, `decontam_clean`

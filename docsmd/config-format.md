@@ -248,12 +248,13 @@ Parameters for the complete reference genomes role.
 |------------|---------|----------------------------------------------------------------------|
 | `directory`| string  | Subdirectory name within processed data tree                         |
 | `kmer_size`| integer | K-mer size used when indexing genomes                                |
-| `run`      | string  | Name of a `[processing.X]` section to execute (optional)            |
+| `run`      | string  | Name of a `[processing.X]` section to execute (must have `output`)  |
 
 ```toml
 [role.genomes]
 directory = "genomes"
 kmer_size = 31
+run       = "prepare_genomes"
 ```
 
 ### `[role.genome_skims]`
@@ -290,6 +291,8 @@ Both the output location and any named input parameters are expressed as
 | `"kmercount@decontamination"` | `processed_data/decontamination/…/kmercount/` |
 | `"kmindex@decontamination"` | `processed_data/decontamination/…/kmindex/` (stamp target + FOF) |
 | `"@idx:decontamination"` | `indexes/decontamination/` (global meta-index, no dataset subpath) |
+| `"cleaned@genomes"` | `processed_data/genomes/…/cleaned/` |
+| `"parts@genomes"` | `processed_data/genomes/…/parts/` |
 
 The `…` component is the dataset-specific subpath supplied automatically at runtime.
 
@@ -331,6 +334,39 @@ steps = [
   {type = "distribute",    batches = 20},
 ]
 ```
+
+### `type = "cleanacgt"` — Split sequences into pure-ACGT segments
+
+Runs `cleanacgt.lua` via `obiscript`. For each input sequence, finds all
+contiguous `[ACGTacgt]+` runs and emits each as a separate sequence. Non-ACGT
+characters (N, IUPAC ambiguity codes, gaps, …) act as split points.
+
+No parameters. Output kind: STREAM.
+
+```toml
+{type = "cleanacgt"}
+```
+
+---
+
+### `type = "lowmask"` — Filter low-complexity sequences
+
+Runs `obik lowmask --extract-high` to keep only high-complexity regions.
+Output kind: STREAM.
+
+| Parameter     | Type    | Required | Description |
+|---------------|---------|----------|-------------|
+| `kmer_size`   | integer | no       | K-mer size for complexity estimation (default: 15) |
+| `entropy_size`| integer | no       | Entropy window size (default: 15) |
+| `threshold`   | float   | no       | Minimum entropy threshold 0–1 (default: 0.7) |
+
+```toml
+{type = "lowmask", kmer_size = 15, entropy_size = 15, threshold = 0.7}
+```
+
+To disable the filter, remove or comment out this step from `[processing.prepare_genomes]`.
+
+---
 
 ### `type = "decontam_clean"` — Decontaminate genome or skim sequences
 
@@ -571,6 +607,36 @@ accessions = ["ERR7254753"]
 biosamples = ["SAMEA10885714"]
 threads    = 4
 ```
+
+### Processing sections (genomes pipeline)
+
+```toml
+# Composite: prepare genome reads after decontamination
+# Step 2 (lowmask) is optional — comment out to skip low-complexity filtering
+[processing.prepare_genomes]
+output = "parts@genomes"
+steps = [
+  {type = "cleanacgt"},
+  {type = "lowmask", kmer_size = 15, entropy_size = 15, threshold = 0.7},
+  {type = "distribute", batches = 24},
+]
+
+# Atomic: decontaminate complete reference genomes (FASTA, single-end or paired-end)
+[processing.clean_genomes]
+type       = "decontam_clean"
+output     = "cleaned@genomes"
+batch_size = 50
+min_score  = 0.03
+
+# Atomic: decontaminate genome skim reads (FASTQ, paired-end)
+[processing.clean_genome_skims]
+type       = "decontam_clean"
+output     = "cleaned@genome_skims"
+batch_size = 50
+min_score  = 0.03
+```
+
+---
 
 ### Future data sections (not yet active)
 
