@@ -87,7 +87,6 @@ skimindex decontam                        # run full pipeline (prepare + count +
 skimindex decontam prepare [options]      # step 1 — fragment reference sequences
 skimindex decontam count   [options]      # step 2 — count k-mers (ntcard)
 skimindex decontam index   [options]      # step 3 — build kmindex sub-indexes
-skimindex decontam clean   [options]      # step 4 — decontaminate genome/skim datasets
 ```
 
 Each step is stamped independently. Re-running `decontam` skips any dataset
@@ -214,20 +213,35 @@ dataset is written to `processed_data/decontamination/{dataset}/kmindex/`.
 | `--list` | Print available datasets as multi-line CSV and exit. |
 | `--dry-run` | Show what would be processed without executing. |
 
-### `decontam clean`
+---
+
+## `genomes` — Manage genome datasets
+
+Processes datasets declared with `role = "genomes"` or `role = "genome_skims"`.
+Two subcommands handle the two stages of the genome preparation pipeline:
+
+```
+skimindex genomes clean   [options]   # decontaminate raw reads
+skimindex genomes prepare [options]   # ACGT-clean → low-complexity filter → distribute
+```
+
+### `genomes clean`
 
 Decontaminates genome and genome-skim datasets against the contamination k-mer
-index built by the three steps above. Operates on all datasets with
+index built by `decontam`. Operates on all datasets with
 `role = "genomes"` or `role = "genome_skims"`.
 
 For each individual, the pipeline:
 
-1. Annotates each read file with `kmquery.lua` via `obiscript`, outputting
-   compressed FASTA with `kmindex_score` and `contamination` annotations.
-2. Filters with `obigrep` using the predicate
+1. Starts a single `kmindex-server` instance on a free port in the 8000 range.
+2. Annotates each read file (R1, then R2 if paired) with `kmquery.lua` via
+   `obiscript`, outputting compressed FASTA with `kmindex_score` and
+   `contamination` annotations.
+3. Filters with `obigrep` using the predicate
    `annotations.contamination && annotations.kmindex_score >= min_score`.
    Paired-end reads are filtered with `--paired-mode or` (a pair is discarded
    when **either** read is contaminated).
+4. Stops the server.
 
 Output per individual (always gzip-compressed FASTA):
 
@@ -238,10 +252,10 @@ processed_data/{role_dir}/{dataset}/{species}/{individual}/cleaned/
 ```
 
 ```
-skimindex decontam clean                             # clean all datasets
-skimindex decontam clean --dataset species_15x       # one dataset
-skimindex decontam clean --dataset species_15x --species Betula_nana
-skimindex decontam clean --dataset species_15x --species Betula_nana --individual IGA-24-34
+skimindex genomes clean                              # clean all datasets
+skimindex genomes clean --dataset species_15x        # one dataset
+skimindex genomes clean --dataset species_15x --species Betula_nana
+skimindex genomes clean --dataset species_15x --species Betula_nana --individual IGA-24-34
 ```
 
 | Option | Description |
@@ -261,6 +275,42 @@ species_15x,Betula_nana,IGA-24-34
 vaccinium_skims,Vaccinium_myrtillus,SAMEA9098823
 …
 ```
+
+### `genomes prepare`
+
+Prepares cleaned genome reads for k-mer indexing. Reads from the `cleaned/`
+output of `genomes clean` and applies three steps in sequence
+(configured in `[processing.prepare_genomes]`):
+
+1. **cleanacgt** — splits sequences on non-ACGT characters (N, IUPAC ambiguity
+   codes, gaps). Each contiguous `[ACGTacgt]+` run becomes a separate sequence.
+2. **lowmask** *(optional — comment out in config to skip)* — filters
+   low-complexity sequences using `obik lowmask --extract-high`, keeping only
+   high-complexity regions. Parameters: `kmer_size` (default 15),
+   `entropy_size` (default 15), `threshold` (default 0.7).
+3. **distribute** — partitions the result into `batches` FASTA files
+   (default 24) to allow parallel k-mer counting downstream.
+
+Output:
+
+```
+processed_data/genomes/{dataset}/{species}/{individual}/parts/
+    frg_0.fasta.gz … frg_23.fasta.gz
+```
+
+```
+skimindex genomes prepare                              # prepare all datasets
+skimindex genomes prepare --dataset species_15x        # one dataset
+skimindex genomes prepare --dataset species_15x --species Betula_nana
+```
+
+| Option | Description |
+|--------|-------------|
+| `--dataset NAME` | Process a single genomes/genome_skims dataset. |
+| `--species NAME` | Restrict to a single species. |
+| `--individual NAME` | Restrict to a single individual (requires `--species`). |
+| `--list` | Print available dataset/species/individual combinations and exit. |
+| `--dry-run` | Show what would be processed without executing. |
 
 ---
 

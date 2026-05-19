@@ -238,7 +238,7 @@ dataset.to_index_data()
 
 ---
 
-## Decontamination cleaning pipeline
+## Genome cleaning pipeline (`genomes clean`)
 
 The cleaning pipeline decontaminates genome and genome-skim reads against the
 contamination k-mer index. It operates on all datasets with
@@ -248,13 +248,20 @@ contamination k-mer index. It operates on all datasets with
 
 ```
 dataset.to_data()   (one Data per individual — FILES with 1 or 2 paths)
+    → kmindex-server started on a free port (8000–8999)
     → obiscript kmquery.lua --fasta-output -Z   → tmp/{sample}_R1_annotated.fasta.gz
     → obiscript kmquery.lua --fasta-output -Z   → tmp/{sample}_R2_annotated.fasta.gz  (paired only)
     → obigrep -p "annotations.contamination && annotations.kmindex_score >= min_score"
               -Z --fasta-output
               --save-discarded {sample}_good.fasta.gz
               --out             {sample}_discarded.fasta.gz
+    → kmindex-server stopped
 ```
+
+A single `kmindex-server` instance is started by Python before processing R1,
+and reused for R2. The port is chosen dynamically (`socket.bind` on a free port
+in the 8000–8999 range) and passed to `kmquery.lua` via `KMINDEX_PORT` and
+`KMINDEX_MANAGE_SERVER=false`.
 
 The contaminating and counter-example library names (`not_ok_libs`, `ok_libs`)
 are auto-derived from `role = "decontamination"` datasets: `example = true` →
@@ -264,19 +271,63 @@ section parameters or the environment variables `KMINDEX_CONTAM_NOT_OK_LIBS` /
 
 ### Per-individual targeting
 
-Because decontaminating one individual can take ~12 hours, `decontam clean`
+Because decontaminating one individual can take ~12 hours, `genomes clean`
 supports per-individual targeting:
 
 ```bash
 # List all available dataset/species/individual combinations
-skimindex decontam clean --list
+skimindex genomes clean --list
 
 # Clean one species across all individuals
-skimindex decontam clean --dataset species_15x --species Betula_nana
+skimindex genomes clean --dataset species_15x --species Betula_nana
 
 # Clean a single individual
-skimindex decontam clean --dataset species_15x --species Betula_nana --individual IGA-24-34
+skimindex genomes clean --dataset species_15x --species Betula_nana --individual IGA-24-34
 ```
+
+---
+
+## Genome preparation pipeline (`genomes prepare`)
+
+Prepares cleaned genome reads for k-mer indexing. Reads from
+`processed_data/genomes/{dataset}/{subdir}/cleaned/` (output of `genomes clean`)
+and applies three steps configured in `[processing.prepare_genomes]`.
+
+### Pipeline steps
+
+```
+directory_data(cleaned@genomes)
+    → cleanacgt      — split on non-ACGT chars → contiguous [ACGTacgt]+ segments
+    → lowmask        — obik lowmask --extract-high (optional, comment out to skip)
+    → distribute     — obidistribute → parts/frg_0.fasta.gz … frg_N.fasta.gz
+```
+
+**Step 1 — cleanacgt**
+
+Runs `cleanacgt.lua` via `obiscript`. For each input sequence, finds all
+contiguous `[ACGTacgt]+` runs and emits each as a separate output sequence.
+Non-ACGT characters (N, IUPAC ambiguity codes, gaps) act as split points.
+No parameters.
+
+**Step 2 — lowmask** *(optional)*
+
+Runs `obik lowmask --extract-high` to remove low-complexity regions.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `kmer_size` | 15 | K-mer size for complexity estimation |
+| `entropy_size` | 15 | Entropy window size |
+| `threshold` | 0.7 | Minimum entropy threshold (0–1) |
+
+To disable, remove or comment out the `{type = "lowmask", …}` line in
+`[processing.prepare_genomes]`.
+
+**Step 3 — distribute**
+
+Partitions the result into `batches` FASTA files (default 24) for parallel
+k-mer counting downstream.
+
+Output: `processed_data/genomes/{dataset}/{subdir}/parts/`
 
 ---
 
